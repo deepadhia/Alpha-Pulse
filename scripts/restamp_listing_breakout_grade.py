@@ -51,7 +51,7 @@ def is_listing_misgraded(doc: dict) -> bool:
 
     if grade in MISPLACED_WINNER_GRADES:
         return True
-    if doc.get("strategy_version") == LISTING_STRATEGY:
+    if doc.get("strategy_version") == LISTING_STRATEGY or str(doc.get("strategy_version", "")).endswith("-listing-day"):
         return True
     if doc.get("is_reentry") is True:
         return True

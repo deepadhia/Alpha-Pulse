@@ -3001,9 +3001,9 @@ def detect_live_patterns(symbols, listing_map):
                     "status": "PAPER_ONLY",
                     "next_day_open": None,
                     "version": SCANNER_VERSION,
-                    "strategy_version": "3.3.0-consolidation",
-                    "execution_version": "3.3.0-single-writer",
-                    "risk_model_version": "3.3.0-archetype-velocity",
+                    "strategy_version": f"{SCANNER_VERSION}-consolidation",
+                    "execution_version": f"{SCANNER_VERSION}-single-writer",
+                    "risk_model_version": f"{SCANNER_VERSION}-archetype-velocity",
                     # Shadow SL tracking fields
                     "shadow_sl_8pct": round(entry * 0.92, 2),
                     "shadow_sl_10pct": round(entry * 0.90, 2),
@@ -3561,10 +3561,10 @@ def detect_scan(symbols, listing_map):
                     "winner_flags": winner_info["winner_flags"],
                     "position_size_weight": size_mult,
                     "version": SCANNER_VERSION, "scanner": "consolidation_scan",
-                    "strategy_version": SCANNER_VERSION,
+                    "strategy_version": f"{SCANNER_VERSION}-consolidation",
                     "exit_version": SCANNER_VERSION,
-                    "execution_version": "3.3.0-single-writer",
-                    "risk_model_version": "3.3.0-archetype-velocity"
+                    "execution_version": f"{SCANNER_VERSION}-single-writer",
+                    "risk_model_version": f"{SCANNER_VERSION}-archetype-velocity"
                 }
                 
                 pos = {
@@ -3577,10 +3577,10 @@ def detect_scan(symbols, listing_map):
                     "position_size_weight": size_mult,
                     "market_regime": _mr,
                     "version": SCANNER_VERSION,
-                    "strategy_version": SCANNER_VERSION,
+                    "strategy_version": f"{SCANNER_VERSION}-consolidation",
                     "exit_version": SCANNER_VERSION,
-                    "execution_version": "3.3.0-single-writer",
-                    "risk_model_version": "3.3.0-archetype-velocity",
+                    "execution_version": f"{SCANNER_VERSION}-single-writer",
+                    "risk_model_version": f"{SCANNER_VERSION}-archetype-velocity",
                     # Shadow SL tracking fields
                     "shadow_sl_8pct": round(entry * 0.92, 2),
                     "shadow_sl_10pct": round(entry * 0.90, 2),

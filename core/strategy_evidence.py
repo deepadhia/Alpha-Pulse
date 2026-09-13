@@ -188,6 +188,8 @@ def build_trade_evidence_doc(trade: dict, db=None, fetch_data_fn=None) -> dict:
         "signal_id": signal_id,
         "grade": grade,
         "engine_type": engine_type,
+        "version": trade.get("version") or "3.5.0",
+        "strategy_version": trade.get("strategy_version") or ("3.5.0-listing-day" if engine_type == "LISTING_DAY_BREAKOUT" else "3.5.0-consolidation"),
         "setup_dna": {
             "listing_vol": listing_vol,
             "volume_spike": vol_spike,

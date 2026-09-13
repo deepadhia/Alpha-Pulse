@@ -703,10 +703,10 @@ def save_breakout_signal(breakout_data):
             "status": position_status,
             "next_day_open": None,
             "version": SCANNER_VERSION,
-            "strategy_version": SCANNER_VERSION,
+            "strategy_version": f"{SCANNER_VERSION}-intraday",
             "exit_version": SCANNER_VERSION,
-            "execution_version": "3.3.0-single-writer",
-            "risk_model_version": "3.3.0-archetype-velocity",
+            "execution_version": f"{SCANNER_VERSION}-single-writer",
+            "risk_model_version": f"{SCANNER_VERSION}-archetype-velocity",
         }
         
         try:

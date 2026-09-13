@@ -43,6 +43,7 @@ db.logs.find({"action": "DAILY_SNAPSHOT", "details.position_version": "2.5.0"})
 
 | Date         | Version | Change                                                                                                                                                                                                                           |
 | ------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `2026-09-13` | `3.5.0` | **14-Day Velocity Loophole Closure & Forensic Evidence Store:** (1) **Unconditional 14-Day Speed Gate:** Enforced `days_held >= 14 and pnl <= 0.0` in `streamlined_ipo_scanner.py`, eliminating the >4% runup immunity loophole that trapped underwater trades for 30–40 days; (2) **Listing Day Forensics & Setup DNA Engine:** Upgraded `core/strategy_evidence.py` to extract granular setup DNA (volume surge, 10d base PRNG %, upper wick %, turnover) and classify qualitative archetypes across all clean cohort trades; (3) **System Self-Diagnostics Section 3:** Added dynamic empirical edge analysis for Listing Day Breakouts directly into `diagnose_trade.py --system`; (4) **Clean Cohort Quarantine:** Re-verified 100% clean-cohort isolation (`entry_date >= 2026-07-05`) in MongoDB `positions`/`signals`, safely quarantining pre-cutoff and contaminated test rows to archive collections. |
 | `2026-08-29` | `3.5.0` | **Price Action & Velocity Upgrade:** (1) **Upper 50% Candle Body Gate:** Breakout candle must close in upper 50% of range (`(CLOSE-LOW)/(HIGH-LOW) >= 0.50`), eliminating shooting star supply traps; (2) **14-Day Velocity Gate:** Tightened dead-money speed gate to 14 days with volume decay guard; (3) **Max 8% Extension Guard:** Blocks chasing overheated entries >8% above base pivot; (4) **Immediate Base Peak Re-Entry:** Re-triggers closed setups right at prior peak cross; (5) **Strategy Evidence Store:** Persistent trade proof in MongoDB (`strategy_evidence`) and safe archive separation (`positions_legacy_archive`). |
 | `2026-08-25` | `3.4.0` | **Grade restamp migration:** `scripts/restamp_listing_breakout_grade.py` sets open listing/re-entry `grade=LISTING_BREAKOUT` where winner_label was stored as grade (`STANDARD`/`POSSIBLE_WINNER`). |
 | `2026-08-25` | `3.4.0` | **Critical signal-book fixes:** (1) listing/re-entry positions now persist `grade=LISTING_BREAKOUT` so IPO exit/trail gates apply; (2) hourly never overwrites open IPO rows + respects soft cap; (3) listing `has_active_position` + soft/hard cap parity; (4) strict mode volume spike required for `BASE_BREAKOUT`; (5) hourly volume tied to breakout bar (no prior-bar borrow); (6) live consol enforces `MIN_LIVE_GRADE`. Docs aligned. |
@@ -63,12 +64,12 @@ db.logs.find({"action": "DAILY_SNAPSHOT", "details.position_version": "2.5.0"})
 
 Do **not** enable these on thin post-exit samples (~5 realized / ~22 dead-money / ~9 trail-winner paths). Prefer missed edge over a backfired rule.
 
-| Idea | Why deferred |
+| Idea | Status / Why deferred |
 |---|---|
-| Underwater dead-money (day 12 / −6%) | Can cut recoveries; needs full-history backtest + shadow |
-| Peak chandelier trail for runup ≥15% | n=9 trail winners; risk of larger givebacks |
-| Consol HQ → ACTIVE | Capital risk; keep force-paper OOS |
-| Retune 20d/21d dead-money | Already looks good; do not retune on thin data |
-| New Early Base Break logic | Legacy label; not in live exit code |
+| Underwater dead-money (day 12 / −6%) | Promoted to production on 2026-09-13 via 14-Day Velocity Speed Gate (`days_held >= 14 and pnl <= 0.0`) |
+| Peak chandelier trail for runup ≥15% | Deferred: n=9 trail winners; risk of larger givebacks |
+| Consol HQ → ACTIVE | Deferred: Capital risk; keep force-paper OOS |
+| Retune 20d/21d dead-money | Deferred: Already looks good; do not retune on thin data |
+| New Early Base Break logic | Deferred: Legacy label; not in live exit code |
 
 The next clean-cohort analysis run should use --start-date 2026-07-05 to isolate signals generated under these tightened parameters.

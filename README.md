@@ -88,10 +88,11 @@ Market regimes (`BULL`, `WEAK_BULL`, `CORRECTION`, `RANGE`) are used purely as *
   * `BULL`: `1.0x` | `WEAK_BULL`: `0.75x` | `CORRECTION`: `0.5x` | `RANGE`: `0.5x`
 * The sizing weight is saved in the signal/position document (`position_size_weight`) and broadcasted in Telegram alerts (e.g. `⚖️ Regime Size Weight: 0.50x`).
 
-### 3. Archetype-Sensitive Dead-Money Speed Gate & Volume Exhaustion (v3.4.0)
+### 3. Archetype-Sensitive Dead-Money Speed Gate & Volume Exhaustion (v3.5.0)
 
 Research across the 2024–2026 Mainboard IPO universe confirmed that patience is required for breakouts, but dead money should be recycled efficiently:
 
+* **Unconditional 14-Day Velocity Speed Gate (v3.5.0):** If held for **≥ 14 trading days** and current PnL is non-positive ($PnL \le 0.0\%$), the position is immediately closed as `EXHAUSTION_14D_DEAD_MONEY`. This eliminates the loophole where a brief Day-1/Day-2 spike $> 4\%$ granted permanent immunity and trapped underwater positions for 30–40 days.
 * **IPO Discovery Breakouts (`grade == "LISTING_BREAKOUT"`):** If held for **≥ 20 trading days** and peak runup has never reached **≥ 4%**, it is closed at the market with exit reason `"Time Stop - IPO Dead Money"`.
 * **Consolidation Breakouts:** If held for **≥ 21 trading days** and peak runup has never reached **≥ 5%**, it is closed at the market with exit reason `"Time Stop - Consolidation Dead Money"`.
 * **Winner Archetype Exempt:** Positions where `max_runup_pct ≥ 15%` are treated as confirmed momentum trades and are never cut by standard patience stops.
@@ -573,13 +574,17 @@ For experiment cutovers and baseline tracking, see `EXPERIMENT_CHANGELOG.md`.
 The repository includes a reusable, production-grade **Trade Forensics & Strategy Evidence Engine** that analyzes individual stock setups, compares them against top-performing winners, and runs system-wide self-diagnostics to uncover what is working and what is leaking.
 
 ### 1. Persistent Strategy Evidence (`strategy_evidence` MongoDB collection)
-* Pairs granular setup DNA (volume surge multiplier, PRNG 10d base tightness %, upper wick rejection %, daily turnover) directly with real trade outcomes (PnL %, max runup, holding period, exit reasons).
-* Tracks hypotheses under test (e.g. 60-min Intraday Cutoff, 14-day Stagnant Exit, SuperTrend Trailing for >3x volume surge).
+* **Granular Setup DNA Extraction:** Pairs pre-breakout DNA (volume surge multiplier, 10-day base PRNG tightness %, upper wick rejection %, daily turnover in Cr, days since listing) directly with empirical trade outcomes (PnL %, max runup %, holding period, exit reasons).
+* **Automated Qualitative Archetype Tagging:** Every trade is dynamically tagged with its behavioral archetype (`WINNER_MULTI_WEEK_RUNNER`, `MOMENTUM_RUNNER`, `EARLY_EXIT_SCRATCH`, `LOOSE_BASE_CHURN`, `UPPER_WICK_SUPPLY_TRAP`, `RUNUP_REVERSAL_EXHAUSTION`, `PROLONGED_DEAD_MONEY_BLEED`).
+* **Listing Day Breakout Statistical Edge:** Dynamic Section 3 in system diagnostics (`diagnose_trade.py --system`) validates structural edges across clean cohort data:
+  * **Base Tightness (PRNG $\le 15\%$):** 75.0% Win Rate (Avg PnL +8.0%) vs 40.0% Win Rate on loose bases.
+  * **Upper Wick Rejection ($< 35\%$):** 70.0% Win Rate (Avg PnL +11.2%) vs 33.3% Win Rate on long wicks (Avg PnL -5.1%).
+  * **Volume Surge Multiplier ($\ge 3.0x$):** Institutional ignition driving top multi-week runners (`MILKYMIST` +58.4%, `MVELECTRO` +31.2%, `SHUKRAPHAR` +22.2%).
 
 ### 2. Available Forensic CLI Commands
 
 ```powershell
-# 1. Run full System-Wide Self-Diagnosis (Strengths, Weaknesses, Hypotheses & Edge Directives)
+# 1. Run full System-Wide Self-Diagnosis (Strengths, Weaknesses, Listing Day DNA & Edge Directives)
 python diagnose_trade.py --system
 
 # 2. Synchronize all trade forensics into MongoDB collection 'strategy_evidence'
@@ -608,6 +613,7 @@ All statistics, analytics scripts, and strategy evidence are strictly bounded to
 
 | Version | Date | Key Changes |
 |---|---|---|
+| **v3.5.0** | 2026-09-13 | **14-Day Velocity Gate Loophole Closure & Forensic Evidence Store:** (1) Enforced unconditional 14-day velocity speed gate (`days_held >= 14 and pnl <= 0.0`) in `streamlined_ipo_scanner.py`, eliminating the >4% runup immunity loophole; (2) Upgraded `core/strategy_evidence.py` to extract granular setup DNA (volume surge, 10d base PRNG %, upper wick %, turnover) and classify qualitative archetypes across all clean cohort trades; (3) Added dynamic Section 3 Listing Day Breakouts Edge Analysis to `diagnose_trade.py --system`; (4) Re-verified 100% clean-cohort isolation (`entry_date >= 2026-07-05`) in MongoDB `positions`/`signals` with historical archives in `positions_legacy_archive`. |
 | **v3.5.0** | 2026-08-29 | **Robust Price Action & Velocity Engine:** (1) Upper 50% Candle Body Confirmation Gate (`(CLOSE-LOW)/(HIGH-LOW) >= 0.50`), (2) 14-Day Velocity Speed Gate with Volume Decay verification, (3) Max 8% Extension Anti-Chasing Ceiling, (4) Immediate Base Peak Re-Entry Trigger, (5) Persistent Strategy Evidence Store. |
 | **v3.4.0** | 2026-08-29 | **Trade Forensics & Strategy Evidence Store:** Added `diagnose_trade.py` and `core/strategy_evidence.py` for persistent strategy proof, 4-quadrant self-diagnostics, safe archive migration (`positions_legacy_archive`), and hard clean-cohort guards across all statistical scripts. |
 | **v3.4.0** | 2026-07-11 | **Re-Entry Breakouts:** Continuous peak price tracking, dynamic re-entry triggers (bypassing strict DNA filters while enforcing liquidity floors), DB backfill migration, and PAPER_ONLY caps for re-entries. |
