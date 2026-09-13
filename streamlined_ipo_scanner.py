@@ -4225,6 +4225,11 @@ def stop_loss_update_scan():
                         elif days_held > 60 and current_price < entry_price * 0.92:
                             exit_reason = "Time Stop -8% (Underperforming after 60 days)"
                 
+                # 14-Day Portfolio Velocity Speed Gate (v3.5.0 Standard):
+                # Cut underwater or dead-money positions held >= 14 days that failed to maintain momentum.
+                if not exit_reason and days_held >= 14 and pnl <= 0.0:
+                    exit_reason = f"Time Stop - Dead Money (14-Day Velocity Gate, PnL {pnl:+.1f}%)"
+
                 # Secondary Stagnant Position Guard (applies globally, even to winner archetypes that pulled back)
                 if not exit_reason and days_held >= 40:
                     if pnl < 10.0:

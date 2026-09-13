@@ -230,6 +230,8 @@ def upsert_position(position_doc: dict):
             # max_runup_pct, max_drawdown_pct) — those are maintained daily and
             # wiping them made weekly shadow-SL audits falsely CRITICAL every week.
             position_doc.pop("exit_reason", None)
+            if "lifecycle_state" not in position_doc or position_doc.get("lifecycle_state") in ("CLOSED", "PAPER_CLOSED"):
+                position_doc["lifecycle_state"] = "POSITION_ACTIVE"
             positions_col.update_one(
                 {"symbol": symbol},
                 [

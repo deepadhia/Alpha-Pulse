@@ -266,3 +266,6 @@ base_audit_charts/
 
 # Large scratch cache files
 scratch_ohlc_cache.pkl
+
+# Local scratch directory (ad-hoc inspection scripts)
+scratch/

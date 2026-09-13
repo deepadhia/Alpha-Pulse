@@ -1946,6 +1946,7 @@ def commit_trade_to_db(breakout_data):
             "trailing_stop": breakout_data['stop_loss'],
             "target_price": breakout_data['target_price'],
             "status": "PAPER_ONLY" if portfolio_full else "ACTIVE",
+            "lifecycle_state": "POSITION_ACTIVE",
             "days_held": 0,
             "max_runup_pct": 0.0,
             "max_drawdown_pct": 0.0,
