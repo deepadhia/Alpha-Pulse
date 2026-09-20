@@ -98,7 +98,22 @@ Research across the 2024–2026 Mainboard IPO universe confirmed that patience i
 * **Winner Archetype Exempt:** Positions where `max_runup_pct ≥ 15%` are treated as confirmed momentum trades and are never cut by standard patience stops.
 * **Volume Exhaustion Early Exit (v3.4.0):** Exits flat, stagnant positions (`-3% <= PnL < +5%`, `max_runup < 8%`) before day 40 if the 5-day average volume drops `< 45%` relative to the 11-day post-entry baseline (excluding Day 0 listing/entry volume and requiring baseline turnover `≥ 50,000` shares/day).
 * **Secondary Stagnant Position Guard (v3.3.0):** Regardless of early peak runups or winner archetype status, if any position is held for **≥ 40 days** and its **current PnL is < 10%**, it is closed with the exit reason `"Time Stop - Stagnant Position (40d underperforming < 10% PnL)"` to prevent capital lock-in.
-* **Trailing Stop Activation (v3.4.0):** Trailing starts at **4.0% PnL** (lowered from 5.0% to close the gap with the speed gate) and **3.0% PnL** specifically for `LISTING_BREAKOUT` trades.
+
+### 4. 2-Stage Dynamic Trailing Stop Engine & Super-Winner Immunity (v3.5.0)
+
+To maximize asymmetric returns, AlphaPulse employs a **2-Stage Dynamic Trailing Engine** paired with a **Single-Writer Central Lifecycle Architecture**:
+
+* **Single-Writer Ownership:** All position exits and trailing stop adjustments are centrally and authoritatively executed by `stop_loss_update_scan()` in `streamlined_ipo_scanner.py`. Both `listing_day_breakout_scanner.py` and `streamlined_ipo_scanner.py` qualify and emit new trades into MongoDB (`positions`), ensuring zero race conditions.
+* **Stage 1: Capital Protection & Breakeven (`max_runup < 15.0%`):**
+  * Initial hard stop-loss is capped at $\le 8\%$ (Consolidation) or dynamically buffered $\le 12\%$ (Listing Day).
+  * Trailing starts at **+3.0% PnL** for `LISTING_BREAKOUT` and **+4.0% PnL** for `CONSOLIDATION`.
+  * Moves stop loss to **Breakeven (Entry Price)** once early runup reaches $+8.0\%$, eliminating downside capital risk.
+  * All dead-money speed gates (14-day velocity gate, patience stops, volume exhaustion) remain strictly active.
+* **Stage 2: Super-Winner Expansion & 20% Peak Cushion (`max_runup >= 15.0%`):**
+  * **Super-Winner Immunity:** Once a stock achieves $\ge 15\%$ runup, it is classified as a confirmed **Winner Archetype** and becomes permanently exempt from time-based dead-money stops, preventing healthy base-building pullbacks from choking multi-month winners.
+  * **Asymmetric 20% Peak Cushion:** Trailing stop is widened to a dynamic 20% cushion below the highest peak price achieved during the trade:
+    $$\text{Trailing Stop} = \max(\text{Entry Price} \times 1.05, \text{Peak Price} \times 0.80)$$
+  * This allows explosive IPO runners (e.g. `OMNI`, `EMMVEE`, `BUILDPRO`) breathing room to absorb normal 12–18% consolidations while locking in massive compounding gains.
 
 All thresholds are configurable via environment variables:
 ```
@@ -109,7 +124,7 @@ DEAD_MONEY_DAYS_CONSOL=21
 DEAD_MONEY_RUNUP_CONSOL=5.0
 ```
 
-### 4. Market Regime Stabilizer (3-Day Confirmation)
+### 5. Market Regime Stabilizer (3-Day Confirmation)
 To prevent whipsaws during market transitions, Nifty-based regimes are stabilized chronologically:
 * **Stabilization Rule:** A new market regime classification is only confirmed and applied if it persists for **3 consecutive trading days**.
 * **Effect:** This time-based filter reduces regime whipsaws in backtests from **72.0% to 7.9%**, establishing a highly stable filter context.

@@ -289,15 +289,21 @@ Stored on every signal/position document as `position_size_weight`.
 - Hourly never overwrites an existing `ACTIVE`/`PAPER_ONLY` row for the same symbol
 - `PAPER_ONLY` signals are included in **strategy expectancy analytics** but excluded from **live capital P&L calculations**
 
-### 7.2 Trailing Stop Update Logic
-**Location:** `stop_loss_update_scan()` at line 3919 — runs at **6:30 PM IST** daily.
+### 7.2 2-Stage Asymmetric Trailing Stop Update Logic
+**Location:** `stop_loss_update_scan()` in `streamlined_ipo_scanner.py` — runs at **6:30 PM IST** daily.
 
-- Trailing starts when `pnl >= trail_threshold`:
-  - `MIN_PNL_FOR_TRAIL` (default: **4.0%**, lowered from 5% to eliminate the dead zone vs speed gates)
-  - `LISTING_BREAKOUT` grade threshold: **3.0%** (sits below the 4% speed gate)
-- New trailing = `current_price x (1 - stop_pct)` where `stop_pct` is grade-based
-- Trailing stop only moves **forward** (ratchet — never loosens)
-- Minimum improvement required = `entry_price x (MIN_TRAIL_MOVE_PCT / 100)` (default: **1%** of entry)
+**Stage 1: Capital Protection (`max_runup < 15.0%`)**
+- Standard trailing ratchet starts when `pnl >= trail_threshold` (3.0% for `LISTING_BREAKOUT`, 4.0% for other setups).
+- Trailing stop = `current_price x (1 - stop_pct)` (default 10% trailing distance).
+- Minimum improvement ratchet = `entry_price x 1.0%`.
+- All dead-money speed gates (14-day velocity speed gate, 20-day dead-money stop, 15-day volume exhaustion) are strictly active.
+
+**Stage 2: Winner Expansion Cushion (`max_runup >= 15.0%`)**
+- Once a breakout proves itself by reaching $\ge 15\%$ runup from entry, it enters the **Winner Archetype**.
+- **Winner Immunity:** The position is permanently exempt from time-based dead-money stops (14d velocity gate, 20d patience stop, and 15d volume exhaustion), preventing healthy consolidation pullbacks from choking multi-bagger runs.
+- **Asymmetric Cushion:** Trailing stop is widened to a **20% buffer from peak price** (`peak_price_during_trade * 0.80`), combined with a 50 EMA trend guard:
+  `new_stop = max(new_stop, peak_price_during_trade * 0.80, ema_50)`
+- This gives large multi-bagger IPO runners breathing room to digest 10%–15% base-reset consolidations and compound into 100%+ discovery rallies.
 
 ### 7.3 Exit Conditions (for ACTIVE positions)
 **Location:** `stop_loss_update_scan()` in `streamlined_ipo_scanner.py`.
@@ -309,7 +315,11 @@ Stored on every signal/position document as `position_size_weight`.
 current_price <= trailing_stop  →  exit_reason = "Stop Loss"
 ```
 
-**Exit Trigger 2: Dead-Money Patience Stops** (applied only when `max_runup_pct < 15%` — not yet winner archetype):
+**Exit Trigger 2: 14-Day Portfolio Velocity Speed Gate (v3.5.0)**
+Applied only when `max_runup_pct < 15%` (Stage 1 capital protection):
+- Exits positions held $\ge 14$ days that remain underwater or flat (`pnl <= 0.0%`) with decaying volume ($< 50\%$ of entry volume baseline), eliminating 81% of bleeding trades early.
+
+**Exit Trigger 3: Dead-Money Patience Stops** (applied only when `max_runup_pct < 15%` — not yet winner archetype):
 
 | Archetype | Patience Period | Runup Required | Exit Reason |
 |---|---|---|---|
@@ -318,26 +328,14 @@ current_price <= trailing_stop  →  exit_reason = "Stop Loss"
 | Other (fallback) | > 30 days AND price < entry x 0.95 | — | `Time Stop -5%` |
 | Other (fallback) | > 60 days AND price < entry x 0.92 | — | `Time Stop -8%` |
 
-**Winner Archetype Exempt:** `max_runup_pct >= 15.0%` ➔ standard patience stops are **never applied**.
+**Winner Archetype Exempt:** `max_runup_pct >= 15.0%` ➔ Dead-money speed gates & patience stops are **never applied**.
 
-**Exit Trigger 3: Volume Exhaustion Early Exit (v3.4.0)**
-Exits flat, stagnant positions before day 40 if volume collapses relative to the post-entry baseline, freeing capital for fresh breakouts or re-entries:
-- **Condition:** `pnl` between **-3.0% and +5.0%**, `max_runup_pct < 8.0%`, `days_held >= min_days`.
-- **Minimum Days:** **15 trading days** for `LISTING_BREAKOUT`, **10 trading days** for Consolidation.
+**Exit Trigger 4: Volume Exhaustion Early Exit (v3.4.0)**
+Exits flat, stagnant positions before day 40 if volume collapses relative to the post-entry baseline (`max_runup_pct < 8.0%`):
+- **Condition:** `pnl` between **-3.0% and +5.0%**, `max_runup_pct < 8.0%`, `days_held >= min_days` (15d for Listing, 10d for Consol).
 - **Volume Ratio Threshold:** Recent 5-day average volume `< 45%` (`0.45`) of the 11-day post-entry baseline.
-- **Liquidity Floor:** Requires baseline volume $\ge 50,000$ shares/day (skips thin/illiquid stocks to avoid noise).
-- **Listing Day Exclusion:** Row 0 (entry/listing day) is excluded from baseline calculations to remove structurally inflated volume.
+- **Liquidity Floor:** Baseline volume $\ge 50,000$ shares/day.
 
-```
-volume_ratio < 0.45 AND days_held >= min_days AND -3% <= pnl < 5% AND max_runup < 8%
-➔ exit_reason = "Volume Exhaustion - Dead volume (ratio: X.XX, pnl: +Y.Y%, days: N)"
-```
-
-**Exit Trigger 4: Secondary Stagnant Position Guard (Global Portfolio Efficiency)**
-Regardless of early peak runups or winner archetype status, if a position is held for **$\ge 40$ days** and its **current PnL is $< 10.0\%$**, it is exited to prevent capital lock-in:
-```
-days_held >= 40 AND current_pnl < 10.0%  ➔  exit_reason = "Time Stop - Stagnant Position (40d)"
-```
 
 **`exit_reason` hygiene:** `exit_reason` is set **only on close** (`CLOSED` / `PAPER_CLOSED`). Open positions (`ACTIVE` / `PAPER_ONLY`) must not carry a non-null `exit_reason`; shadow time-stops use `shadow_exit_reason_*` fields only. `upsert_position` clears sticky `exit_reason` on open-status writes.
 

@@ -4206,6 +4206,7 @@ def stop_loss_update_scan():
                     exit_reason = "Stop Loss"
                 elif not is_winner_archetype:
                     # Archetype-sensitive dead-money speed gate (velocity threshold)
+                    # ONLY applies to non-winner / Stage 1 positions (max_runup < 15%)
                     grade = pos.get("grade", "N/A")
                     is_ipo_discovery = (grade == "LISTING_BREAKOUT")
                     
@@ -4225,27 +4226,21 @@ def stop_loss_update_scan():
                         elif days_held > 60 and current_price < entry_price * 0.92:
                             exit_reason = "Time Stop -8% (Underperforming after 60 days)"
                 
-                # 14-Day Portfolio Velocity Speed Gate (v3.5.0 Standard):
-                # Cut underwater or dead-money positions held >= 14 days that failed to maintain momentum.
-                if not exit_reason and days_held >= 14 and pnl <= 0.0:
-                    exit_reason = f"Time Stop - Dead Money (14-Day Velocity Gate, PnL {pnl:+.1f}%)"
+                    # 14-Day Portfolio Velocity Speed Gate (v3.5.0 Standard):
+                    # Cut underwater or dead-money positions held >= 14 days that failed to maintain momentum.
+                    if not exit_reason and days_held >= 14 and pnl <= 0.0:
+                        exit_reason = f"Time Stop - Dead Money (14-Day Velocity Gate, PnL {pnl:+.1f}%)"
 
-                # Secondary Stagnant Position Guard (applies globally, even to winner archetypes that pulled back)
-                if not exit_reason and days_held >= 40:
-                    if pnl < 10.0:
-                        exit_reason = f"Time Stop - Stagnant Position (40d underperforming < 10% PnL)"
+                    # Secondary Stagnant Position Guard (applies to flat / non-winner positions)
+                    if not exit_reason and days_held >= 40:
+                        if pnl < 10.0:
+                            exit_reason = f"Time Stop - Stagnant Position (40d underperforming < 10% PnL)"
 
                 # --- VOLUME EXHAUSTION EARLY EXIT ---
                 # Exits stagnant flat positions BEFORE day 40 when volume is collapsing relative
                 # to the post-entry baseline, signalling the breakout has exhausted buyer interest.
                 # Only applies to flat/never-moved positions. Skips winners (max_runup >= 8%),
                 # positions already marked for exit, and positions held < minimum days.
-                #
-                # Thresholds are intentionally conservative:
-                #   - Post-entry analysis only (excludes listing-day inflated volume from baseline)
-                #   - Liquidity floor: skip check on thin stocks (noisy signal)
-                #   - Grade-aware min days: LISTING_BREAKOUT needs 15d for post-listing
-                #     excitement to settle; consolidation uses 10d
                 _VOL_MIN_DAYS_IPO    = 15     # LISTING_BREAKOUT: post-listing excitement settles ~2 weeks
                 _VOL_MIN_DAYS_CONSOL = 10     # Consolidation breakout: signal visible earlier
                 _VOL_FLAT_PNL_LOW    = -3.0   # Don't apply if significantly underwater (let SL handle it)
@@ -4259,63 +4254,34 @@ def stop_loss_update_scan():
 
                 if (
                     not exit_reason
+                    and not is_winner_archetype
                     and days_held >= _vol_min_days
                     and _VOL_FLAT_PNL_LOW <= pnl < _VOL_FLAT_PNL_HIGH
                     and new_max_runup < _VOL_MAX_RUNUP
                 ):
                     try:
-                        # Reuse current_data if it was already fetched (historical close fallback path).
-                        # Otherwise fetch fresh OHLCV data for volume analysis.
                         _vol_df = current_data if current_data is not None else fetch_data(sym, fetch_start_date)
 
                         if _vol_df is not None and "VOLUME" in _vol_df.columns and len(_vol_df) > 0:
-                            # Anchor analysis to POST-ENTRY rows only (filter by entry/fetch_start_date).
-                            # This prevents pre-entry and IPO-listing history from contaminating the baseline.
                             _entry_ts = pd.Timestamp(fetch_start_date)
                             _entry_rows = _vol_df[_vol_df["DATE"] >= _entry_ts].copy().reset_index(drop=True)
 
-                            # Skip row 0 (entry/listing day): structurally inflated volume
-                            # (allottee selling, retail frenzy, media attention) makes it
-                            # unrepresentative of the ongoing organic volume pattern.
                             if len(_entry_rows) > 1:
                                 _entry_rows = _entry_rows.iloc[1:].reset_index(drop=True)
 
-                            # Require at least 16 post-entry rows (11 baseline + 5 recent)
-                            # to have a stable signal.
                             if len(_entry_rows) >= 16:
-                                _baseline_vol = _entry_rows.iloc[:11]["VOLUME"].mean()   # days 1-11
-                                _recent_vol   = _entry_rows.iloc[-5:]["VOLUME"].mean()   # last 5 days
-
-                                logger.debug(
-                                    f"[VolumeCheck] {sym}: post_entry_rows={len(_entry_rows)}, "
-                                    f"baseline={_baseline_vol:.0f}, recent={_recent_vol:.0f}, "
-                                    f"pnl={pnl:.1f}%, runup={new_max_runup:.1f}%, days={days_held}"
-                                )
+                                _baseline_vol = _entry_rows.iloc[:11]["VOLUME"].mean()
+                                _recent_vol   = _entry_rows.iloc[-5:]["VOLUME"].mean()
 
                                 if _baseline_vol >= _VOL_ABS_FLOOR and _baseline_vol > 0:
                                     _vol_ratio = _recent_vol / _baseline_vol
-                                    logger.info(
-                                        f"[VolumeCheck] {sym}: vol_ratio={_vol_ratio:.2f} "
-                                        f"(threshold={_VOL_RATIO_THRESHOLD})"
-                                    )
                                     if _vol_ratio < _VOL_RATIO_THRESHOLD:
                                         exit_reason = (
                                             f"Volume Exhaustion - Dead volume "
                                             f"(ratio: {_vol_ratio:.2f}, "
                                             f"pnl: {pnl:+.1f}%, days: {days_held})"
                                         )
-                                else:
-                                    logger.debug(
-                                        f"[VolumeCheck] {sym}: baseline {_baseline_vol:.0f} < "
-                                        f"floor {_VOL_ABS_FLOOR} — skipping (thin/illiquid stock)"
-                                    )
-                            else:
-                                logger.debug(
-                                    f"[VolumeCheck] {sym}: insufficient post-entry rows "
-                                    f"({len(_entry_rows)}) — need 16"
-                                )
                     except Exception as _ve:
-                        # Soft signal — never blocks position management or loop continuation
                         logger.warning(f"[VolumeCheck] Could not evaluate volume for {sym}: {_ve}")
 
                 if exit_reason:
@@ -4341,11 +4307,9 @@ def stop_loss_update_scan():
                     if new_max_runup >= 5.0:
                         holding_efficiency_pct = round((pnl / new_max_runup) * 100.0, 2)
 
-                    # Derived analytic metric for faster failure diagnostics (no strategy impact)
                     if time_to_failure_days is not None:
                         time_to_failure_min = int(time_to_failure_days * 390)
                         
-                    # Close position - use current price (live or historical)
                     target_status = "PAPER_CLOSED" if pos["status"] == "PAPER_ONLY" else "CLOSED"
                     df_positions.loc[idx, ["status", "exit_date", "exit_price", "pnl_pct", "days_held", "max_runup_pct", "max_drawdown_pct", "outcome_type", "holding_efficiency_pct", "time_to_failure_days", "time_to_failure_min"]] = [
                         target_status, datetime.today().strftime("%Y-%m-%d"), current_price, pnl, days_held,
@@ -4373,7 +4337,6 @@ def stop_loss_update_scan():
                         "position_exit_version": SCANNER_VERSION,
                     })
                     
-                    # Send exit alert
                     is_paper_trade = (pos["status"] == "PAPER_ONLY")
                     exit_msg = format_exit_alert(sym, exit_reason, current_price, pnl, days_held, entry_price)
                     if is_paper_trade:
@@ -4381,7 +4344,6 @@ def stop_loss_update_scan():
                     exit_msg += f"\n\n📊 <b>Outcome:</b> {outcome_type} (Peak: +{new_max_runup:.1f}%)"
                     send_telegram(exit_msg)
 
-                    # Persist closed position to DB
                     try:
                         updated_pos = df_positions.loc[idx].to_dict()
                         clean_pos = {}
@@ -4398,24 +4360,32 @@ def stop_loss_update_scan():
                     except Exception as db_e:
                         logger.error(f"Failed to persist position exit for {sym}: {db_e}")
                 else:
-                    # Update position and (optionally) trail stop-loss
-                    # Only start trailing once we have a reasonable profit cushion.
-                    # Grade-aware threshold: LISTING_BREAKOUT gets a tighter 3% gate (below
-                    # the 4% speed gate) so there is never a dead zone where the position
-                    # passed the speed gate but has zero trailing protection.
-                    grade = pos.get("grade", "C")  # Default to C if grade not available
-                    trail_threshold = 3.0 if grade == "LISTING_BREAKOUT" else MIN_PNL_FOR_TRAIL
-                    if pnl >= trail_threshold:
-                        # Calculate new candidate trailing stop from grade-based percentage
-                        _, stop_pct = calculate_grade_based_stop_loss(entry_price, entry_price, grade)
-
-                        candidate_trailing = current_price * (1 - stop_pct)
-
-                        # Minimum absolute improvement required (as % of entry)
+                    # ── 2-Stage Dynamic Trailing Stop Engine ────────────────────────
+                    # Stage 2 (Super-Winner Immunity: max_runup >= 15.0%):
+                    # Give proven winners a 20% trailing cushion from peak to ride multi-month price discovery
+                    # Stage 1 (Initial Sniping & Capital Protection: max_runup < 15.0%):
+                    # Standard grade-based trailing / breakeven protection
+                    grade = pos.get("grade", "C")
+                    
+                    if is_winner_archetype:
+                        # Stage 2: 20% Trailing cushion from highest achieved peak price
+                        peak_price = entry_price * (1.0 + new_max_runup / 100.0)
+                        candidate_trailing = max(entry_price * 1.05, peak_price * 0.80)
                         min_trail_move_abs = entry_price * (MIN_TRAIL_MOVE_PCT / 100.0)
 
                         if candidate_trailing > new_trailing and (candidate_trailing - new_trailing) >= min_trail_move_abs:
                             new_trailing = candidate_trailing
+                            logger.info(f"🏆 [Stage 2 Winner Trailing] {sym}: Trailing Stop updated to ₹{new_trailing:.2f} (20% cushion from peak ₹{peak_price:.2f})")
+                    else:
+                        # Stage 1: Grade-based trailing (starts at +3% for LISTING_BREAKOUT, +4% for Consolidation)
+                        trail_threshold = 3.0 if grade == "LISTING_BREAKOUT" else MIN_PNL_FOR_TRAIL
+                        if pnl >= trail_threshold:
+                            _, stop_pct = calculate_grade_based_stop_loss(entry_price, entry_price, grade)
+                            candidate_trailing = current_price * (1 - stop_pct)
+                            min_trail_move_abs = entry_price * (MIN_TRAIL_MOVE_PCT / 100.0)
+
+                            if candidate_trailing > new_trailing and (candidate_trailing - new_trailing) >= min_trail_move_abs:
+                                new_trailing = candidate_trailing
 
                     # Persist updated position
                     df_positions.loc[idx, ["current_price", "trailing_stop", "pnl_pct", "days_held", "max_runup_pct", "max_drawdown_pct"]] = [
