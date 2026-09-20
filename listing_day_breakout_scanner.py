@@ -591,6 +591,12 @@ def load_listing_data():
         df = pd.DataFrame(docs)
         if 'listing_date' in df.columns and not df.empty:
             df['listing_date'] = pd.to_datetime(df['listing_date'], utc=True, errors='coerce').dt.tz_localize(None).dt.date
+        if 'is_nse_addition' in df.columns:
+            df['is_nse_addition'] = df['is_nse_addition'].fillna(False).astype(bool)
+        if 'bse_liquidity_passed' in df.columns:
+            df['bse_liquidity_passed'] = df['bse_liquidity_passed'].fillna(True).astype(bool)
+        if 'bse_perfect_base' in df.columns:
+            df['bse_perfect_base'] = df['bse_perfect_base'].fillna(False).astype(bool)
         return df
     except Exception as e:
         logger.error(f"Error loading listing data from MongoDB: {e}")
@@ -1008,11 +1014,18 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
         days_since_listing = (today_date - listing_date).days
 
         # BSE Liquidity and Base Quality Check for NSE Additions
-        is_nse_addition = listing_info.get('is_nse_addition', False)
+        raw_is_nse = listing_info.get('is_nse_addition', False)
+        is_nse_addition = bool(raw_is_nse is True or (pd.notna(raw_is_nse) and bool(raw_is_nse)))
         bse_symbol = listing_info.get('bse_symbol')
-        bse_liquidity_passed = listing_info.get('bse_liquidity_passed', True)
-        bse_perfect_base = listing_info.get('bse_perfect_base', False)
+        if pd.isna(bse_symbol):
+            bse_symbol = None
+        raw_bse_liq = listing_info.get('bse_liquidity_passed', True)
+        bse_liquidity_passed = bool(raw_bse_liq is True or (pd.notna(raw_bse_liq) and bool(raw_bse_liq)) or pd.isna(raw_bse_liq))
+        raw_bse_pb = listing_info.get('bse_perfect_base', False)
+        bse_perfect_base = bool(raw_bse_pb is True or (pd.notna(raw_bse_pb) and bool(raw_bse_pb)))
         bse_rejection_reason = listing_info.get('bse_rejection_reason')
+        if pd.isna(bse_rejection_reason):
+            bse_rejection_reason = None
         
         if is_nse_addition and days_since_listing > 0:
             if days_since_listing > 30:
