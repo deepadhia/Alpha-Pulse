@@ -599,6 +599,33 @@ def audit_performance_gate(positions_col, signals_col):
         if paper_rate > 0.5:
             _warn(SEC, f"Over half of signals are PAPER_ONLY ({paper_rate:.1%}) — portfolio cap is blocking many setups")
 
+    # ── Strategy Evidence 50-Sample Milestone Check ──
+    evidence_count = 0
+    try:
+        if positions_col is not None and getattr(positions_col, "database", None) is not None:
+            ev_col = positions_col.database["strategy_evidence"]
+            evidence_count = ev_col.count_documents({})
+    except Exception:
+        pass
+    if evidence_count == 0 and positions_col is not None:
+        try:
+            clean_cutoff = datetime(2026, 7, 5)
+            evidence_count = positions_col.count_documents({
+                "$or": [
+                    {"entry_date": {"$gte": "2026-07-05"}},
+                    {"entry_date": {"$gte": clean_cutoff}}
+                ]
+            })
+        except Exception:
+            evidence_count = 0
+
+    SAMPLE_TARGET = 50
+    evidence_pct = (evidence_count / SAMPLE_TARGET) * 100.0 if SAMPLE_TARGET > 0 else 0.0
+    if evidence_count >= SAMPLE_TARGET:
+        _ok(SEC, f"🎯 Strategy Evidence Milestone REACHED: {evidence_count}/{SAMPLE_TARGET} clean trade samples collected ({evidence_pct:.1f}%). Quantitative statistical significance testing & rule promotion unlocked!")
+    else:
+        _find("INFO", SEC, f"⏳ Strategy Evidence Progress: {evidence_count}/{SAMPLE_TARGET} clean trade samples collected ({evidence_pct:.1f}%). (Passive gathering in progress — statistical gates remain locked until 50 samples).")
+
     return {
         "n_closed":   n_closed,
         "win_rate":   win_rate,
@@ -610,6 +637,9 @@ def audit_performance_gate(positions_col, signals_col):
         "n_intraday_closed": n_intra_closed,
         "n_intraday_active": n_intra_active,
         "cohort": "edge_ex_intraday",
+        "evidence_count": evidence_count,
+        "evidence_target": SAMPLE_TARGET,
+        "evidence_milestone_reached": evidence_count >= SAMPLE_TARGET,
     }
 
 # ─── Section 5: Exit Integrity ─────────────────────────────────────────────────
@@ -1336,6 +1366,14 @@ def build_report(perf_data: dict, fixes_applied: list = None) -> str:
             lines.append(f"  INTRADAY (info)   : closed={ni_c or 0} | active={ni_a or 0}")
         ca = perf_data.get("cohort_avg")
         lines.append(f"  Full cohort avg   : {ca:+.2f}%" if ca is not None else "  Full cohort avg   : N/A")
+        
+        ev_c = perf_data.get("evidence_count")
+        if ev_c is not None:
+            ev_t = perf_data.get("evidence_target", 50)
+            if ev_c >= ev_t:
+                lines.append(f"  Evidence Store    : 🎯 {ev_c}/{ev_t} samples collected (100%+) — MILESTONE REACHED! (Ready for statistical review)")
+            else:
+                lines.append(f"  Evidence Store    : ⏳ {ev_c}/{ev_t} samples collected ({(ev_c/ev_t)*100:.1f}%) [Passive Gathering]")
         lines.append("")
 
     # Findings by section
@@ -1454,6 +1492,17 @@ def _build_telegram_message(
     if ca is not None:
         lines.append(f"\u2022 Full cohort avg: <b>{ca:+.2f}%</b>")
     lines.append(f"\u2022 Active positions: <b>{n_a}</b>")
+
+    ev_c = perf_data.get("evidence_count")
+    if ev_c is not None:
+        ev_t = perf_data.get("evidence_target", 50)
+        lines.append("")
+        if ev_c >= ev_t:
+            lines.append(f"🎯 <b>Evidence Milestone: {ev_c}/{ev_t} Samples REACHED!</b>")
+            lines.append("<i>Ready for statistical significance & rule review.</i>")
+        else:
+            lines.append(f"⏳ <b>Evidence Store: {ev_c}/{ev_t} samples</b> ({(ev_c/ev_t)*100:.1f}%)")
+            lines.append("<i>Passive gathering active (gates locked until 50 samples).</i>")
 
     # Error + warning summary
     error_findings = [f for f in findings if f["level"] == "ERROR"]

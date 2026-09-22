@@ -3763,15 +3763,30 @@ def weekly_summary():
 • Average P&L: {avg_pnl:.2f}%
 • Best Position: {best_position['symbol']} ({best_position['pnl_pct']:.2f}%)
 • Worst Position: {worst_position['symbol']} ({worst_position['pnl_pct']:.2f}%)"""
+    # Strategy Evidence 50-Sample Milestone Progress
+    ev_count = 0
+    try:
+        from db import db
+        if db is not None:
+            ev_count = db["strategy_evidence"].count_documents({})
+    except Exception:
+        pass
+
+    if ev_count >= 50:
+        evidence_text = f"""
+🎯 <b>Evidence Store Milestone:</b> {ev_count}/50 Samples REACHED!
+• Ready for quantitative significance testing & rule promotion review."""
     else:
-        performance_text = "\n📈 <b>Performance:</b> No active positions"
+        evidence_text = f"""
+⏳ <b>Evidence Store:</b> {ev_count}/50 samples ({(ev_count/50)*100:.1f}%)
+• Passive gathering active (statistical gates locked until 50 samples)."""
     
     msg = f"""📊 <b>Weekly Summary</b>
     
 🔍 <b>This Week:</b>
 • New Signals: {weekly_signals}
 • Active Positions: {active_positions}
-• Total Signals (All Time): {len(df_signals)}{performance_text}
+• Total Signals (All Time): {len(df_signals)}{performance_text}{evidence_text}
 
 📅 <b>Week Range:</b> {week_start.strftime('%Y-%m-%d')} to {datetime.today().strftime('%Y-%m-%d')}"""
     
