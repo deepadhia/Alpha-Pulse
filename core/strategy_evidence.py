@@ -77,15 +77,24 @@ def build_trade_evidence_doc(trade: dict, db=None, fetch_data_fn=None) -> dict:
         except Exception:
             pass
 
+    # Setup DNA Parameters (No dummy/magic constants — real market data only)
     days_since_listing = int(sig.get("days_since_listing") or trade.get("days_since_listing") or sig.get("ipo_age") or trade.get("ipo_age") or 0)
-    listing_vol = int(sig.get("listing_day_volume") or trade.get("listing_day_volume") or 1_000_000)
-    vol_spike = float(sig.get("volume_spike") or sig.get("volume_ratio") or trade.get("volume_ratio") or 1.5)
-    prng_10d = float(sig.get("listing_range_pct") if (sig.get("listing_range_pct") is not None and sig.get("listing_range_pct") > 0) else (trade.get("consolidation_range_pct") or sig.get("consolidation_range_pct") or 12.0))
-    upper_wick_pct = float(trade.get("upper_wick_pct") or sig.get("upper_wick_pct") or 15.0)
-    turnover_cr = float(trade.get("turnover_cr") or sig.get("turnover_cr") or sig.get("avg_turnover_cr") or 5.0)
+    listing_vol = sig.get("listing_day_volume") or trade.get("listing_day_volume")
+    vol_spike = sig.get("volume_spike") or sig.get("volume_ratio") or trade.get("volume_ratio")
+    prng_10d = sig.get("listing_range_pct") if (sig.get("listing_range_pct") is not None and sig.get("listing_range_pct") > 0) else (trade.get("consolidation_range_pct") or sig.get("consolidation_range_pct"))
+    upper_wick_pct = trade.get("upper_wick_pct") or sig.get("upper_wick_pct")
+    turnover_cr = trade.get("turnover_cr") or sig.get("turnover_cr") or sig.get("avg_turnover_cr")
     market_regime = sig.get("market_regime") or trade.get("market_regime") or "BULL"
 
-    # Enrich from market candles if fetch_data_fn is provided
+    # Automatically load real market data fetcher if not provided
+    if fetch_data_fn is None:
+        try:
+            from streamlined_ipo_scanner import fetch_data
+            fetch_data_fn = fetch_data
+        except Exception:
+            fetch_data_fn = None
+
+    # Enrich directly from genuine market candles up to entry date
     if fetch_data_fn:
         try:
             df = fetch_data_fn(sym, "2025-01-01")
@@ -95,7 +104,19 @@ def build_trade_evidence_doc(trade: dict, db=None, fetch_data_fn=None) -> dict:
                     listing_vol = int(df['VOLUME'].iloc[0])
 
                 match_idx = df.index[df['DATE'].astype(str).str[:10] <= entry_date_str]
-                sub_df = df.loc[:match_idx[-1]] if len(match_idx) > 0 else df
+                if len(match_idx) > 0:
+                    sub_df = df.loc[:match_idx[-1]]
+                else:
+                    first_date_str = str(df['DATE'].iloc[0])[:10]
+                    try:
+                        dt_entry = datetime.strptime(entry_date_str, "%Y-%m-%d")
+                        dt_first = datetime.strptime(first_date_str, "%Y-%m-%d")
+                        if 0 <= (dt_first - dt_entry).days <= 3:
+                            sub_df = df.iloc[:1]
+                        else:
+                            sub_df = pd.DataFrame()
+                    except Exception:
+                        sub_df = pd.DataFrame()
 
                 if len(sub_df) > 0:
                     last_c = sub_df.iloc[-1]
@@ -105,7 +126,7 @@ def build_trade_evidence_doc(trade: dict, db=None, fetch_data_fn=None) -> dict:
                         upper_wick_pct = round((u_wick / c_range) * 100.0, 1)
 
                     r20 = sub_df.tail(20)
-                    r20_vol = float(r20['VOLUME'].mean()) if 'VOLUME' in r20.columns and len(r20) > 0 else 100_000.0
+                    r20_vol = float(r20['VOLUME'].mean()) if 'VOLUME' in r20.columns and len(r20) > 0 else 0.0
                     if r20_vol > 0:
                         vol_spike = round(float(last_c['VOLUME']) / r20_vol, 2)
                         turnover_cr = round((r20_vol * float(last_c['CLOSE'])) / 10_000_000.0, 1)
@@ -116,8 +137,15 @@ def build_trade_evidence_doc(trade: dict, db=None, fetch_data_fn=None) -> dict:
                         r10_h = float(r10['HIGH'].max())
                         if r10_l > 0:
                             prng_10d = round(((r10_h - r10_l) / r10_l) * 100.0, 1)
-        except Exception:
+        except Exception as _fetch_err:
             pass
+
+    # Ensure clean float conversions without dummy defaults (Preserve None if uncomputable)
+    vol_spike = float(vol_spike) if vol_spike is not None else None
+    prng_10d = float(prng_10d) if prng_10d is not None else None
+    upper_wick_pct = float(upper_wick_pct) if upper_wick_pct is not None else None
+    turnover_cr = float(turnover_cr) if turnover_cr is not None else None
+    listing_vol = int(listing_vol) if listing_vol is not None else None
 
     is_concluded = status in ["CLOSED", "PAPER_CLOSED"]
     is_win = pnl_pct > 0.0
@@ -129,11 +157,11 @@ def build_trade_evidence_doc(trade: dict, db=None, fetch_data_fn=None) -> dict:
     learning_summary = ""
 
     if is_win:
-        if vol_spike >= 3.0 and pnl_pct >= 10.0:
+        if vol_spike is not None and vol_spike >= 3.0 and pnl_pct >= 10.0:
             archetype = "HIGH_VOL_MOMENTUM_RUNNER"
             algo_takeaway = f"Institutional volume expansion ({vol_spike:.1f}x) drove strong follow-through (+{pnl_pct:.1f}%). SuperTrend trailing protects multi-week runners."
             learning_summary = f"Massive volume burst ({vol_spike:.1f}x avg vol) validated institutional conviction, powering a +{pnl_pct:.1f}% gain."
-        elif prng_10d <= 15.0 and pnl_pct >= 10.0:
+        elif prng_10d is not None and prng_10d <= 15.0 and pnl_pct >= 10.0:
             archetype = "TIGHT_BASE_COMPOUNDER"
             algo_takeaway = f"Tight base coil ({prng_10d:.1f}% PRNG) capped risk floor and enabled asymmetric payout (+{pnl_pct:.1f}%)."
             learning_summary = f"Narrow volatility coil ({prng_10d:.1f}% PRNG) prevented wide whipsaws and yielded +{pnl_pct:.1f}% upside."
@@ -142,12 +170,12 @@ def build_trade_evidence_doc(trade: dict, db=None, fetch_data_fn=None) -> dict:
             algo_takeaway = f"Solid breakout follow-through (+{pnl_pct:.1f}%). Systematic trailing stop locked in gains."
             learning_summary = f"Steady breakout follow-through (+{pnl_pct:.1f}%) with systematic stop protection."
     else:
-        if upper_wick_pct >= 35.0:
+        if upper_wick_pct is not None and upper_wick_pct >= 35.0:
             archetype = "UPPER_WICK_SUPPLY_TRAP"
             failure_reason = f"Breakout closed with {upper_wick_pct:.1f}% upper wick; heavy institutional supply rejection into the close."
             algo_takeaway = "Upper 50% Candle Body Gate (v3.5.0) structurally rejects breakouts closing with >35% upper wick."
             learning_summary = f"Long upper wick ({upper_wick_pct:.1f}%) signaled severe overhead supply; avoided by candle body confirmation gate."
-        elif days_held >= 14:
+        elif days_held is not None and days_held >= 14 and pnl_pct <= 0.0:
             archetype = "STAGNANT_DEAD_MONEY_BLEED"
             failure_reason = f"Position held {days_held:.0f} days with negative return ({pnl_pct:.1f}%); volume decayed below Day 1 baseline."
             algo_takeaway = "14-Day Velocity Speed Gate exits stagnant trades early at small drawdown, freeing capital for fast runners."
@@ -158,22 +186,56 @@ def build_trade_evidence_doc(trade: dict, db=None, fetch_data_fn=None) -> dict:
             algo_takeaway = "Dynamic swing low stop (capped at 12%) strictly contained downside loss."
             learning_summary = f"Immediate lack of continuation ({pnl_pct:.1f}%); downside risk strictly contained by stop loss."
 
+    # ── Calculate Structured Winner Traits & Loser Trap Flags ──
+    winner_traits = []
+    if days_since_listing is not None and 0 < days_since_listing <= 35:
+        winner_traits.append("early_breakout_le_35d")
+    if prng_10d is not None and prng_10d >= 5.0:
+        winner_traits.append("listing_range_gte_5pct")
+    if vol_spike is not None and vol_spike >= 1.5:
+        winner_traits.append("volume_ratio_gte_1_5")
+    if turnover_cr is not None and turnover_cr >= 1.0:
+        winner_traits.append("institutional_turnover_gte_1cr")
+    if listing_vol is not None and listing_vol >= 150_000:
+        winner_traits.append("listing_vol_gte_150k")
+    winner_score = len(winner_traits)
+
+    trap_flags = []
+    if upper_wick_pct is not None and upper_wick_pct >= 35.0:
+        trap_flags.append("SUPPLY_TRAP_UPPER_WICK")
+    if prng_10d is not None and prng_10d > 15.0:
+        trap_flags.append("LOOSE_BASE_VOLATILITY")
+    if vol_spike is not None and vol_spike > 0 and vol_spike < 1.5:
+        trap_flags.append("ANEMIC_VOLUME_SPIKE")
+    if turnover_cr is not None and turnover_cr > 0 and turnover_cr < 1.0:
+        trap_flags.append("ILLIQUID_TURNOVER_TRAP")
+    if days_held is not None and days_held >= 14 and pnl_pct <= 0.0:
+        trap_flags.append("STAGNANT_DRIFT_14D")
+    trap_score = len(trap_flags)
+
     cohorts = [archetype, engine_type]
-    if vol_spike >= 3.0:
-        cohorts.append("HIGH_VOLUME_BURST")
-    elif vol_spike >= 1.5:
-        cohorts.append("MODERATE_VOLUME_SPIKE")
-    else:
-        cohorts.append("LOW_VOLUME_WEAK")
+    cohorts.append(f"WINNER_SCORE_{winner_score}")
+    cohorts.append(f"TRAP_SCORE_{trap_score}")
+    for tf in trap_flags:
+        cohorts.append(tf)
 
-    if prng_10d <= 15.0:
-        cohorts.append("TIGHT_BASE")
-    elif prng_10d <= 25.0:
-        cohorts.append("NORMAL_BASE")
-    else:
-        cohorts.append("WIDE_LOOSE_BASE")
+    if vol_spike is not None:
+        if vol_spike >= 3.0:
+            cohorts.append("HIGH_VOLUME_BURST")
+        elif vol_spike >= 1.5:
+            cohorts.append("MODERATE_VOLUME_SPIKE")
+        else:
+            cohorts.append("LOW_VOLUME_WEAK")
 
-    if upper_wick_pct >= 35.0:
+    if prng_10d is not None:
+        if prng_10d <= 15.0:
+            cohorts.append("TIGHT_BASE")
+        elif prng_10d <= 25.0:
+            cohorts.append("NORMAL_BASE")
+        else:
+            cohorts.append("WIDE_LOOSE_BASE")
+
+    if upper_wick_pct is not None and upper_wick_pct >= 35.0:
         cohorts.append("HIGH_UPPER_WICK_REJECTION")
 
     if is_win and pnl_pct >= 10.0:
@@ -197,7 +259,11 @@ def build_trade_evidence_doc(trade: dict, db=None, fetch_data_fn=None) -> dict:
             "upper_wick_pct": upper_wick_pct,
             "turnover_cr": turnover_cr,
             "days_since_listing": days_since_listing,
-            "market_regime": market_regime
+            "market_regime": market_regime,
+            "winner_score": winner_score,
+            "winner_traits": winner_traits,
+            "trap_score": trap_score,
+            "trap_flags": trap_flags
         },
         "outcome": {
             "status": status,
