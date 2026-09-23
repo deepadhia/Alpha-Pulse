@@ -292,7 +292,8 @@ def build_trade_evidence_doc(trade: dict, db=None, fetch_data_fn=None) -> dict:
 
 def record_trade_closure_evidence(trade: dict, db=None, fetch_data_fn=None) -> bool:
     """
-    Persists a single trade's forensic evidence doc directly to MongoDB `strategy_evidence`.
+    Persists a single trade's forensic evidence doc directly to MongoDB `strategy_evidence`
+    and updates the corresponding `positions` document with structured DNA fields.
     """
     if db is None:
         try:
@@ -309,6 +310,21 @@ def record_trade_closure_evidence(trade: dict, db=None, fetch_data_fn=None) -> b
             {"evidence_id": doc["evidence_id"]},
             {"$set": doc},
             upsert=True
+        )
+        # Sync DNA and forensics to positions collection for unified querying
+        positions_col = db["positions"]
+        dna = doc.get("setup_dna", {})
+        forensics = doc.get("forensics", {})
+        positions_col.update_one(
+            {"symbol": doc["symbol"]},
+            {"$set": {
+                "winner_score": dna.get("winner_score"),
+                "winner_traits": dna.get("winner_traits"),
+                "trap_score": dna.get("trap_score"),
+                "trap_flags": dna.get("trap_flags"),
+                "archetype": forensics.get("archetype"),
+                "algo_takeaway": forensics.get("algo_takeaway")
+            }}
         )
         return True
     except Exception as e:
@@ -382,6 +398,20 @@ def sync_all_trade_evidence(db, fetch_data_fn=None) -> int:
             {"evidence_id": doc["evidence_id"]},
             {"$set": doc},
             upsert=True
+        )
+        # Also sync back to positions collection
+        dna = doc.get("setup_dna", {})
+        forensics = doc.get("forensics", {})
+        positions_col.update_one(
+            {"symbol": doc["symbol"]},
+            {"$set": {
+                "winner_score": dna.get("winner_score"),
+                "winner_traits": dna.get("winner_traits"),
+                "trap_score": dna.get("trap_score"),
+                "trap_flags": dna.get("trap_flags"),
+                "archetype": forensics.get("archetype"),
+                "algo_takeaway": forensics.get("algo_takeaway")
+            }}
         )
         valid_evidence_ids.add(doc["evidence_id"])
         synced_count += 1

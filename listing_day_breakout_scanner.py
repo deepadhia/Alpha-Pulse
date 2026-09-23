@@ -2424,51 +2424,108 @@ def scan_listing_day_breakouts():
                     today_date = datetime.now().date()
                     
                     if day_high > peak_price or live_price > peak_price:
-                        # Liquidity Check (Basic, bypasses strict 1.5x rule)
+                        # 1. Anti-Chasing Extension Guard: reject if price is > 8.0% extended above peak_price
+                        entry_extension_pct = ((live_price - peak_price) / peak_price * 100.0) if peak_price > 0 else 0.0
+                        if entry_extension_pct > 8.0:
+                            logger.info(f"🚫 Skipping Re-Entry for {symbol}: Overextended {entry_extension_pct:.1f}% > 8.0% above peak trigger (₹{peak_price:.2f})")
+                            write_daily_log("listing_day", symbol, "REJECTED_REENTRY", {
+                                "reason": "REENTRY_OVEREXTENDED",
+                                "failing_metric": "REENTRY_OVEREXTENDED",
+                                "failing_value": round(entry_extension_pct, 1),
+                                "threshold": 8.0,
+                                "live_price": live_price,
+                                "peak_price": peak_price
+                            }, log_type="REJECTED")
+                            continue
+
+                        # 2. Liquidity & Volume Floor Check
                         turnover = live_price * live_vol
-                        if live_vol >= 150000 and turnover >= 10000000:
-                            logger.info(f"⚡ RE-ENTRY TRIGGERED for {symbol}! Live: ₹{live_price:.2f}, Vol: {live_vol}")
-                            
-                            # Construct breakout dict
-                            breakout = {
-                                "symbol": symbol,
-                                "type": "RE_ENTRY",
-                                "entry_price": live_price,
-                                "stop_loss": live_price * 0.92, # Standard 8% stop loss
-                                "target_price": live_price * 1.20, # Initial 20% target
-                                "risk_reward": 2.5,
-                                "listing_day_high": peak_price, # Store peak here for reference
-                                "current_price": live_price,
-                                "volume_spike": 0, # bypassed
-                                "volume_vs_listing_day": 0,
-                                "listing_range_pct": 0,
-                                "days_since_listing": 0,
-                                "is_reentry": True,
-                                "parent_signal_id": pos.get("signal_id", f"parent_{symbol}"),
-                                "reentry_count": pos.get("reentry_count", 0) + 1,
-                                "price_source": live_source,
-                                "pattern_type": "RE_ENTRY",
-                                "market_regime": scanner_module.get_market_regime(today_date),
-                                "tier": "RE-ENTRY",
-                                "position_size_pct": 100,
-                                "tier_rationale": "Re-Entry Breakout (Liquidity filters bypassed)"
-                            }
-                            
-                            # Save signal and position atomically
-                            success, portfolio_full, active_count, _mr, size_mult = commit_trade_to_db(breakout)
-                            if success:
-                                # Send Alert
-                                limit_buy = live_price * 1.02
-                                msg = f"⚡ <b>RE-ENTRY BREAKOUT!</b>\n\n📊 <b>{symbol}</b>\n📋 Trigger: Crossed peak ₹{peak_price:.2f}\n"
-                                msg += f"💰 Current Price: ₹{live_price:,.2f} <i>({live_source})</i>\n"
-                                msg += f"🛑 Stop Loss: ₹{breakout['stop_loss']:,.2f}\n"
-                                if portfolio_full:
-                                    msg = f"⚠️ <b>[PORTFOLIO FULL - PAPER ONLY]</b> (Active: {active_count})\n" + msg
-                                msg += f"\n⚠️ Action Required: Place a <b>Limit Buy Order</b> around <b>₹{limit_buy:,.2f}</b>"
-                                send_telegram(msg)
-                                breakouts_found += 1
-                        else:
-                            logger.info(f"🚫 {symbol} crossed trigger (₹{peak_price:.2f}) but failed Re-Entry Liquidity check (Vol: {live_vol}, T/O: ₹{turnover/10000000:.2f}Cr)")
+                        if live_vol < 150000 or turnover < 10000000:
+                            logger.info(f"🚫 {symbol} crossed trigger (₹{peak_price:.2f}) but failed Re-Entry Liquidity check (Vol: {live_vol:,.0f}, T/O: ₹{turnover/10000000:.2f}Cr)")
+                            write_daily_log("listing_day", symbol, "REJECTED_REENTRY", {
+                                "reason": "LIQUIDITY_BELOW_FLOOR",
+                                "failing_metric": "LIQUIDITY_BELOW_FLOOR",
+                                "failing_value": live_vol,
+                                "threshold": 150000,
+                                "live_vol": live_vol,
+                                "turnover_cr": round(turnover / 10000000.0, 2)
+                            }, log_type="REJECTED")
+                            continue
+
+                        # 3. Upper 50% Candle Body Gate (Anti-Wick Rejection)
+                        day_low = None
+                        try:
+                            df_check = scanner_module.fetch_data(symbol, "2026-01-01")
+                            if df_check is not None and not df_check.empty:
+                                df_check.columns = [c.upper() for c in df_check.columns]
+                                day_low = float(df_check['LOW'].iloc[-1])
+                                day_high_candle = float(df_check['HIGH'].iloc[-1])
+                                day_high = max(day_high, day_high_candle)
+                        except Exception:
+                            day_low = None
+
+                        if day_low is not None and day_high > day_low:
+                            close_location = (live_price - day_low) / (day_high - day_low)
+                            if close_location < 0.50:
+                                logger.info(f"🚫 Skipping Re-Entry for {symbol}: Upper wick exhaustion ({close_location*100:.1f}% < 50.0% of range)")
+                                write_daily_log("listing_day", symbol, "REJECTED_REENTRY", {
+                                    "reason": "UPPER_WICK_REJECTION",
+                                    "failing_metric": "UPPER_WICK_REJECTION",
+                                    "failing_value": round(close_location * 100.0, 1),
+                                    "threshold": 50.0,
+                                    "day_high": day_high,
+                                    "day_low": day_low,
+                                    "live_price": live_price
+                                }, log_type="REJECTED")
+                                continue
+
+                        # Compute genuine metrics from df_check to preserve data collection integrity
+                        r20_vol = float(df_check['VOLUME'].tail(20).mean()) if (df_check is not None and not df_check.empty and 'VOLUME' in df_check.columns) else 0.0
+                        vol_spike_calc = round(live_vol / r20_vol, 2) if r20_vol > 0 else 1.0
+                        r10_low = float(df_check['LOW'].tail(10).min()) if (df_check is not None and not df_check.empty and 'LOW' in df_check.columns) else 0.0
+                        r10_high = float(df_check['HIGH'].tail(10).max()) if (df_check is not None and not df_check.empty and 'HIGH' in df_check.columns) else 0.0
+                        prng_calc = round(((r10_high - r10_low) / r10_low) * 100.0, 1) if r10_low > 0 else float(pos.get("listing_range_pct", 0) or 0)
+                        days_since_calc = len(df_check) if (df_check is not None and not df_check.empty) else int(pos.get("days_since_listing", 0) or 0)
+
+                        # Construct breakout dict
+                        breakout = {
+                            "symbol": symbol,
+                            "type": "RE_ENTRY",
+                            "entry_price": live_price,
+                            "stop_loss": live_price * 0.92, # Standard 8% stop loss
+                            "target_price": live_price * 1.20, # Initial 20% target
+                            "risk_reward": 2.5,
+                            "listing_day_high": peak_price, # Store peak here for reference
+                            "current_price": live_price,
+                            "volume_spike": vol_spike_calc,
+                            "volume_vs_listing_day": vol_spike_calc,
+                            "listing_range_pct": prng_calc,
+                            "days_since_listing": days_since_calc,
+                            "entry_extension_pct": round(entry_extension_pct, 2),
+                            "is_reentry": True,
+                            "parent_signal_id": pos.get("signal_id", f"parent_{symbol}"),
+                            "reentry_count": pos.get("reentry_count", 0) + 1,
+                            "price_source": live_source,
+                            "pattern_type": "RE_ENTRY",
+                            "market_regime": scanner_module.get_market_regime(today_date),
+                            "tier": "RE-ENTRY",
+                            "position_size_pct": 100,
+                            "tier_rationale": "Re-Entry Breakout (Strict Extension & Candle Body passed)"
+                        }
+                        
+                        # Save signal and position atomically
+                        success, portfolio_full, active_count, _mr, size_mult = commit_trade_to_db(breakout)
+                        if success:
+                            # Send Alert
+                            limit_buy = live_price * 1.02
+                            msg = f"⚡ <b>RE-ENTRY BREAKOUT!</b>\n\n📊 <b>{symbol}</b>\n📋 Trigger: Crossed peak ₹{peak_price:.2f} (+{entry_extension_pct:.1f}%)\n"
+                            msg += f"💰 Current Price: ₹{live_price:,.2f} <i>({live_source})</i>\n"
+                            msg += f"🛑 Stop Loss: ₹{breakout['stop_loss']:,.2f}\n"
+                            if portfolio_full:
+                                msg = f"⚠️ <b>[PORTFOLIO FULL - PAPER ONLY]</b> (Active: {active_count})\n" + msg
+                            msg += f"\n⚠️ Action Required: Place a <b>Limit Buy Order</b> around <b>₹{limit_buy:,.2f}</b>"
+                            send_telegram(msg)
+                            breakouts_found += 1
                 except Exception as e:
                     logger.error(f"Error checking re-entry for {symbol}: {e}")
                     

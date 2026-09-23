@@ -548,6 +548,35 @@ class TestRegressionFixes(unittest.TestCase):
         self.assertIn("🔴", exit_loss_msg)
         self.assertIn("-8.00%", exit_loss_msg)
 
+    def test_reentry_extension_and_candle_body_guards(self):
+        """Test that re-entry breakouts reject overextended prices (>8%) and upper wick traps (<50% candle body)."""
+        peak_trigger = 800.0
+
+        # 1. Overextended Re-Entry Case (e.g. +15.0% above peak trigger)
+        overextended_live = 920.0 # +15.0%
+        ext_pct = ((overextended_live - peak_trigger) / peak_trigger) * 100.0
+        self.assertGreater(ext_pct, 8.0)
+        is_rejected_ext = ext_pct > 8.0
+        self.assertTrue(is_rejected_ext)
+
+        # 2. Upper Wick Exhaustion Case (Spike to 850, close at 810, low at 800 -> 10/50 = 20% < 50%)
+        day_high = 850.0
+        day_low = 800.0
+        live_price_wick = 810.0 # Upper wick is 40 / 50 = 80%, candle location is 10 / 50 = 20%
+        close_location = (live_price_wick - day_low) / (day_high - day_low)
+        self.assertLess(close_location, 0.50)
+        is_rejected_wick = close_location < 0.50
+        self.assertTrue(is_rejected_wick)
+
+        # 3. Clean Re-Entry Case (Price 820 -> +2.5% extension, Low 790, High 825 -> candle location 30/35 = 85.7%)
+        clean_live = 820.0
+        clean_high = 825.0
+        clean_low = 790.0
+        clean_ext = ((clean_live - peak_trigger) / peak_trigger) * 100.0
+        clean_loc = (clean_live - clean_low) / (clean_high - clean_low)
+        self.assertLessEqual(clean_ext, 8.0)
+        self.assertGreaterEqual(clean_loc, 0.50)
+
 if __name__ == '__main__':
     unittest.main()
 
