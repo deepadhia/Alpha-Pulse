@@ -1969,6 +1969,7 @@ def commit_trade_to_db(breakout_data):
             "grade": position_grade,
             "winner_label": breakout_data.get('winner_label', 'STANDARD'),
             "winner_score": breakout_data.get('winner_score', 0),
+            "market_regime": mr,
             "position_size_pct": breakout_data.get('position_size_pct', 60),
             "version": SCANNER_VERSION,
             "strategy_version": f"{SCANNER_VERSION}-listing-day",
