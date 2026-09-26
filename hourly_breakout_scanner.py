@@ -46,9 +46,10 @@ CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 # Add current directory to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# Import from main scanner
+# Import from main scanner (robust absolute path resolution)
 import importlib.util
-spec = importlib.util.spec_from_file_location("scanner", "streamlined_ipo_scanner.py")
+_scanner_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "streamlined_ipo_scanner.py")
+spec = importlib.util.spec_from_file_location("scanner", _scanner_path)
 scanner_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(scanner_module)
 
@@ -555,20 +556,26 @@ def detect_intraday_breakout(df, symbol, bulk_prices=None):
         return None
 
 def format_intraday_alert(breakout_data):
-    """Format production-grade intraday breakout alert with all essential details"""
-    symbol = breakout_data['symbol']
-    entry = breakout_data['entry_price']
-    stop = breakout_data['stop_loss']
-    target = breakout_data['target_price']
-    current = breakout_data['current_price']
-    rsi = breakout_data['rsi']
-    vol_spike = breakout_data['volume_spike']
-    rr = breakout_data['risk_reward']
-    strength = breakout_data['breakout_strength']
+    """Format production-grade intraday breakout alert with entry distance forensics."""
+    symbol = breakout_data.get('symbol', '?')
+    entry = float(breakout_data.get('entry_price') or 0.0)
+    stop = float(breakout_data.get('stop_loss') or 0.0)
+    target = float(breakout_data.get('target_price') or 0.0)
+    current = float(breakout_data.get('current_price') or entry)
+    rsi = float(breakout_data.get('rsi') or 50.0)
+    vol_spike = float(breakout_data.get('volume_spike') or 1.0)
+    rr = float(breakout_data.get('risk_reward') or 0.0)
+    strength = breakout_data.get('breakout_strength', 3)
     regime = breakout_data.get('market_regime', 'NORMAL')
     
     risk_pct = ((entry - stop) / entry * 100) if entry > 0 else 0
     reward_pct = ((target - entry) / entry * 100) if entry > 0 else 0
+    dist_pct = ((current - entry) / entry * 100) if entry > 0 else 0
+    
+    dist_str = f"+{dist_pct:.2f}% above trigger" if dist_pct >= 0 else f"{dist_pct:.2f}% below trigger"
+    warning_note = ""
+    if dist_pct > 3.5:
+        warning_note = "\n⚠️ <i>Note: CMP is over-extended (>3.5% above trigger). Avoid chasing.</i>"
     
     msg = f"""⚡ <b>AlphaPulse</b> | <b>INTRADAY BREAKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━
@@ -576,8 +583,8 @@ def format_intraday_alert(breakout_data):
 📋 <i>Intraday Momentum Surge</i>
 
 💰 <b>TRADE EXECUTION</b>
-• <b>Live Price:</b> ₹{current:,.2f}
 • <b>Trigger Level:</b> ₹{entry:,.2f}
+• <b>Live Price:</b> ₹{current:,.2f} ({dist_str}){warning_note}
 • <b>Stop Loss:</b> ₹{stop:,.2f} (<code>-{risk_pct:.1f}%</code>)
 • <b>Profit Target:</b> ₹{target:,.2f} (<code>+{reward_pct:.1f}%</code>)
 • <b>Risk/Reward:</b> 1:{rr:.1f}

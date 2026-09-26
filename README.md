@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-3.5.0-orange.svg)](https://github.com/deepadhia/Alpha-Pulse)
+[![Version](https://img.shields.io/badge/version-3.5.1-orange.svg)](https://github.com/deepadhia/Alpha-Pulse)
 [![Automated](https://img.shields.io/badge/automation-GitHub%20Actions-green.svg)](https://github.com/features/actions)
 
 **AlphaPulse** is a high-conviction, behavior-driven quantitative momentum and breakout qualification system. It participates **only in confirmed breakouts** with structural and volume validation, ruthlessly filtering out noise and tracking setup forensics to continuously refine the statistical edge.
@@ -628,6 +628,8 @@ All statistics, analytics scripts, and strategy evidence are strictly bounded to
 
 | Version | Date | Key Changes |
 |---|---|---|
+| **v3.5.1** | 2026-09-27 | **Institutional Risk, Re-Entry & Alerting Upgrades:** (1) Peak-Gated 14-Day Velocity Speed Gate (`max_runup < 3.5%` + `pnl <= 0%`) protecting developing base-builders while eliminating non-performers; (2) 5-Day Re-Entry Cooldown Quarantine in `db.py:get_reentry_watchlist()` to eliminate next-day whipsaw churn; (3) Institutional Volume Surge Gate (`volume_spike >= 1.50x`) on re-entries; (4) Consolidated Telegram Alert Suite (batched SL moves + unified EOD Portfolio & Risk report with setup types and shadow tracking). |
+| **v3.5.1** | 2026-09-27 | **Institutional Risk, Re-Entry & Alerting Upgrades:** (1) Peak-Gated 14-Day Velocity Speed Gate (`max_runup < 3.5%` + `pnl <= 0%`) protecting developing base-builders while eliminating non-performers; (2) 5-Day Re-Entry Cooldown Quarantine in `db.py:get_reentry_watchlist()` to eliminate next-day whipsaw churn; (3) Institutional Volume Surge Gate (`volume_spike >= 1.50x`) on re-entries; (4) Consolidated Telegram Alert Suite (batched SL moves + unified EOD Portfolio & Risk report with setup types and shadow tracking). |
 | **v3.5.0** | 2026-09-13 | **14-Day Velocity Gate Loophole Closure & Forensic Evidence Store:** (1) Enforced unconditional 14-day velocity speed gate (`days_held >= 14 and pnl <= 0.0`) in `streamlined_ipo_scanner.py`, eliminating the >4% runup immunity loophole; (2) Upgraded `core/strategy_evidence.py` to extract granular setup DNA (volume surge, 10d base PRNG %, upper wick %, turnover) and classify qualitative archetypes across all clean cohort trades; (3) Added dynamic Section 3 Listing Day Breakouts Edge Analysis to `diagnose_trade.py --system`; (4) Re-verified 100% clean-cohort isolation (`entry_date >= 2026-07-05`) in MongoDB `positions`/`signals` with historical archives in `positions_legacy_archive`. |
 | **v3.5.0** | 2026-08-29 | **Robust Price Action & Velocity Engine:** (1) Upper 50% Candle Body Confirmation Gate (`(CLOSE-LOW)/(HIGH-LOW) >= 0.50`), (2) 14-Day Velocity Speed Gate with Volume Decay verification, (3) Max 8% Extension Anti-Chasing Ceiling, (4) Immediate Base Peak Re-Entry Trigger, (5) Persistent Strategy Evidence Store. |
 | **v3.4.0** | 2026-08-29 | **Trade Forensics & Strategy Evidence Store:** Added `diagnose_trade.py` and `core/strategy_evidence.py` for persistent strategy proof, 4-quadrant self-diagnostics, safe archive migration (`positions_legacy_archive`), and hard clean-cohort guards across all statistical scripts. |
@@ -648,4 +650,4 @@ All statistics, analytics scripts, and strategy evidence are strictly bounded to
 
 ---
 
-<sub>Built for systematic momentum trading | AlphaPulse v3.5.0 | Automated via GitHub Actions + Cloudflare Worker Dispatcher | MongoDB Atlas Infrastructure | Data-Driven Filter Optimization</sub>
+<sub>Built for systematic momentum trading | AlphaPulse v3.5.1 | Automated via GitHub Actions + Cloudflare Worker Dispatcher | MongoDB Atlas Infrastructure | Data-Driven Filter Optimization</sub>

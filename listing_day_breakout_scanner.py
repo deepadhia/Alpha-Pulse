@@ -2544,6 +2544,19 @@ def scan_listing_day_breakouts():
                         # Compute genuine metrics from df_check to preserve data collection integrity
                         r20_vol = float(df_check['VOLUME'].tail(20).mean()) if (df_check is not None and not df_check.empty and 'VOLUME' in df_check.columns) else 0.0
                         vol_spike_calc = round(live_vol / r20_vol, 2) if r20_vol > 0 else 1.0
+
+                        # 4. Institutional Volume Surge Gate: Require >= 1.50x volume spike on re-entry
+                        if vol_spike_calc < 1.50:
+                            logger.info(f"🚫 Skipping Re-Entry for {symbol}: Sub-par volume surge ({vol_spike_calc:.2f}x < 1.50x threshold)")
+                            write_daily_log("listing_day", symbol, "REJECTED_REENTRY", {
+                                "reason": "REENTRY_VOLUME_BELOW_SURGE",
+                                "failing_metric": "REENTRY_VOLUME_BELOW_SURGE",
+                                "failing_value": vol_spike_calc,
+                                "threshold": 1.50,
+                                "live_vol": live_vol,
+                                "r20_vol": r20_vol
+                            }, log_type="REJECTED")
+                            continue
                         r10_low = float(df_check['LOW'].tail(10).min()) if (df_check is not None and not df_check.empty and 'LOW' in df_check.columns) else 0.0
                         r10_high = float(df_check['HIGH'].tail(10).max()) if (df_check is not None and not df_check.empty and 'HIGH' in df_check.columns) else 0.0
                         prng_calc = round(((r10_high - r10_low) / r10_low) * 100.0, 1) if r10_low > 0 else float(pos.get("listing_range_pct", 0) or 0)

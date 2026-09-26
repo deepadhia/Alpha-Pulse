@@ -3741,7 +3741,7 @@ def detect_scan(symbols, listing_map):
     return signals_found
 
 def weekly_summary():
-    """Generate detailed weekly summary with performance metrics"""
+    """Generate detailed institutional weekly summary with performance metrics"""
     from db import get_all_signals_df, get_all_positions_df
     df_signals = get_all_signals_df()
     df_positions = get_all_positions_df()
@@ -3750,7 +3750,6 @@ def weekly_summary():
     week_start = datetime.today() - timedelta(days=7)
     
     if not df_signals.empty and "signal_date" in df_signals.columns:
-        # Ensure week_start is naive if signal_date is naive
         if df_signals["signal_date"].dt.tz is None and week_start.tzinfo is not None:
             week_start = week_start.replace(tzinfo=None)
         elif df_signals["signal_date"].dt.tz is not None and week_start.tzinfo is None:
@@ -3760,23 +3759,29 @@ def weekly_summary():
         weekly_signals = len(df_signals[df_signals["signal_date"] >= week_start])
     else:
         weekly_signals = 0
-    if not df_positions.empty and "status" in df_positions.columns:
-        active_positions = len(df_positions[df_positions["status"] == "ACTIVE"])
-    else:
-        active_positions = 0
+
+    active_live = len(df_positions[df_positions["status"] == "ACTIVE"]) if not df_positions.empty and "status" in df_positions.columns else 0
+    active_paper = len(df_positions[df_positions["status"] == "PAPER_ONLY"]) if not df_positions.empty and "status" in df_positions.columns else 0
+    closed_count = len(df_positions[df_positions["status"].isin(["CLOSED", "PAPER_CLOSED"])]) if not df_positions.empty and "status" in df_positions.columns else 0
     
-    # Performance stats for active positions
-    if active_positions > 0 and "pnl_pct" in df_positions.columns:
+    performance_text = ""
+    if active_live > 0 and "pnl_pct" in df_positions.columns:
         active_df = df_positions[df_positions["status"] == "ACTIVE"]
         avg_pnl = active_df["pnl_pct"].mean()
         best_position = active_df.loc[active_df["pnl_pct"].idxmax()] if not active_df.empty else None
         worst_position = active_df.loc[active_df["pnl_pct"].idxmin()] if not active_df.empty else None
         
+        best_str = f"{best_position['symbol']} ({best_position['pnl_pct']:+.1f}%)" if best_position is not None else "N/A"
+        worst_str = f"{worst_position['symbol']} ({worst_position['pnl_pct']:+.1f}%)" if worst_position is not None else "N/A"
+        pnl_sign = '+' if avg_pnl >= 0 else ''
+        pnl_c = '🟢' if avg_pnl >= 0 else '🔴'
+        
         performance_text = f"""
-📈 <b>Performance Highlights:</b>
-• Average P&L: {avg_pnl:.2f}%
-• Best Position: {best_position['symbol']} ({best_position['pnl_pct']:.2f}%)
-• Worst Position: {worst_position['symbol']} ({worst_position['pnl_pct']:.2f}%)"""
+📈 <b>Live Book Highlights:</b>
+• Average Unrealized: {pnl_c} <b>{pnl_sign}{avg_pnl:.2f}%</b>
+• Top Position: <b>{best_str}</b>
+• Lagging: <b>{worst_str}</b>"""
+
     # Strategy Evidence 50-Sample Milestone Progress
     ev_count = 0
     try:
@@ -3795,19 +3800,22 @@ def weekly_summary():
 ⏳ <b>Evidence Store:</b> {ev_count}/50 samples ({(ev_count/50)*100:.1f}%)
 • Passive gathering active (statistical gates locked until 50 samples)."""
     
-    msg = f"""📊 <b>Weekly Summary</b>
-    
-🔍 <b>This Week:</b>
-• New Signals: {weekly_signals}
-• Active Positions: {active_positions}
-• Total Signals (All Time): {len(df_signals)}{performance_text}{evidence_text}
+    msg = f"""📊 <b>AlphaPulse | WEEKLY PERFORMANCE & SYSTEM SUMMARY</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔍 <b>Active Book & Signals (Last 7 Days):</b>
+• New Breakout Signals: <b>{weekly_signals}</b>
+• Active Live Positions: <b>{active_live}</b>
+• Paper / Research Holdings: <b>{active_paper}</b>
+• Realized Closed Trades: <b>{closed_count}</b>{performance_text}{evidence_text}
 
-📅 <b>Week Range:</b> {week_start.strftime('%Y-%m-%d')} to {datetime.today().strftime('%Y-%m-%d')}"""
+📅 <b>Week Window:</b> {week_start.strftime('%Y-%m-%d')} to {datetime.today().strftime('%Y-%m-%d')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ <i>AlphaPulse v{SCANNER_VERSION}</i>"""
     
     send_telegram(msg)
 
 def monthly_review():
-    """Generate detailed monthly review with comprehensive stats"""
+    """Generate detailed institutional monthly review with comprehensive stats"""
     from db import get_all_signals_df, get_all_positions_df
     df_signals = get_all_signals_df()
     df_positions = get_all_positions_df()
@@ -3816,7 +3824,6 @@ def monthly_review():
     month_start = datetime.today().replace(day=1)
     
     if not df_signals.empty and "signal_date" in df_signals.columns:
-        # Ensure month_start is naive if signal_date is naive
         if df_signals["signal_date"].dt.tz is None and month_start.tzinfo is not None:
             month_start = month_start.replace(tzinfo=None)
         elif df_signals["signal_date"].dt.tz is not None and month_start.tzinfo is None:
@@ -3838,27 +3845,271 @@ def monthly_review():
     
     # Position stats
     if not df_positions.empty and "status" in df_positions.columns:
-        active_positions = len(df_positions[df_positions["status"] == "ACTIVE"])
-        closed_positions = len(df_positions[df_positions["status"] == "CLOSED"])
+        active_live = len(df_positions[df_positions["status"] == "ACTIVE"])
+        active_paper = len(df_positions[df_positions["status"] == "PAPER_ONLY"])
+        closed_positions = len(df_positions[df_positions["status"].isin(["CLOSED", "PAPER_CLOSED"])])
     else:
-        active_positions = 0
+        active_live = 0
+        active_paper = 0
         closed_positions = 0
     
-    msg = f"""📊 <b>Monthly Review</b>
-    
+    msg = f"""📊 <b>AlphaPulse | MONTHLY STRATEGY & PORTFOLIO REVIEW</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📈 <b>This Month ({month_start.strftime('%B %Y')}):</b>
-• New Signals: {monthly_signals}
-• Active Positions: {active_positions}
-• Closed Positions: {closed_positions}
+• New Breakout Signals: <b>{monthly_signals}</b>
+• Active Live Positions: <b>{active_live}</b>
+• Paper / Forward Positions: <b>{active_paper}</b>
+• Realized Closed Positions: <b>{closed_positions}</b>
 
-🎯 <b>All-Time Stats:</b>
-• Total Signals: {total_signals}
-• Grade Distribution:
+🎯 <b>All-Time Clean Setup Distribution:</b>
+• Total Qualified Signals: <b>{total_signals}</b>
 {grade_text}
 
-📅 <b>Review Period:</b> {month_start.strftime('%Y-%m-%d')} to {datetime.today().strftime('%Y-%m-%d')}"""
+📅 <b>Review Period:</b> {month_start.strftime('%Y-%m-%d')} to {datetime.today().strftime('%Y-%m-%d')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ <i>AlphaPulse v{SCANNER_VERSION}</i>"""
     
     send_telegram(msg)
+
+def format_alphapulse_portfolio_report():
+    """Format a unified, institutional EOD Daily Portfolio & Risk Report for AlphaPulse."""
+    try:
+        from db import db
+        positions = list(db.positions.find())
+    except Exception as e:
+        logger.error(f"Failed to fetch positions for portfolio report: {e}")
+        return ""
+
+    def format_grade(grade):
+        if not grade:
+            return "Standard"
+        g = str(grade).upper()
+        if g == "LISTING_BREAKOUT":
+            return "Listing BO"
+        if g == "STANDARD":
+            return "Standard"
+        if g == "INTRADAY":
+            return "Intraday"
+        if g == "B":
+            return "Grade B"
+        if g in ["A+", "A"]:
+            return f"Grade {g}"
+        return g
+
+    now_ist = datetime.now()
+    active_live = [p for p in positions if p.get('status') == 'ACTIVE']
+    active_paper = [p for p in positions if p.get('status') == 'PAPER_ONLY']
+
+    # 1. Live Positions
+    total_live_pnl = 0.0
+    live_lines = []
+    for p in active_live:
+        sym = p.get('symbol')
+        grd = format_grade(p.get('grade'))
+        entry = float(p.get('entry_price') or 0.0)
+        curr = float(p.get('current_price') or entry)
+        sl = float(p.get('trailing_stop') or p.get('stop_loss') or (entry * 0.90))
+        pnl = float(p.get('pnl_pct') or (((curr - entry) / entry * 100) if entry else 0.0))
+        total_live_pnl += pnl
+        days = int(p.get('days_held') or 0)
+        w_score = p.get('winner_score') or p.get('winner_traits_score') or 0
+        w_label = p.get('winner_label')
+        
+        pnl_c = '🟢' if pnl >= 0 else '🔴'
+        pnl_s = '+' if pnl >= 0 else ''
+        sl_dist = ((sl - curr) / curr * 100) if curr > 0 else 0.0
+        w_badge = f" | 💎 Score: {w_score}/4" if w_score else ""
+        if w_label == "POSSIBLE_WINNER":
+            w_badge += " 🔥"
+            
+        live_lines.append(
+            f"• <b>{sym}</b> ({grd}): ₹{entry:,.2f} → <b>₹{curr:,.2f}</b> ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>) | SL: ₹{sl:,.2f} ({sl_dist:.1f}%){w_badge} · {days}d"
+        )
+
+    avg_live_pnl = (total_live_pnl / len(active_live)) if active_live else 0.0
+    avg_live_color = '🟢' if avg_live_pnl >= 0 else '🔴'
+
+    # 2. Paper Positions
+    paper_lines = []
+    total_paper_pnl = 0.0
+    for p in active_paper:
+        sym = p.get('symbol')
+        grd = format_grade(p.get('grade'))
+        entry = float(p.get('entry_price') or 0.0)
+        curr = float(p.get('current_price') or entry)
+        sl = float(p.get('trailing_stop') or p.get('stop_loss') or (entry * 0.90))
+        pnl = float(p.get('pnl_pct') or (((curr - entry) / entry * 100) if entry else 0.0))
+        total_paper_pnl += pnl
+        days = int(p.get('days_held') or 0)
+        w_score = p.get('winner_score') or p.get('winner_traits_score') or 0
+        w_label = p.get('winner_label')
+        
+        pnl_c = '🟢' if pnl >= 0 else '🔴'
+        pnl_s = '+' if pnl >= 0 else ''
+        sl_dist = ((sl - curr) / curr * 100) if curr > 0 else 0.0
+        w_badge = f" | 💎 Score: {w_score}/4" if w_score else ""
+        if w_label == "POSSIBLE_WINNER":
+            w_badge += " 🔥"
+            
+        paper_lines.append(
+            f"• <b>{sym}</b> ({grd}): ₹{entry:,.2f} → <b>₹{curr:,.2f}</b> ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>) | SL: ₹{sl:,.2f} ({sl_dist:.1f}%){w_badge} · {days}d"
+        )
+
+    avg_paper_pnl = (total_paper_pnl / len(active_paper)) if active_paper else 0.0
+    avg_paper_color = '🟢' if avg_paper_pnl >= 0 else '🔴'
+
+    # 3. Shadow Tracking Counts & Active Shadow-Only Positions
+    sh_8_act = sum(1 for p in positions if p.get('shadow_status_8pct') == 'ACTIVE')
+    sh_10_act = sum(1 for p in positions if p.get('shadow_status_10pct') == 'ACTIVE')
+    sh_12_act = sum(1 for p in positions if p.get('shadow_status_12pct') == 'ACTIVE')
+
+    shadow_only = [
+        p for p in positions 
+        if p.get('status') in ['CLOSED', 'PAPER_CLOSED'] and (
+            p.get('shadow_status_8pct') == 'ACTIVE' or 
+            p.get('shadow_status_10pct') == 'ACTIVE' or 
+            p.get('shadow_status_12pct') == 'ACTIVE'
+        )
+    ]
+
+    shadow_only_lines = []
+    for p in shadow_only:
+        sym = p.get('symbol')
+        grd = format_grade(p.get('grade'))
+        entry = float(p.get('entry_price') or 0.0)
+        curr = float(p.get('current_price') or entry)
+        pnl = float(p.get('pnl_pct') or (((curr - entry) / entry * 100) if entry else 0.0))
+        pnl_c = '🟢' if pnl >= 0 else '🔴'
+        pnl_s = '+' if pnl >= 0 else ''
+        active_sh = []
+        if p.get('shadow_status_8pct') == 'ACTIVE': active_sh.append('8%')
+        if p.get('shadow_status_10pct') == 'ACTIVE': active_sh.append('10%')
+        if p.get('shadow_status_12pct') == 'ACTIVE': active_sh.append('12%')
+        sh_str = '/'.join(active_sh)
+        shadow_only_lines.append(f"  ↳ <b>{sym}</b> ({grd}) [Live Closed]: ₹{entry:,.2f} → <b>₹{curr:,.2f}</b> ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>) | {sh_str} Active")
+
+    # 4. Top 5 Shadow Performers & Defensive Loss Cuts
+    def get_pnl(p):
+        entry = float(p.get('entry_price') or 0.0)
+        curr = float(p.get('current_price') or entry)
+        return float(p.get('pnl_pct') or (((curr - entry) / entry * 100) if entry else 0.0))
+
+    sorted_by_pnl = sorted(positions, key=get_pnl, reverse=True)
+    top_winners = [p for p in sorted_by_pnl if get_pnl(p) > 0][:5]
+    top_losers = [p for p in reversed(sorted_by_pnl) if get_pnl(p) < 0][:3]
+
+    top_win_lines = []
+    for i, p in enumerate(top_winners, 1):
+        sym = p.get('symbol')
+        grd = format_grade(p.get('grade'))
+        pnl = get_pnl(p)
+        status_label = 'Active' if p.get('status') in ['ACTIVE', 'PAPER_ONLY'] else 'Closed'
+        top_win_lines.append(f"  {i}. <b>{sym}</b> ({grd}): 🟢 <b>+{pnl:.1f}%</b> ({status_label})")
+
+    losers_items = [f"<b>{p.get('symbol')}</b> (🔴 {get_pnl(p):.1f}%)" for p in top_losers]
+    losers_summary = ', '.join(losers_items)
+
+    # 5. Recent Exits
+    def get_exit_sort_key(p):
+        ex_d = p.get('exit_date')
+        if isinstance(ex_d, datetime):
+            return ex_d
+        if isinstance(ex_d, str):
+            try: return datetime.fromisoformat(ex_d)
+            except: pass
+        return datetime.min
+
+    closed_positions = [p for p in positions if p.get('status') in ['CLOSED', 'PAPER_CLOSED'] and p.get('exit_reason')]
+    closed_positions.sort(key=get_exit_sort_key, reverse=True)
+    recent_exits = closed_positions[:4]
+
+    exit_lines = []
+    for p in recent_exits:
+        sym = p.get('symbol')
+        pnl = float(p.get('pnl_pct') or 0.0)
+        reason = p.get('exit_reason', 'Exit')
+        pnl_c = '🟢' if pnl >= 0 else '🔴'
+        pnl_s = '+' if pnl >= 0 else ''
+        days = p.get('days_held', '?')
+        exit_lines.append(f"• <b>{sym}</b>: {pnl_c} <b>{pnl_s}{pnl:.1f}%</b> | Held {days}d ({reason})")
+
+    report = f"""📊 <b>AlphaPulse | DAILY PORTFOLIO & RISK REPORT — {now_ist.strftime('%Y-%m-%d')}</b>
+⏱️ <b>Time:</b> {now_ist.strftime('%H:%M IST')} | 🛡️ <b>Clean Cohort:</b> Active
+
+🟢 <b>LIVE POSITIONS ({len(active_live)} Active)</b>
+"""
+    if live_lines:
+        report += '\n'.join(live_lines) + f"\n<i>Book Avg Unrealized: {avg_live_color} <b>{avg_live_pnl:+.1f}%</b></i>\n\n"
+    else:
+        report += "• <i>No active live positions.</i>\n\n"
+
+    report += f"""📋 <b>PAPER / FORWARD RESEARCH ({len(active_paper)} Positions)</b>
+"""
+    if paper_lines:
+        report += '\n'.join(paper_lines) + f"\n<i>Paper Avg Unrealized: {avg_paper_color} <b>{avg_paper_pnl:+.1f}%</b></i>\n\n"
+    else:
+        report += "• <i>No active paper positions.</i>\n\n"
+
+    report += f"""👥 <b>SHADOW MULTI-STOP TRACKING (8% / 10% / 12%)</b>
+• <b>Active Floors:</b> 8%: {sh_8_act} | 10%: {sh_10_act} | 12%: {sh_12_act}
+"""
+    if shadow_only_lines:
+        report += "• <b>Shadow-Only Runners:</b>\n" + '\n'.join(shadow_only_lines) + "\n\n"
+    else:
+        report += "\n"
+
+    report += f"""🏆 <b>TOP SHADOW TRADES & INSIGHTS (Good vs Bad)</b>
+🟢 <b>Top 5 Performers:</b>
+""" + '\n'.join(top_win_lines) + f"""
+🔴 <b>Defensive Loss Cuts:</b> {losers_summary}
+
+"""
+
+    if exit_lines:
+        report += f"""🚪 <b>RECENT EXITS</b>
+""" + '\n'.join(exit_lines) + "\n\n"
+
+    report += """━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🛡️ <i>Automated Unified AlphaPulse EOD Snapshot</i>"""
+    return report
+
+def format_consolidated_sl_updates(sl_updates, logic_version="v3.3"):
+    """Format multiple stop loss updates into a single, clean consolidated message."""
+    if not sl_updates:
+        return ""
+    now_str = datetime.now().strftime('%Y-%m-%d')
+    time_str = datetime.now().strftime('%H:%M IST')
+    lines = [
+        f"🛑 <b>STOP LOSS ADJUSTMENTS — {now_str}</b>",
+        f"🔖 <b>Logic: {logic_version}</b> | ATR Trailing Engine",
+        f"Total Adjustments: <b>{len(sl_updates)}</b>",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    ]
+    for item in sl_updates:
+        sym = item.get('symbol', '?')
+        old_sl = float(item.get('old_sl') or 0.0)
+        new_sl = float(item.get('new_sl') or 0.0)
+        curr = float(item.get('current_price') or 0.0)
+        pnl = float(item.get('pnl') or 0.0)
+        grade = item.get('grade', 'A')
+        entry = float(item.get('entry_price') or 0.0)
+        
+        sl_type = "ATR Trail"
+        if entry > 0 and new_sl >= round(entry * 1.005, 2) and old_sl < round(entry * 1.005, 2):
+            sl_type = "Breakeven Floor"
+        elif entry > 0 and curr >= entry * 1.75:
+            sl_type = "Stage 2 Trail"
+            
+        pnl_c = '🟢' if pnl >= 0 else '🔴'
+        pnl_sign = '+' if pnl >= 0 else ''
+        sl_change = ((new_sl - old_sl) / old_sl * 100) if old_sl > 0 else 0
+        lines.append(
+            f"• <b>{sym}</b> (Grade {grade}): SL ₹{old_sl:,.2f} → <b>₹{new_sl:,.2f}</b> (<b>+{sl_change:.2f}%</b>) [{sl_type}]\n"
+            f"  CMP: ₹{curr:,.2f} ({pnl_c} P&L: <b>{pnl_sign}{pnl:.1f}%</b>)\n"
+        )
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append(f"⏱️ <b>Updated:</b> {time_str} | 🔖 <b>{logic_version}</b>")
+    return '\n'.join(lines)
 
 def format_position_update_alert(symbol, current_price, entry_price, old_trailing, new_trailing, pnl_pct, days_held, grade):
     """Format professional broker-grade position update alert (Dhan/Upstox style)."""
@@ -4042,10 +4293,11 @@ def stop_loss_update_scan():
   👥 Tracking: {shadows_str}\n\n"""
 
     pre_scan_msg += f"⏰ <i>{datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"
-    send_telegram(pre_scan_msg)
+    logger.info("Pre-scan summary generated (suppressed telegram noise)")
     
     updates_made = 0
     exits_triggered = 0
+    sl_updates_batch = []
     failed_updates = []
     
     for idx, pos in active_positions.iterrows():
@@ -4256,9 +4508,10 @@ def stop_loss_update_scan():
                             exit_reason = "Time Stop -8% (Underperforming after 60 days)"
                 
                     # 14-Day Portfolio Velocity Speed Gate (v3.5.0 Standard):
-                    # Cut underwater or dead-money positions held >= 14 days that failed to maintain momentum.
-                    if not exit_reason and days_held >= 14 and pnl <= 0.0:
-                        exit_reason = f"Time Stop - Dead Money (14-Day Velocity Gate, PnL {pnl:+.1f}%)"
+                    # Cut true dead-money positions held >= 14 days that never achieved momentum (peak runup < 3.5% and flat/negative PnL).
+                    # Protects healthy base-builders (max_runup >= 3.5%) while eliminating non-performers.
+                    if not exit_reason and days_held >= 14 and pnl <= 0.0 and new_max_runup < 3.5:
+                        exit_reason = f"Time Stop - Dead Money (14-Day Velocity Gate, PnL {pnl:+.1f}%, Peak +{new_max_runup:.1f}%)"
 
                     # Secondary Stagnant Position Guard (applies to flat / non-winner positions)
                     if not exit_reason and days_held >= 40:
@@ -4457,11 +4710,17 @@ def stop_loss_update_scan():
                             "position_exit_version": SCANNER_VERSION,
                         })
 
-                        # Send position update alert only when stop-loss actually moves
-                        update_msg = format_position_update_alert(
-                            sym, current_price, entry_price, old_trailing, new_trailing, pnl, days_held, grade
-                        )
-                        send_telegram(update_msg)
+                        # Collect for consolidated stop-loss adjustments alert
+                        sl_updates_batch.append({
+                            'symbol': sym,
+                            'old_sl': old_trailing,
+                            'new_sl': new_trailing,
+                            'current_price': current_price,
+                            'entry_price': entry_price,
+                            'pnl': pnl,
+                            'days_held': days_held,
+                            'grade': grade
+                        })
 
                     # Persist to DB (Critical Fix: was missing)
                     try:
@@ -4641,7 +4900,7 @@ def stop_loss_update_scan():
 
             if shadow_closed_messages:
                 shadow_alert = f"👥 <b>Shadow SL Exit Alert: {sym}</b>\n\n" + "\n".join(shadow_closed_messages) + f"\n\n💰 Entry: ₹{entry_price:.2f} | Current: ₹{current_price:.2f}"
-                send_telegram(shadow_alert)
+                logger.info(f"[SHADOW SILENT UPDATE] {sym}: " + " | ".join(shadow_closed_messages))
                 
             # Assign shadow variables to DataFrame row for persistence
             shadow_fields = {
@@ -4698,24 +4957,18 @@ def stop_loss_update_scan():
     
     # Positions are written row-by-row via upsert_position inside the loop; no batch write needed.
 
-    # Send summary
-    summary_msg = f"""🔄 <b>Stop-Loss Update Scan Complete</b>
-    
-📊 <b>Results:</b>
-✅ Positions Updated: {updates_made}
-🚪 Positions Closed: {exits_triggered}
-⚠️ Failed Updates: {len(failed_updates)}
-📈 Active Positions: {len(real_active) - exits_triggered}"""
-    
-    if not shadow_only.empty:
-        summary_msg += f"\n👥 Shadow-Only Active: {len(shadow_only)}"
-    
-    if failed_updates:
-        summary_msg += f"\n\n❌ <b>Failed Symbols:</b> {', '.join(failed_updates)}"
-    
-    summary_msg += f"\n\n⏰ <b>Scan Time:</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-    
-    send_telegram(summary_msg)
+    # 1. Send consolidated stop loss adjustment alert (if any trailing stops were raised)
+    if sl_updates_batch:
+        consolidated_sl_msg = format_consolidated_sl_updates(sl_updates_batch, logic_version=f"v{SCANNER_VERSION}")
+        send_telegram(consolidated_sl_msg)
+
+    # 2. Send unified EOD Portfolio & Risk Report
+    try:
+        portfolio_report_msg = format_alphapulse_portfolio_report()
+        if portfolio_report_msg:
+            send_telegram(portfolio_report_msg)
+    except Exception as e:
+        logger.error(f"Failed to send unified portfolio report: {e}")
     logger.info(f"Stop-loss update complete: {updates_made} updated, {exits_triggered} closed, {len(failed_updates)} failed")
 
 def heartbeat():

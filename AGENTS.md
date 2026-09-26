@@ -89,24 +89,29 @@ python manage_db.py diagnose --symbols KUSUMGAR CMRGREEN --vs-winners
 
 ---
 
-## 🚦 5. Quantitative & Risk Management Rules (v3.5.0 Standards)
+## 🚦 5. Quantitative & Risk Management Rules (v3.5.1 Standards)
 
 1. **Upper 50% Candle Body Confirmation Rule:**
    - Any breakout attempt must close in the upper 50% of its total daily range: `(CLOSE - LOW) / (HIGH - LOW) >= 0.50`.
    - Rejects long shooting stars and upper supply traps (e.g. `KUSUMGAR`) structurally without curve-fitting narrow wick thresholds.
-2. **14-Day Portfolio Velocity Speed Gate:**
-   - Positions held `≥ 14 days` with flat/negative PnL ($PnL \le 0\%$) and decaying volume ($< 50\%$ of entry baseline) are closed early.
-   - Cohort testing proves 81% of underwater 14-day trades continue to bleed (avg -13.16% drawdown), making this an essential alpha preservation rule.
+2. **Peak-Gated 14-Day Portfolio Velocity Speed Gate:**
+   - Positions held `≥ 14 days` with flat/negative PnL ($PnL \le 0\%$) AND **peak runup $< 3.5\%$** (`new_max_runup < 3.5%`) are closed early.
+   - Eliminates genuine non-performers (`JNPR`, `SAATVIKGL`) while protecting developing base-builders (e.g. `SUDEEPPHRM`, `AEROPLANE`) from premature chops.
 3. **Anti-Chasing 8% Max Extension Guard:**
    - Breakout entries $> 8.0\%$ extended above the base breakout pivot or listing high are rejected to prevent buying overheated tops.
-4. **Immediate Base Peak Re-Entry Trigger:**
-   - Closed setups stored on the re-entry watchlist immediately re-trigger the moment price breaks above `peak_price_during_trade` with volume surge, capturing momentum ignition (e.g., `URBANCO` at ₹152) with zero opportunity loss.
+4. **Base Peak Re-Entry Engine with 5-Day Cooldown & Institutional Volume Floor:**
+   - **5-Day Quarantine:** Requires `5d <= days_since_exit <= 30d` before a closed stock is eligible for re-entry, completely eliminating next-day whipsaw churn.
+   - **Institutional Volume Floor:** Requires `volume_spike >= 1.50x` on re-entries, ensuring positions are only taken on genuine institutional accumulation rather than low-volume noise.
 5. **Volume Surge Multiplier:**
    - High-conviction Tier A setups require `≥ 3.0x` volume surge over the 20-day average.
    - Setups with volume spike `< 1.5x` or volume `< 150,000` shares are automatically rejected.
 6. **Base Tightness (PRNG):**
    - 10-day price range (PRNG) must be `≤ 15%` to ensure coiled volatility and tight risk stops.
-7. **Backtest & Quant Integrity:**
+7. **Day-0 Chronology Safeguard:**
+   - Day-0 entries (`days_held == 0`) are completely exempt from trailing stop adjustments and time stops, preserving initial structural risk floors for entry-day noise.
+8. **Consolidated Institutional Telegram Suite:**
+   - Replaces noisy individual per-trade alerts with a single batched `🛑 STOP LOSS ADJUSTMENTS` card and a unified EOD `📊 DAILY PORTFOLIO & RISK REPORT` tracking live book, paper book, setup types (`Listing BO`, `Grade B`), Winner Scores (`💎 4/4 🔥`), Shadow Multi-Stop Tracking (Top 5 Performers & Defensive Cuts), and recent exits.
+9. **Backtest & Quant Integrity:**
    - Never alter trading rules or backtesting logic silently.
    - Backtest integrity and statistical rigor take precedence over code aesthetics.
 

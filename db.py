@@ -782,17 +782,35 @@ def update_cached_market_cap(symbol: str, market_cap_cr: float):
 
 
 def get_reentry_watchlist() -> list:
-    """Retrieve all closed positions within the last 30 days that have not already triggered a re-entry."""
+    """Retrieve closed positions from 5 to 30 days ago that have not already triggered a re-entry (5-day cooldown)."""
     if positions_col is None:
         return []
     try:
-        thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+        now_utc = datetime.now(timezone.utc)
+        thirty_days_ago = now_utc - timedelta(days=30)
+        five_days_ago = now_utc - timedelta(days=5)
+        
         docs = positions_col.find({
             "status": {"$in": ["CLOSED", "PAPER_CLOSED"]},
-            "exit_date": {"$gte": thirty_days_ago},
             "reentry_count": {"$in": [0, None]} # Not already re-entered
         })
-        return list(docs)
+        
+        valid_docs = []
+        for d in docs:
+            ex_d = d.get("exit_date")
+            if not ex_d:
+                continue
+            if isinstance(ex_d, str):
+                try:
+                    ex_d = datetime.fromisoformat(ex_d.replace("Z", "+00:00"))
+                except:
+                    continue
+            if isinstance(ex_d, datetime):
+                if ex_d.tzinfo is None:
+                    ex_d = ex_d.replace(tzinfo=timezone.utc)
+                if thirty_days_ago <= ex_d <= five_days_ago:
+                    valid_docs.append(d)
+        return valid_docs
     except Exception as e:
         logger.error(f"[DB] get_reentry_watchlist failed: {e}")
         return []
