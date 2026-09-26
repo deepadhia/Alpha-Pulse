@@ -1920,6 +1920,12 @@ def commit_trade_to_db(breakout_data):
         # IPO dead-money / volume-exhaustion / trail thresholds (not consol defaults).
         position_grade = "LISTING_BREAKOUT"
         
+        tier = breakout_data.get('tier', 'A')
+        lh_ref = breakout_data.get('listing_day_high')
+        entry_p = breakout_data['entry_price']
+        limit_buy_price = round(lh_ref * 1.035 if lh_ref is not None and lh_ref > 0 else entry_p * 1.02, 2)
+        max_chase = 3.5 if tier == 'A' else 2.0
+
         # Create signal doc
         signal_doc = {
             "signal_id": signal_id,
@@ -1927,6 +1933,8 @@ def commit_trade_to_db(breakout_data):
             "signal_date": datetime.now(),
             "signal_time": _now_ist().strftime("%H:%M:%S"),
             "entry_price": breakout_data['entry_price'],
+            "limit_buy_price": limit_buy_price,
+            "max_chase_pct": max_chase,
             "stop_loss": breakout_data['stop_loss'],
             "target_price": breakout_data['target_price'],
             "status": "PAPER_ONLY" if portfolio_full else "ACTIVE",
@@ -1938,7 +1946,7 @@ def commit_trade_to_db(breakout_data):
             "days_since_listing": breakout_data['days_since_listing'],
             "winner_label": breakout_data.get('winner_label', 'STANDARD'),
             "winner_score": breakout_data.get('winner_score', 0),
-            "tier": breakout_data.get('tier', 'A'),
+            "tier": tier,
             "market_regime": mr,
             "version": SCANNER_VERSION,
             "strategy_version": f"{SCANNER_VERSION}-listing-day",
@@ -1957,6 +1965,8 @@ def commit_trade_to_db(breakout_data):
             "symbol": symbol,
             "entry_date": datetime.now(),
             "entry_price": breakout_data['entry_price'],
+            "limit_buy_price": limit_buy_price,
+            "max_chase_pct": max_chase,
             "current_price": breakout_data['current_price'],
             "stop_loss": breakout_data['stop_loss'],
             "trailing_stop": breakout_data['stop_loss'],
@@ -1967,6 +1977,7 @@ def commit_trade_to_db(breakout_data):
             "max_runup_pct": 0.0,
             "max_drawdown_pct": 0.0,
             "grade": position_grade,
+            "tier": tier,
             "winner_label": breakout_data.get('winner_label', 'STANDARD'),
             "winner_score": breakout_data.get('winner_score', 0),
             "market_regime": mr,
@@ -2239,6 +2250,11 @@ def save_watchlist_signal(breakout_data):
             "status": "WATCH",
             "watch_level": breakout_data['listing_day_high'],
             "current_price": breakout_data['current_price'],
+            "limit_buy_price": round(breakout_data['listing_day_high'] * 1.035, 2),
+            "max_chase_pct": 3.5,
+            "tier": "WATCHLIST",
+            "winner_label": "WATCHLIST_ONLY",
+            "winner_score": 1,
             "distance_pct": round(distance_pct, 2),
             "notes": "Within 5% of listing high",
             "version": SCANNER_VERSION,

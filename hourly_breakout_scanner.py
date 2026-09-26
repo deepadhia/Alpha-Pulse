@@ -671,12 +671,20 @@ def save_breakout_signal(breakout_data):
 
         position_status = "PAPER_ONLY" if portfolio_full else "ACTIVE"
         
+        entry_val = float(breakout_data['entry_price'])
+        limit_buy_price = round(entry_val * 1.02, 2)
+
         new_signal = {
             "signal_id": signal_id,
             "symbol": symbol,
             "signal_date": signal_date.strftime('%Y-%m-%d') if hasattr(signal_date, 'strftime') else str(signal_date),
-            "entry_price": breakout_data['entry_price'],
+            "entry_price": entry_val,
+            "limit_buy_price": limit_buy_price,
+            "max_chase_pct": 2.0,
             "grade": "INTRADAY",
+            "tier": "INTRADAY",
+            "winner_label": "INTRADAY_MOMENTUM",
+            "winner_score": 3,
             "score": breakout_data['breakout_strength'] * 10,
             "stop_loss": breakout_data['stop_loss'],
             "target_price": breakout_data['target_price'],
@@ -693,9 +701,14 @@ def save_breakout_signal(breakout_data):
             "signal_id": signal_id,
             "symbol": symbol,
             "entry_date": signal_date.strftime('%Y-%m-%d') if hasattr(signal_date, 'strftime') else str(signal_date),
-            "entry_price": breakout_data['entry_price'],
+            "entry_price": entry_val,
+            "limit_buy_price": limit_buy_price,
+            "max_chase_pct": 2.0,
             "grade": "INTRADAY",
-            "current_price": breakout_data['entry_price'],
+            "tier": "INTRADAY",
+            "winner_label": "INTRADAY_MOMENTUM",
+            "winner_score": 3,
+            "current_price": entry_val,
             "stop_loss": breakout_data['stop_loss'],
             "trailing_stop": breakout_data['stop_loss'],
             "pnl_pct": 0,

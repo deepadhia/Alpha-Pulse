@@ -796,3 +796,49 @@ def get_reentry_watchlist() -> list:
     except Exception as e:
         logger.error(f"[DB] get_reentry_watchlist failed: {e}")
         return []
+
+
+def update_manual_fill_price(symbol: str, fill_price: float, notes: str = "") -> bool:
+    """Updates active/paper position and associated signal with actual manual fill price from real-world execution."""
+    if positions_col is None:
+        return False
+    try:
+        sym = symbol.upper().strip()
+        pos = positions_col.find_one({"symbol": sym, "status": {"$in": ["ACTIVE", "PAPER_ONLY"]}})
+        if not pos:
+            logger.warning(f"[DB] No open ACTIVE/PAPER_ONLY position found for {sym}")
+            return False
+        
+        orig_entry = float(pos.get("entry_price", fill_price))
+        cur_price = float(pos.get("current_price", fill_price))
+        pnl_pct = ((cur_price - fill_price) / fill_price * 100.0) if fill_price > 0 else 0.0
+        slippage_pct = round(((fill_price - orig_entry) / orig_entry * 100.0), 2) if orig_entry > 0 else 0.0
+        
+        update_fields = {
+            "entry_price": fill_price,
+            "real_fill_price": fill_price,
+            "original_trigger_price": orig_entry,
+            "execution_slippage_pct": slippage_pct,
+            "pnl_pct": round(pnl_pct, 2),
+            "status": "ACTIVE",
+            "execution_type": "MANUAL_FILL",
+            "fill_updated_at": datetime.now(timezone.utc),
+            "manual_notes": notes
+        }
+        positions_col.update_one({"_id": pos["_id"]}, {"$set": update_fields})
+        
+        if signals_col is not None and pos.get("signal_id"):
+            signals_col.update_one(
+                {"signal_id": pos["signal_id"]},
+                {"$set": {
+                    "entry_price": fill_price,
+                    "real_fill_price": fill_price,
+                    "status": "ACTIVE",
+                    "execution_slippage_pct": slippage_pct
+                }}
+            )
+        logger.info(f"[DB] Successfully updated manual fill for {sym}: ₹{fill_price:.2f} (Trigger: ₹{orig_entry:.2f}, Slippage: {slippage_pct:>+5.2f}%)")
+        return True
+    except Exception as e:
+        logger.error(f"[DB] update_manual_fill_price failed for {symbol}: {e}")
+        return False

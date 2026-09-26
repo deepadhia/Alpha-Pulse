@@ -2789,6 +2789,8 @@ def detect_live_patterns(symbols, listing_map):
                     "signal_date": date_str,
                     "signal_time": datetime.now().strftime("%H:%M:%S"),
                     "entry_price": round(entry, 2),
+                    "limit_buy_price": round(entry * 1.02, 2),
+                    "max_chase_pct": 2.0,
                     # Bug 2: breakout_close = close of the candle that confirmed the breakout.
                     # This is the fair reference price for research; entry_price may differ
                     # if the scanner was live during market hours.
@@ -2992,7 +2994,14 @@ def detect_live_patterns(symbols, listing_map):
                     "symbol": sym,
                     "entry_date": date_str,
                     "entry_price": round(entry, 2),
+                    "limit_buy_price": round(entry * 1.02, 2),
+                    "max_chase_pct": 2.0,
                     "grade": grade,
+                    "tier": grade,
+                    "winner_label": _winner_meta['winner_label'],
+                    "winner_score": _winner_meta['winner_score'],
+                    "winner_criteria": _winner_meta['winner_criteria'],
+                    "winner_flags": _winner_meta['winner_flags'],
                     "current_price": round(entry, 2),
                     "stop_loss": round(stop, 2),
                     "trailing_stop": round(stop, 2),
@@ -3548,6 +3557,8 @@ def detect_scan(symbols, listing_map):
                     "signal_id": sid, "symbol": sym, "signal_date": date_str,
                     "signal_time": datetime.now().strftime("%H:%M:%S"),
                     "entry_price": entry,
+                    "limit_buy_price": round(entry * 1.02, 2),
+                    "max_chase_pct": 2.0,
                     "breakout_close": round(breakout_close_ref_scan, 2),
                     "entry_note": entry_note_scan,
                     "consolidation_window": w,
@@ -3559,6 +3570,7 @@ def detect_scan(symbols, listing_map):
                     "winner_score": winner_info["winner_score"],
                     "winner_criteria": winner_info["winner_criteria"],
                     "winner_flags": winner_info["winner_flags"],
+                    "tier": "B",
                     "position_size_weight": size_mult,
                     "version": SCANNER_VERSION, "scanner": "consolidation_scan",
                     "strategy_version": f"{SCANNER_VERSION}-consolidation",
@@ -3569,7 +3581,9 @@ def detect_scan(symbols, listing_map):
                 
                 pos = {
                     "symbol": sym, "entry_date": date_str, "entry_price": entry,
-                    "grade": grade, "current_price": entry, "stop_loss": stop,
+                    "limit_buy_price": round(entry * 1.02, 2),
+                    "max_chase_pct": 2.0,
+                    "grade": grade, "tier": "B", "current_price": entry, "stop_loss": stop,
                     "trailing_stop": stop, "pnl_pct": 0, "days_held": 0, 
                     "status": "ACTIVE" if not portfolio_full else "PAPER_ONLY",
                     "winner_label": winner_info["winner_label"],

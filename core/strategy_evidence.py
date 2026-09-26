@@ -402,10 +402,20 @@ def sync_all_trade_evidence(db, fetch_data_fn=None) -> int:
         # Also sync back to positions collection
         dna = doc.get("setup_dna", {})
         forensics = doc.get("forensics", {})
+        winner_score_val = dna.get("winner_score", 0)
+        winner_label_val = trade.get("winner_label") or ("POSSIBLE_WINNER" if winner_score_val >= 4 else ("STANDARD" if winner_score_val >= 2 else "WATCHLIST_ONLY"))
+        tier_val = trade.get("tier") or ("A" if (doc.get("engine_type") == "LISTING_DAY_BREAKOUT" and winner_score_val >= 4) else ("B" if doc.get("engine_type") == "CONSOLIDATION" else "STANDARD"))
+        entry_val = float(doc.get("outcome", {}).get("entry_price") or 0.0)
+        limit_buy_price_val = trade.get("limit_buy_price") or round(entry_val * (1.035 if tier_val == "A" else 1.02), 2)
+
         positions_col.update_one(
             {"symbol": doc["symbol"]},
             {"$set": {
-                "winner_score": dna.get("winner_score"),
+                "winner_score": winner_score_val,
+                "winner_label": winner_label_val,
+                "tier": tier_val,
+                "limit_buy_price": limit_buy_price_val,
+                "max_chase_pct": 3.5 if tier_val == "A" else 2.0,
                 "winner_traits": dna.get("winner_traits"),
                 "trap_score": dna.get("trap_score"),
                 "trap_flags": dna.get("trap_flags"),
