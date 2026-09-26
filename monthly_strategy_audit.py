@@ -71,16 +71,22 @@ def run_monthly_audit(send_alert: bool = True) -> dict:
     df = pd.DataFrame(docs)
     total_trades = len(df)
 
-    # Flatten columns
+    def _to_float(v, default=0.0):
+        try:
+            return float(v) if v is not None else default
+        except (ValueError, TypeError):
+            return default
+
+    # Flatten columns safely against None values
     df['status'] = df['outcome'].apply(lambda x: x.get('status', 'UNKNOWN') if isinstance(x, dict) else 'UNKNOWN')
-    df['pnl_pct'] = df['outcome'].apply(lambda x: float(x.get('pnl_pct', 0)) if isinstance(x, dict) else 0.0)
-    df['max_runup_pct'] = df['outcome'].apply(lambda x: float(x.get('max_runup_pct', 0)) if isinstance(x, dict) else 0.0)
-    df['days_held'] = df['outcome'].apply(lambda x: float(x.get('days_held', 0)) if isinstance(x, dict) else 0.0)
-    df['is_win'] = df['outcome'].apply(lambda x: bool(x.get('is_win', False)) if isinstance(x, dict) else False)
-    df['is_concluded'] = df['outcome'].apply(lambda x: bool(x.get('is_concluded', False)) if isinstance(x, dict) else False)
-    df['vol_spike'] = df['setup_dna'].apply(lambda x: float(x.get('volume_spike', 1.5)) if isinstance(x, dict) else 1.5)
-    df['prng'] = df['setup_dna'].apply(lambda x: float(x.get('prng_10d_pct', 15.0)) if isinstance(x, dict) else 15.0)
-    df['upper_wick'] = df['setup_dna'].apply(lambda x: float(x.get('upper_wick_pct', 0.0)) if isinstance(x, dict) else 0.0)
+    df['pnl_pct'] = df['outcome'].apply(lambda x: _to_float(x.get('pnl_pct'), 0.0) if isinstance(x, dict) else 0.0)
+    df['max_runup_pct'] = df['outcome'].apply(lambda x: _to_float(x.get('max_runup_pct'), 0.0) if isinstance(x, dict) else 0.0)
+    df['days_held'] = df['outcome'].apply(lambda x: _to_float(x.get('days_held'), 0.0) if isinstance(x, dict) else 0.0)
+    df['is_win'] = df['outcome'].apply(lambda x: bool(x.get('is_win')) if isinstance(x, dict) and x.get('is_win') is not None else False)
+    df['is_concluded'] = df['outcome'].apply(lambda x: bool(x.get('is_concluded')) if isinstance(x, dict) and x.get('is_concluded') is not None else False)
+    df['vol_spike'] = df['setup_dna'].apply(lambda x: _to_float(x.get('volume_spike'), 1.5) if isinstance(x, dict) else 1.5)
+    df['prng'] = df['setup_dna'].apply(lambda x: _to_float(x.get('prng_10d_pct'), 15.0) if isinstance(x, dict) else 15.0)
+    df['upper_wick'] = df['setup_dna'].apply(lambda x: _to_float(x.get('upper_wick_pct'), 0.0) if isinstance(x, dict) else 0.0)
     df['archetype'] = df['forensics'].apply(lambda x: x.get('archetype', 'UNKNOWN') if isinstance(x, dict) else 'UNKNOWN')
 
     # Metrics

@@ -89,7 +89,7 @@ python manage_db.py diagnose --symbols KUSUMGAR CMRGREEN --vs-winners
 
 ---
 
-## 🚦 5. Quantitative & Risk Management Rules (v3.5.1 Standards)
+## 🚦 5. Quantitative & Risk Management Rules (v3.5.0 Standards)
 
 1. **Upper 50% Candle Body Confirmation Rule:**
    - Any breakout attempt must close in the upper 50% of its total daily range: `(CLOSE - LOW) / (HIGH - LOW) >= 0.50`.

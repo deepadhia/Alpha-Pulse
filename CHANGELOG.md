@@ -4,7 +4,7 @@ All notable changes, quantitative safeguards, and alerting architecture updates 
 
 ---
 
-## [v3.5.1] — 2026-09-27
+## [v3.5.0] — 2026-09-27
 
 ### 🛡️ Quantitative Risk & Re-Entry Safeguards
 * **Peak-Gated 14-Day Velocity Speed Gate:**
