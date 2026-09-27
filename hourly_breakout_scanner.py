@@ -560,25 +560,18 @@ def format_intraday_alert(breakout_data):
     if dist_pct > 3.5:
         warning_note = "\n⚠️ <i>Note: CMP is over-extended (>3.5% above trigger). Avoid chasing.</i>"
     
-    msg = f"""⚡ <b>AlphaPulse</b> | <b>INTRADAY BREAKOUT</b>
-━━━━━━━━━━━━━━━━━━━━
-📊 <b>{symbol}</b>  •  <b>Score {strength}/3</b>
+    msg = f"""⚡ <b>AlphaPulse | INTRADAY BREAKOUT</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 <b>{symbol}</b>  •  Strength <b>{strength}/3</b>  •  <b>{regime}</b>
 📋 <i>Intraday Momentum Surge</i>
 
-💰 <b>TRADE EXECUTION</b>
-• <b>Trigger Level:</b> ₹{entry:,.2f}
-• <b>Live Price:</b> ₹{current:,.2f} ({dist_str}){warning_note}
-• <b>Stop Loss:</b> ₹{stop:,.2f} (<code>-{risk_pct:.1f}%</code>)
+• <b>Trigger Level:</b> ₹{entry:,.2f}  •  <b>Live Price:</b> ₹{current:,.2f} ({dist_str}){warning_note}
+• <b>Stop Loss:</b> ₹{stop:,.2f} (<code>-{risk_pct:.1f}%</code>)  •  <b>R/R:</b> 1:{rr:.1f}
 • <b>Profit Target:</b> ₹{target:,.2f} (<code>+{reward_pct:.1f}%</code>)
-• <b>Risk/Reward:</b> 1:{rr:.1f}
+• <b>Volume Surge:</b> <b>{vol_spike:.1f}x</b>  •  <b>RSI (14):</b> {rsi:.1f}
 
-📈 <b>SETUP METRICS</b>
-• <b>Volume Surge:</b> <b>{vol_spike:.1f}x</b>
-• <b>RSI (14):</b> {rsi:.1f}
-• <b>Market Regime:</b> <b>{regime}</b>
-
-⚡ <b>Action:</b> Review live chart for entry confirmation
-━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
     return msg
 
@@ -856,16 +849,18 @@ def scan_watchlist():
     if breakouts_found > 0:
         db_status = '✅ OK' if db_stats.get('db_failures', 0) == 0 else f"❌ {db_stats.get('db_failures')} FAILURES"
         detection_msg = '🎉 New intraday breakouts detected! Check alerts above.' if breakouts_found > 0 else '✅ No new breakouts at this time.'
-        summary = f"""⚡ <b>AlphaPulse</b> | <b>HOURLY WATCHLIST SUMMARY</b>
-━━━━━━━━━━━━━━━━━━━━
-🔍 <b>Scan Telemetry:</b>
-• <b>Watchlist Symbols:</b> {len(symbols)}
-• <b>Breakouts Found:</b> {breakouts_found}
-• <b>System DB Health:</b> {db_status}
+        summary = f"""⚡ <b>AlphaPulse | HOURLY WATCHLIST SUMMARY</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📅 <b>{datetime.now().strftime('%d %b %Y, %H:%M IST')}</b>
+
+• <b>Watchlist Symbols:</b> {len(symbols)}  •  <b>DB Health:</b> {db_status}
+• <b>Breakouts Found:</b> <b>{breakouts_found}</b>
 
 {detection_msg}
-━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%Y-%m-%d %H:%M IST')}</i>"""
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ <i>AlphaPulse v{SCANNER_VERSION}</i>"""
         send_telegram(summary)
 
 def main():

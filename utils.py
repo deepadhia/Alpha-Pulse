@@ -175,7 +175,7 @@ def fetch_from_upstox(symbol, start_date, end_date):
                 candles = data['data']['candles']
                 if candles:
                     # Convert to DataFrame
-                    df = pd.DataFrame(candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close'])
+                    df = pd.DataFrame(candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'oi'])
                     
                     # Handle timestamp conversion - try different formats
                     try:
@@ -189,7 +189,7 @@ def fetch_from_upstox(symbol, start_date, end_date):
                             # Try string format
                             df['DATE'] = pd.to_datetime(df['timestamp'], format='%Y-%m-%d')
                     
-                    df.columns = ['timestamp', 'OPEN', 'HIGH', 'LOW', 'CLOSE', 'VOLUME', 'IGNORE', 'DATE']
+                    df.columns = ['timestamp', 'OPEN', 'HIGH', 'LOW', 'CLOSE', 'VOLUME', 'OI', 'DATE']
                     
                     # Select required columns and add LTP column (use CLOSE as LTP)
                     df = df[['DATE', 'OPEN', 'HIGH', 'LOW', 'CLOSE', 'VOLUME']]
@@ -238,14 +238,14 @@ def fetch_nifty_from_upstox(start_date, end_date):
             if 'data' in data and 'candles' in data['data']:
                 candles = data['data']['candles']
                 if candles:
-                    df = pd.DataFrame(candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close'])
+                    df = pd.DataFrame(candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'oi'])
                     
                     try:
                         df['DATE'] = pd.to_datetime(df['timestamp'])
                     except Exception:
                         df['DATE'] = pd.to_datetime(df['timestamp'], format='%Y-%m-%d')
                     
-                    df.columns = ['timestamp', 'OPEN', 'HIGH', 'LOW', 'CLOSE', 'VOLUME', 'IGNORE', 'DATE']
+                    df.columns = ['timestamp', 'OPEN', 'HIGH', 'LOW', 'CLOSE', 'VOLUME', 'OI', 'DATE']
                     df = df[['DATE', 'OPEN', 'HIGH', 'LOW', 'CLOSE', 'VOLUME']]
                     df['LTP'] = df['CLOSE']
                     
@@ -491,12 +491,15 @@ def send_holiday_notification_once(scanner_name: str, today_str: Optional[str] =
         return False
 
     # 3. Format message and send notification
-    skip_msg = (
-        f"📅 <b>NSE Market Holiday / Non-Trading Day</b>\n\n"
-        f"🗓 <b>Date:</b> {today_str}\n"
-        f"⏸ <b>Status:</b> Market closed — automated scans paused.\n"
-        f"✅ Scanners will resume on the next trading session."
-    )
+    skip_msg = f"""📅 <b>AlphaPulse | MARKET HOLIDAY</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🗓 <b>Date:</b> {today_str}
+⏸ <b>Status:</b> NSE Market closed — automated scans paused.
+✅ Scanners will resume on next trading session.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ <i>AlphaPulse Telemetry</i>"""
 
     logger.info(f"📅 Market is closed today ({today_str}). Sending single daily holiday notification (triggered by {scanner_name}).")
 

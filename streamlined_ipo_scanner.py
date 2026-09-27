@@ -1011,39 +1011,31 @@ def format_signal_alert(symbol, grade, entry_price, stop_loss, target_price, sco
     base_range_str = "N/A"
     if consolidation_low and consolidation_high and consolidation_high > 0:
         prng = ((consolidation_high - consolidation_low) / consolidation_high) * 100
-        base_range_str = f"₹{consolidation_low:,.1f} - ₹{consolidation_high:,.1f} ({prng:.1f}% PRNG)"
+        base_range_str = f"₹{consolidation_low:,.1f}-₹{consolidation_high:,.1f} ({prng:.1f}%)"
 
     pattern_display = escape_html_text(pattern_type or "Consolidation Breakout")
     regime_display = escape_html_text(market_regime or "NORMAL")
     date_str = date if isinstance(date, str) else date.strftime('%Y-%m-%d')
-    src_display = escape_html_text(price_source or (data_source or "Live Data"))
     clean_sym = escape_html_text(symbol)
     clean_grade = escape_html_text(str(grade))
 
-    msg = f"""🎯 <b>AlphaPulse</b> | <b>BREAKOUT SIGNAL</b>
-━━━━━━━━━━━━━━━━━━━━
-📊 <b>{clean_sym}</b>  •  <b>Grade {clean_grade}</b> (Score: {score:.0f}/100)
+    msg = f"""🎯 <b>AlphaPulse | BREAKOUT SIGNAL</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 <b>{clean_sym}</b>  •  Grade <b>{clean_grade}</b> (Score: {score:.0f}/100)
 📋 <i>{pattern_display}</i>
 
-💰 <b>TRADE EXECUTION</b>
-• <b>Trigger Price:</b> ₹{entry_price:,.2f}
-• <b>Limit Buy Max:</b> ≤ ₹{limit_buy_price:,.2f} <i>(+3.5% cap)</i>
-• <b>Stop Loss:</b> ₹{stop_loss:,.2f} (<code>-{risk_percentage:.1f}%</code>)
+• <b>Trigger / Entry:</b> ₹{entry_price:,.2f}  <i>(Limit Max: ≤ ₹{limit_buy_price:,.2f})</i>
+• <b>Stop Loss:</b> ₹{stop_loss:,.2f} (<code>-{risk_percentage:.1f}%</code>)  •  <b>R/R:</b> 1:{risk_reward_ratio:.1f}
 • <b>Profit Target:</b> ₹{target_price:,.2f} (<code>+{reward_percentage:.1f}%</code>)
-• <b>Risk/Reward:</b> 1:{risk_reward_ratio:.1f}
+• <b>Base Range:</b> {base_range_str}  •  <b>Regime:</b> {regime_display}
 
-📈 <b>SETUP METRICS</b>
-• <b>Base Range:</b> {base_range_str}
-• <b>Market Regime:</b> <b>{regime_display}</b>
-• <b>Price Source:</b> {src_display}
-
-⚡ <b>Action:</b> Place Limit Buy order at or below ₹{limit_buy_price:,.2f}
-━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION} • {date_str}</i>"""
     return msg
 
 def format_exit_alert(symbol, exit_reason, exit_price, pnl_pct, days_held, entry_price):
-    """Format detailed exit alert with broker-grade P&L colors (Dhan/Upstox style)"""
+    """Format clean, compact exit alert with broker-grade P&L colors"""
     from utils import escape_html_text
     exit_emojis = {
         "Stop Loss": "🛑",
@@ -1055,7 +1047,15 @@ def format_exit_alert(symbol, exit_reason, exit_price, pnl_pct, days_held, entry
     }
     emoji = exit_emojis.get(exit_reason, "📊")
     clean_sym = escape_html_text(symbol)
-    clean_reason = escape_html_text(exit_reason)
+    
+    friendly_reasons = {
+        "Time Stop - Dead Money (14-Day Velocity Gate)": "14-Day Velocity Gate",
+        "Early Base Break": "Early Base Breakdown",
+        "Stop Loss": "Stop Loss Hit",
+        "Partial Take": "Target Hit (Partial Take)",
+        "Trailing Stop": "Trailing Stop Hit",
+    }
+    clean_reason = escape_html_text(friendly_reasons.get(exit_reason, exit_reason))
     
     pnl_abs = exit_price - entry_price
     if pnl_pct > 0:
@@ -1065,17 +1065,16 @@ def format_exit_alert(symbol, exit_reason, exit_price, pnl_pct, days_held, entry
     else:
         pnl_badge = f"⚪ <b>0.00%</b> (₹0.00/sh)"
     
-    msg = f"""{emoji} <b>AlphaPulse</b> | <b>POSITION EXIT</b>
-━━━━━━━━━━━━━━━━━━━━
-📊 <b>Symbol:</b> <b>{clean_sym}</b>
-📋 <b>Exit Reason:</b> <b>{clean_reason}</b>
+    msg = f"""{emoji} <b>AlphaPulse | POSITION EXIT</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-💰 <b>FINANCIAL OUTCOME</b>
-• <b>Exit Price:</b> ₹{exit_price:,.2f}
-• <b>Entry Price:</b> ₹{entry_price:,.2f}
-• <b>Realized P&amp;L:</b> {pnl_badge}
-• <b>Holding Period:</b> {int(float(days_held))} day{'s' if int(float(days_held)) != 1 else ''}
-━━━━━━━━━━━━━━━━━━━━
+📊 <b>{clean_sym}</b>  •  <b>{clean_reason}</b>
+{pnl_badge}
+
+• <b>Price:</b> ₹{entry_price:,.2f} → <b>₹{exit_price:,.2f}</b>
+• <b>Held:</b> {int(float(days_held))} day{'s' if int(float(days_held)) != 1 else ''}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
     return msg
 
@@ -1884,17 +1883,16 @@ def update_positions():
                 logger.error(f"⚠️ Extreme price drop detected for {sym}: {prev_price} -> {current_price} ({price_change_pct:.2f}%). Potential stock split or data error.")
                 from utils import escape_html_text
                 clean_sym = escape_html_text(sym)
-                split_alert = f"""⚠️ <b>AlphaPulse</b> | <b>CORPORATE ACTION / PRICE ANOMALY</b>
-━━━━━━━━━━━━━━━━━━━━
-📊 <b>Symbol:</b> <b>{clean_sym}</b>
-📉 <b>Price Drop:</b> <code>{price_change_pct:.2f}%</code> <i>(Extreme Volatility)</i>
+                split_alert = f"""⚠️ <b>AlphaPulse | CORPORATE ACTION / ANOMALY</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-💰 <b>PRICE TELEMETRY</b>
-• <b>Prior Reference:</b> ₹{prev_price:,.2f}
-• <b>Incoming LTP:</b> ₹{current_price:,.2f}
+📊 <b>{clean_sym}</b>
+📉 Price Drop: <code>{price_change_pct:.2f}%</code> (Extreme Volatility)
 
-⚠️ <b>Status:</b> Database updates paused for this symbol to prevent stop-loss distortion. Manual corporate action verification required.
-━━━━━━━━━━━━━━━━━━━━
+• <b>Prior Ref:</b> ₹{prev_price:,.2f}  •  <b>LTP:</b> ₹{current_price:,.2f}
+⚠️ <i>DB updates paused. Manual corporate action check required.</i>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
                 send_telegram(split_alert)
                 continue
@@ -3115,25 +3113,17 @@ def detect_live_patterns(symbols, listing_map):
                 prng_pct = ((high2 - low) / high2 * 100) if high2 > 0 else 0
                 vol_ratio = vol_ratio_val
 
-                message = f"""⚠️ <b>[PORTFOLIO FULL - PAPER ONLY]</b>
-🎯 <b>AlphaPulse</b> | <b>CONSOLIDATION BREAKOUT</b>
-━━━━━━━━━━━━━━━━━━━━
-📊 <b>{sym}</b>  •  <b>Grade {grade}</b>
-📋 <i>{w}-Day Base Breakout</i>
+                message = f"""🎯 <b>AlphaPulse | CONSOLIDATION BREAKOUT</b> <i>[PAPER ONLY]</i>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-💰 <b>TRADE EXECUTION</b>
-• <b>Trigger Price:</b> ₹{entry:,.2f}
-• <b>Stop Loss:</b> ₹{stop:,.2f} (<code>-{risk_pct:.1f}%</code>)
-• <b>Profit Target:</b> ₹{target:,.2f} (<code>+{reward_pct:.1f}%</code>)
+📊 <b>{sym}</b>  •  Grade <b>{grade}</b>  •  {w}-Day Base Breakout
 
-📈 <b>SETUP METRICS</b>
-• <b>Volume Surge:</b> <b>{vol_ratio:.1f}x</b> <i>(vs 20d avg)</i>
-• <b>Base Volatility:</b> <b>{prng_pct:.1f}% PRNG</b>
-• <b>Avg Turnover:</b> ₹{avg_turnover_cr:.1f} Cr/day  •  <b>Mcap:</b> ₹{mcap_cr:,.0f} Cr
-• <b>Market Regime:</b> <b>{_mr}</b>
+• <b>Trigger / Entry:</b> ₹{entry:,.2f}  <i>(Ref price)</i>
+• <b>Stop Loss:</b> ₹{stop:,.2f} (<code>-{risk_pct:.1f}%</code>)  •  <b>Target:</b> ₹{target:,.2f} (<code>+{reward_pct:.1f}%</code>)
+• <b>Volume Surge:</b> <b>{vol_ratio:.1f}x</b> vs 20d avg  •  <b>Base PRNG:</b> {prng_pct:.1f}%
+• <b>Turnover:</b> ₹{avg_turnover_cr:.1f} Cr/day  •  <b>Regime:</b> {_mr}
 
-⚡ <b>Execution:</b> Enter at market open tomorrow (Ref: ₹{entry:,.2f})
-━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION} • {date_str}</i>"""
                 send_telegram(message)
                 
@@ -3744,17 +3734,18 @@ def detect_scan(symbols, listing_map):
     except Exception:
         active_positions_cnt = 0
 
-    summary_msg = f"""📊 <b>AlphaPulse</b> | <b>DAILY SCAN SUMMARY</b>
-━━━━━━━━━━━━━━━━━━━━
-🔍 <b>Scan Telemetry:</b>
-• <b>Symbols Processed:</b> {symbols_processed}
-• <b>New Signals Found:</b> {signals_found}
-• <b>Active Portfolio Positions:</b> {active_positions_cnt}
-• <b>System DB Health:</b> {db_status}
+    summary_msg = f"""📊 <b>AlphaPulse | DAILY SCAN SUMMARY</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📅 <b>{datetime.today().strftime('%d %b %Y, %H:%M IST')}</b>
+
+• <b>Processed:</b> {symbols_processed} symbols  •  <b>DB Health:</b> {db_status}
+• <b>Signals Found:</b> <b>{signals_found}</b>  •  <b>Active Positions:</b> <b>{active_positions_cnt}</b>
 
 {detection_msg}
-━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.today().strftime('%Y-%m-%d %H:%M IST')}</i>"""
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ <i>AlphaPulse v{SCANNER_VERSION}</i>"""
     
     send_telegram(summary_msg)
     return signals_found
@@ -3796,6 +3787,7 @@ def weekly_summary():
         pnl_c = '🟢' if avg_pnl >= 0 else '🔴'
         
         performance_text = f"""
+
 📈 <b>Live Book Highlights:</b>
 • Average Unrealized: {pnl_c} <b>{pnl_sign}{avg_pnl:.2f}%</b>
 • Top Position: <b>{best_str}</b>
@@ -3812,22 +3804,23 @@ def weekly_summary():
 
     if ev_count >= 50:
         evidence_text = f"""
-🎯 <b>Evidence Store Milestone:</b> {ev_count}/50 Samples REACHED!
-• Ready for quantitative significance testing & rule promotion review."""
+
+🎯 <b>Evidence Store:</b> <b>{ev_count}/50</b> ✅ <i>Milestone Reached!</i>"""
     else:
         evidence_text = f"""
-⏳ <b>Evidence Store:</b> {ev_count}/50 samples ({(ev_count/50)*100:.1f}%)
-• Passive gathering active (statistical gates locked until 50 samples)."""
-    
-    msg = f"""📊 <b>AlphaPulse | WEEKLY PERFORMANCE & SYSTEM SUMMARY</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔍 <b>Active Book & Signals (Last 7 Days):</b>
-• New Breakout Signals: <b>{weekly_signals}</b>
-• Active Live Positions: <b>{active_live}</b>
-• Paper / Research Holdings: <b>{active_paper}</b>
-• Realized Closed Trades: <b>{closed_count}</b>{performance_text}{evidence_text}
 
-📅 <b>Week Window:</b> {week_start.strftime('%Y-%m-%d')} to {datetime.today().strftime('%Y-%m-%d')}
+⏳ <b>Evidence Store:</b> <b>{ev_count}/50</b> ({(ev_count/50)*100:.0f}%) — <i>Passive gathering active</i>"""
+    
+    msg = f"""📊 <b>AlphaPulse | WEEKLY SUMMARY</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📅 <b>{week_start.strftime('%d %b')} – {datetime.today().strftime('%d %b %Y')}</b>
+
+🔍 <b>Portfolio &amp; Signals (7d)</b>
+• Signals: <b>{weekly_signals}</b>  •  Closed: <b>{closed_count}</b>
+• Live Book: <b>{active_live}</b> active  •  Paper Book: <b>{active_paper}</b>
+{performance_text}{evidence_text}
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION}</i>"""
     
@@ -3872,19 +3865,18 @@ def monthly_review():
         active_paper = 0
         closed_positions = 0
     
-    msg = f"""📊 <b>AlphaPulse | MONTHLY STRATEGY & PORTFOLIO REVIEW</b>
+    msg = f"""📊 <b>AlphaPulse | MONTHLY STRATEGY &amp; PORTFOLIO REVIEW</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📈 <b>This Month ({month_start.strftime('%B %Y')}):</b>
-• New Breakout Signals: <b>{monthly_signals}</b>
-• Active Live Positions: <b>{active_live}</b>
-• Paper / Forward Positions: <b>{active_paper}</b>
-• Realized Closed Positions: <b>{closed_positions}</b>
 
-🎯 <b>All-Time Clean Setup Distribution:</b>
-• Total Qualified Signals: <b>{total_signals}</b>
+📅 <b>{month_start.strftime('%B %Y')}</b>
+
+📈 <b>Monthly Activity</b>
+• Signals: <b>{monthly_signals}</b>  •  Closed Trades: <b>{closed_positions}</b>
+• Live Book: <b>{active_live}</b> active  •  Paper Book: <b>{active_paper}</b>
+
+🎯 <b>Setup Distribution</b>
 {grade_text}
 
-📅 <b>Review Period:</b> {month_start.strftime('%Y-%m-%d')} to {datetime.today().strftime('%Y-%m-%d')}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION}</i>"""
     
@@ -3944,7 +3936,8 @@ def format_alphapulse_portfolio_report():
             w_badge += " 🔥"
             
         live_lines.append(
-            f"• <b>{sym}</b> ({grd}): ₹{entry:,.2f} → <b>₹{curr:,.2f}</b> ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>) | SL: ₹{sl:,.2f} ({sl_dist:.1f}%){w_badge} · Held {days}d"
+            f"• <b>{sym}</b> ({grd}) · Held {days}d{w_badge}\n"
+            f"  CMP: <b>₹{curr:,.2f}</b> ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>)  •  SL: ₹{sl:,.2f} ({sl_dist:.1f}%)"
         )
 
     avg_live_pnl = (total_live_pnl / len(active_live)) if active_live else 0.0
@@ -3973,7 +3966,8 @@ def format_alphapulse_portfolio_report():
             w_badge += " 🔥"
             
         paper_lines.append(
-            f"• <b>{sym}</b> ({grd}): ₹{entry:,.2f} → <b>₹{curr:,.2f}</b> ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>) | SL: ₹{sl:,.2f} ({sl_dist:.1f}%){w_badge} · Held {days}d"
+            f"• <b>{sym}</b> ({grd}) · Held {days}d{w_badge}\n"
+            f"  CMP: <b>₹{curr:,.2f}</b> ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>)  •  SL: ₹{sl:,.2f} ({sl_dist:.1f}%)"
         )
 
     avg_paper_pnl = (total_paper_pnl / len(active_paper)) if active_paper else 0.0
@@ -4008,7 +4002,7 @@ def format_alphapulse_portfolio_report():
         if p.get('shadow_status_10pct') == 'ACTIVE': active_sh.append('10%')
         if p.get('shadow_status_12pct') == 'ACTIVE': active_sh.append('12%')
         sh_str = '/'.join(active_sh)
-        shadow_only_lines.append(f"  ↳ <b>{sym}</b> ({grd}) [Live Closed]: ₹{entry:,.2f} → <b>₹{curr:,.2f}</b> ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>) | {sh_str} Active · Held {days}d")
+        shadow_only_lines.append(f"  ↳ <b>{sym}</b> ({grd}): <b>₹{curr:,.2f}</b> ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>) | {sh_str} · Held {days}d")
 
     # 4. Top 5 Shadow Performers & Defensive Loss Cuts
     def get_pnl(p):
@@ -4054,12 +4048,14 @@ def format_alphapulse_portfolio_report():
         pnl_c = '🟢' if pnl >= 0 else '🔴'
         pnl_s = '+' if pnl >= 0 else ''
         days = int(float(p.get('days_held') or 0))
-        exit_lines.append(f"• <b>{sym}</b>: {pnl_c} <b>{pnl_s}{pnl:.1f}%</b> | Held {days}d ({reason})")
+        exit_lines.append(f"• <b>{sym}</b>: {pnl_c} <b>{pnl_s}{pnl:.1f}%</b> · Held {days}d ({reason})")
 
-    report = f"""📊 <b>AlphaPulse | DAILY PORTFOLIO & RISK REPORT — {now_ist.strftime('%Y-%m-%d')}</b>
-⏱️ <b>Time:</b> {now_ist.strftime('%H:%M IST')} | 🛡️ <b>Clean Cohort:</b> Active
+    report = f"""📊 <b>AlphaPulse | DAILY PORTFOLIO &amp; RISK REPORT</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🟢 <b>LIVE POSITIONS ({len(active_live)} Active)</b>
+📅 <b>{now_ist.strftime('%d %b %Y')}</b>  •  ⏱️ <b>{now_ist.strftime('%H:%M IST')}</b>  •  🛡️ Clean Cohort Active
+
+🟢 <b>LIVE POSITIONS ({len(active_live)})</b>
 """
     if live_lines:
         report += '\n'.join(live_lines) + f"\n<i>Book Avg Unrealized: {avg_live_color} <b>{avg_live_pnl:+.1f}%</b></i>\n\n"
@@ -4073,8 +4069,8 @@ def format_alphapulse_portfolio_report():
     else:
         report += "• <i>No active paper positions.</i>\n\n"
 
-    report += f"""👥 <b>SHADOW MULTI-STOP TRACKING (8% / 10% / 12%)</b>
-• <b>Active Floors:</b> 8%: {sh_8_act} | 10%: {sh_10_act} | 12%: {sh_12_act}
+    report += f"""👥 <b>SHADOW MULTI-STOP TRACKING</b>
+• Active Floors: 8%: <b>{sh_8_act}</b>  •  10%: <b>{sh_10_act}</b>  •  12%: <b>{sh_12_act}</b>
 """
     if shadow_only_lines:
         report += "• <b>Shadow-Only Runners:</b>\n" + '\n'.join(shadow_only_lines) + "\n\n"
@@ -4093,7 +4089,7 @@ def format_alphapulse_portfolio_report():
 """ + '\n'.join(exit_lines) + "\n\n"
 
     report += """━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🛡️ <i>Automated Unified AlphaPulse EOD Snapshot</i>"""
+⚡ <i>AlphaPulse EOD Snapshot</i>"""
     return report
 
 def format_consolidated_sl_updates(sl_updates, logic_version=None):
@@ -4105,10 +4101,11 @@ def format_consolidated_sl_updates(sl_updates, logic_version=None):
     now_str = datetime.now().strftime('%Y-%m-%d')
     time_str = datetime.now().strftime('%H:%M IST')
     lines = [
-        f"🛑 <b>STOP LOSS ADJUSTMENTS — {now_str}</b>",
-        f"🔖 <b>Logic: {version_label}</b> | ATR Trailing Engine",
-        f"Total Adjustments: <b>{len(sl_updates)}</b>",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🛑 <b>AlphaPulse | STOP LOSS ADJUSTMENTS</b>",
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"",
+        f"📅 <b>{now_str}</b>  •  <b>{len(sl_updates)}</b> update(s)",
+        f"",
     ]
     for item in sl_updates:
         sym = escape_html_text(item.get('symbol', '?'))
@@ -4122,19 +4119,21 @@ def format_consolidated_sl_updates(sl_updates, logic_version=None):
         
         sl_type = "ATR Trail"
         if entry > 0 and new_sl >= round(entry * 1.005, 2) and old_sl < round(entry * 1.005, 2):
-            sl_type = "Breakeven Floor"
+            sl_type = "Breakeven"
         elif entry > 0 and curr >= entry * 1.75:
-            sl_type = "Stage 2 Trail"
+            sl_type = "Stage 2"
             
         pnl_c = '🟢' if pnl >= 0 else '🔴'
         pnl_sign = '+' if pnl >= 0 else ''
         sl_change = ((new_sl - old_sl) / old_sl * 100) if old_sl > 0 else 0
+        sl_change_sign = '+' if sl_change >= 0 else ''
         lines.append(
-            f"• <b>{sym}</b> (Grade {grade} · Held {days}d): SL ₹{old_sl:,.2f} → <b>₹{new_sl:,.2f}</b> (<b>+{sl_change:.2f}%</b>) [{sl_type}]\n"
-            f"  CMP: ₹{curr:,.2f} ({pnl_c} P&amp;L: <b>{pnl_sign}{pnl:.1f}%</b> | Held: <b>{days}d</b>)\n"
+            f"• <b>{sym}</b> (Grade {grade} · {days}d)  |  {pnl_c} <b>{pnl_sign}{pnl:.1f}%</b>\n"
+            f"  SL: ₹{old_sl:,.2f} → <b>₹{new_sl:,.2f}</b> ({sl_change_sign}{sl_change:.1f}%) [{sl_type}]  •  CMP: ₹{curr:,.2f}"
         )
+        lines.append("")
     lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    lines.append(f"⏱️ <b>Updated:</b> {time_str} | 🔖 <b>{version_label}</b>")
+    lines.append(f"⚡ <i>AlphaPulse {version_label} • {time_str}</i>")
     return '\n'.join(lines)
 
 def format_position_update_alert(symbol, current_price, entry_price, old_trailing, new_trailing, pnl_pct, days_held, grade):
@@ -4154,20 +4153,16 @@ def format_position_update_alert(symbol, current_price, entry_price, old_trailin
         
     trailing_status = "🔺 Stop Raised" if new_trailing > old_trailing else "🔹 Maintained"
     
-    msg = f"""🔄 <b>AlphaPulse</b> | <b>TRAILING STOP UPDATE</b>
-━━━━━━━━━━━━━━━━━━━━
-📊 <b>Symbol:</b> <b>{clean_sym}</b>  •  <b>Grade {clean_grade}</b>
+    msg = f"""🔄 <b>AlphaPulse | TRAILING STOP UPDATE</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-💰 <b>LIVE STATUS</b>
-• <b>Current LTP:</b> ₹{current_price:,.2f}
-• <b>Entry Price:</b> ₹{entry_price:,.2f}
+📊 <b>{clean_sym}</b>  •  Grade <b>{clean_grade}</b>  •  Held: <b>{days_held_int}d</b>
+
+• <b>Stop Loss:</b> ₹{old_trailing:,.2f} → <b>₹{new_trailing:,.2f}</b> (<b>{trailing_status}</b>)
+• <b>Current LTP:</b> ₹{current_price:,.2f}  <i>(Entry: ₹{entry_price:,.2f})</i>
 • <b>Unrealized P&amp;L:</b> {pnl_badge}
-• <b>Days Held:</b> {days_held_int} day{'s' if days_held_int != 1 else ''}
 
-🛡️ <b>STOP-LOSS ADJUSTMENT</b>
-• <b>Previous Stop:</b> ₹{old_trailing:,.2f}
-• <b>New Trailing Stop:</b> ₹{new_trailing:,.2f} (<b>{trailing_status}</b>)
-━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
     return msg
 
@@ -4224,7 +4219,14 @@ def stop_loss_update_scan():
     active_positions = active_positions_all[active_mask]
     
     if active_positions.empty:
-        send_telegram("📊 <b>Stop-Loss Update Scan</b>\n\n✅ No active positions to update.")
+        msg = f"""📊 <b>AlphaPulse | STOP-LOSS UPDATE SCAN</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ <b>No active positions to update</b>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ <i>AlphaPulse v{SCANNER_VERSION}</i>"""
+        send_telegram(msg)
         return
     
     # Send pre-scan summary showing all positions that will be updated
@@ -4418,18 +4420,16 @@ def stop_loss_update_scan():
                     from utils import escape_html_text
                     clean_sym = escape_html_text(sym)
                     last_px = pos.get('current_price', pos.get('entry_price', 0))
-                    failed_msg = f"""⚠️ <b>AlphaPulse</b> | <b>DATA FETCH WARNING</b>
-━━━━━━━━━━━━━━━━━━━━
-📊 <b>Symbol:</b> <b>{clean_sym}</b>
-❌ <b>Status:</b> Historical OHLCV data unavailable
+                    failed_msg = f"""⚠️ <b>AlphaPulse | DATA FETCH WARNING</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-💰 <b>LAST KNOWN METRICS</b>
-• <b>Entry Date:</b> {pos.get('entry_date')}
-• <b>Days Held:</b> {days_held}d
-• <b>Last Price:</b> ₹{last_px:,.2f}
+📊 <b>{clean_sym}</b>  •  Held: <b>{days_held}d</b>
+❌ Historical OHLCV data unavailable
 
-💡 <b>Action:</b> Automated retry on next scan cycle
-━━━━━━━━━━━━━━━━━━━━
+• <b>Last Price:</b> ₹{last_px:,.2f}  •  <b>Entry:</b> {pos.get('entry_date')}
+💡 <i>Auto-retry on next scan cycle.</i>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
                     send_telegram(failed_msg)
                     continue
@@ -4454,20 +4454,16 @@ def stop_loss_update_scan():
                     from utils import escape_html_text
                     clean_sym = escape_html_text(sym)
                     last_px = pos.get('current_price', pos.get('entry_price', 0))
-                    stale_msg = f"""⚠️ <b>AlphaPulse</b> | <b>STALE DATA GUARD</b>
-━━━━━━━━━━━━━━━━━━━━
-📊 <b>Symbol:</b> <b>{clean_sym}</b>
-❌ <b>Latest Feed Date:</b> {latest_date}
-⚠️ <b>Expected Session:</b> {last_expected}
+                    stale_msg = f"""⚠️ <b>AlphaPulse | STALE DATA GUARD</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-💰 <b>STATUS & SAFETY</b>
-• <b>Last Price:</b> ₹{last_px:,.2f}
-• <b>Entry Date:</b> {pos.get('entry_date')}
-• <b>Days Held:</b> {days_held}d
-• <b>Guard:</b> Exit decisions halted until fresh session data is available
+📊 <b>{clean_sym}</b>  •  Held: <b>{days_held}d</b>
+❌ Data feed stale — exit decisions halted.
 
-💡 <b>Action:</b> Automated retry on next scan cycle
-━━━━━━━━━━━━━━━━━━━━
+• <b>Feed Date:</b> {latest_date}  •  <b>Expected:</b> {last_expected}
+• <b>Last Price:</b> ₹{last_px:,.2f}  •  <b>Entry:</b> {pos.get('entry_date')}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
                     send_telegram(stale_msg)
                     continue
@@ -4488,19 +4484,16 @@ def stop_loss_update_scan():
                     old_trailing = pos.get("trailing_stop", pos.get("stop_loss", prev_price * 0.95))
                     from utils import escape_html_text
                     clean_sym = escape_html_text(sym)
-                    split_alert = f"""⚠️ <b>AlphaPulse</b> | <b>CORPORATE ACTION / PRICE ANOMALY</b>
-━━━━━━━━━━━━━━━━━━━━
-📊 <b>Symbol:</b> <b>{clean_sym}</b>
-📉 <b>Price Drop:</b> <code>{price_change_pct:.2f}%</code>
+                    split_alert = f"""⚠️ <b>AlphaPulse | CORPORATE ACTION / ANOMALY</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-💰 <b>PRICE TELEMETRY</b>
-• <b>Prior Reference:</b> ₹{prev_price:,.2f}
-• <b>Incoming LTP:</b> ₹{current_price:,.2f}
-• <b>Trailing Stop:</b> ₹{old_trailing:,.2f}
-• <b>Days Held:</b> {days_held}d
+📊 <b>{clean_sym}</b>
+📉 Price Drop: <code>{price_change_pct:.2f}%</code> (Extreme Volatility)
 
-⚠️ <b>Status:</b> Stop-loss exit execution suspended to protect against split distortion. Manual reconciliation required.
-━━━━━━━━━━━━━━━━━━━━
+• <b>Prior Ref:</b> ₹{prev_price:,.2f}  •  <b>LTP:</b> ₹{current_price:,.2f}
+⚠️ <i>DB updates paused. Manual corporate action check required.</i>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
                     send_telegram(split_alert)
                     failed_updates.append(sym)
@@ -5003,16 +4996,15 @@ def stop_loss_update_scan():
             clean_sym = escape_html_text(sym)
             clean_err = escape_html_text(str(e))
             last_px = pos.get('current_price', pos.get('entry_price', 0))
-            error_msg = f"""❌ <b>AlphaPulse</b> | <b>POSITION UPDATE EXCEPTION</b>
-━━━━━━━━━━━━━━━━━━━━
-📊 <b>Symbol:</b> <b>{clean_sym}</b>
-⚠️ <b>Exception:</b> <code>{clean_err[:200]}</code>
+            error_msg = f"""❌ <b>AlphaPulse | UPDATE EXCEPTION</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-💰 <b>POSITION METRICS</b>
-• <b>Entry Date:</b> {pos.get('entry_date')}
-• <b>Days Held:</b> {days_held}d
-• <b>Last Price:</b> ₹{last_px:,.2f}
-━━━━━━━━━━━━━━━━━━━━
+📊 <b>{clean_sym}</b>  •  Held: <b>{days_held}d</b>
+⚠️ <code>{clean_err[:160]}</code>
+
+• <b>Last Price:</b> ₹{last_px:,.2f}  •  <b>Entry:</b> {pos.get('entry_date')}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
             send_telegram(error_msg)
             continue
@@ -5039,12 +5031,15 @@ def heartbeat():
     try:
         from db import get_active_positions_count
         active_positions = get_active_positions_count()
-        message = f"""💓 <b>AlphaPulse</b> | <b>SCANNER HEARTBEAT</b>
-━━━━━━━━━━━━━━━━━━━━
-⏱️ <b>Status:</b> All automated engines operational
-📈 <b>Active Positions:</b> {active_positions}
-🕒 <b>Heartbeat Time:</b> {datetime.now().strftime('%d %b %Y, %H:%M IST')}
-━━━━━━━━━━━━━━━━━━━━
+        message = f"""💓 <b>AlphaPulse | SCANNER HEARTBEAT</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ <b>All automated engines operational</b>
+
+• <b>Active Positions:</b> <b>{active_positions}</b>
+• <b>Time:</b> {datetime.now().strftime('%d %b %Y, %H:%M IST')}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION}</i>"""
         logger.info(f"Heartbeat message: {message}")
         send_telegram(message)

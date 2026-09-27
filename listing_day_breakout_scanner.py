@@ -2073,31 +2073,8 @@ def classify_listing_winner_traits(
     }
 
 def _format_dna_section(breakout_data):
-    """Formats proven setup DNA and winner traits for Telegram breakout alerts"""
-    winner_score = breakout_data.get('winner_score', 0)
-    vol_spike = breakout_data.get('volume_spike', 0)
-    prng = breakout_data.get('listing_range_pct', 0)
-    turnover = breakout_data.get('avg_turnover_cr', 0)
-    days_since = breakout_data.get('days_since_listing', 0)
-    
-    traits = []
-    if vol_spike >= 3.0:
-        traits.append(f"Institutional Surge ({vol_spike:.1f}x)")
-    elif vol_spike >= 1.5:
-        traits.append(f"Volume Surge ({vol_spike:.1f}x)")
-        
-    if 0 < prng <= 15.0:
-        traits.append(f"Tight Base Coil ({prng:.1f}% PRNG)")
-    elif prng > 15.0:
-        traits.append(f"Base PRNG {prng:.1f}%")
-        
-    if turnover > 0:
-        traits.append(f"Turnover ₹{turnover:.1f}Cr")
-    elif days_since <= 35:
-        traits.append(f"Fresh IPO Base ({days_since}d)")
-        
-    traits_str = " • ".join(traits) if traits else "Standard Breakout Profile"
-    
+    """Format compact DNA edge summary for breakout alerts"""
+    winner_score = breakout_data.get('winner_traits_score', 0)
     if winner_score >= 4:
         conviction = "🟢 High Conviction"
     elif winner_score >= 2:
@@ -2105,10 +2082,7 @@ def _format_dna_section(breakout_data):
     else:
         conviction = "⚪ Base Profile"
         
-    return f"""🧬 <b>PROVEN SETUP DNA</b>
-• <b>Winner Score:</b> <b>{winner_score}/5</b> <i>({conviction})</i>
-• <b>Edge Traits:</b> {traits_str}
-• <b>Supply Absorption:</b> Upper 50% Body Gate Passed"""
+    return f"• <b>Setup Edge:</b> Score <b>{winner_score}/5</b> ({conviction}) • Upper 50% Body Passed"
 
 
 def format_listing_breakout_alert(breakout_data):
@@ -2133,28 +2107,19 @@ def format_listing_breakout_alert(breakout_data):
     reward_pct = ((target - entry) / entry * 100) if entry > 0 else 0
     dna_section = _format_dna_section(breakout_data)
 
-    return f"""🎯 <b>AlphaPulse</b> | <b>LISTING BREAKOUT</b>
-━━━━━━━━━━━━━━━━━━━━
-📊 <b>{symbol}</b>  •  <b>Tier {tier}</b> ({pos_size}% Size)
-📋 <i>Listing Day High Breakout</i>
+    return f"""🎯 <b>AlphaPulse | LISTING BREAKOUT</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-💰 <b>TRADE EXECUTION</b>
-• <b>Trigger Price:</b> ₹{entry:,.2f}
-• <b>Limit Buy Max:</b> ≤ ₹{limit_buy_price:,.2f} <i>(+3.5% cap)</i>
-• <b>Stop Loss:</b> ₹{stop:,.2f} (<code>-{risk_pct:.1f}%</code>)
+📊 <b>{symbol}</b>  •  Tier <b>{tier}</b>  •  Size <b>{pos_size}%</b>
+📋 <i>Listing Day High Breakout ({days_since_listing}d post-IPO)</i>
+
+• <b>Trigger / Entry:</b> ₹{entry:,.2f}  <i>(Limit Max: ≤ ₹{limit_buy_price:,.2f})</i>
+• <b>Stop Loss:</b> ₹{stop:,.2f} (<code>-{risk_pct:.1f}%</code>)  •  <b>R/R:</b> 1:{rr:.1f}
 • <b>Profit Target:</b> ₹{target:,.2f} (<code>+{reward_pct:.1f}%</code>)
-• <b>Risk/Reward:</b> 1:{rr:.1f}
-
-📈 <b>SETUP METRICS</b>
-• <b>Volume Surge:</b> <b>{vol_spike:.1f}x</b> <i>(vs 20d avg)</i>
-• <b>Listing Day High:</b> ₹{listing_high:,.2f} <i>(Broken)</i>
-• <b>IPO Age:</b> {days_since_listing} days post-listing
-• <b>Market Regime:</b> <b>{regime}</b>
-
+• <b>Volume Surge:</b> <b>{vol_spike:.1f}x</b>  •  <b>Listing High:</b> ₹{listing_high:,.2f}
 {dna_section}
 
-⚡ <b>Action:</b> Place Limit Buy order at or below ₹{limit_buy_price:,.2f}
-━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
 
 
@@ -2179,29 +2144,19 @@ def format_base_breakout_alert(breakout_data):
     limit_buy_price = entry * 1.02
     dna_section = _format_dna_section(breakout_data)
 
-    return f"""📦 <b>AlphaPulse</b> | <b>BASE BREAKOUT (Tier B)</b>
-━━━━━━━━━━━━━━━━━━━━
-📊 <b>{symbol}</b>  •  <b>Tier B</b> ({position_size}% Size)
-📋 <i>Accumulation Base Breakout below Listing High</i>
+    return f"""📦 <b>AlphaPulse | BASE BREAKOUT (Tier B)</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-💰 <b>TRADE EXECUTION</b>
-• <b>Trigger Price:</b> ₹{entry:,.2f}
-• <b>Limit Buy Max:</b> ≤ ₹{limit_buy_price:,.2f}
-• <b>Stop Loss:</b> ₹{stop:,.2f} (<code>-{risk_pct:.1f}%</code>)
+📊 <b>{symbol}</b>  •  Tier <b>B</b>  •  Size <b>{position_size}%</b>
+📋 <i>Accumulation Base Breakout ({dist_below_high:.1f}% below LH)</i>
+
+• <b>Trigger / Entry:</b> ₹{entry:,.2f}  <i>(Limit Max: ≤ ₹{limit_buy_price:,.2f})</i>
+• <b>Stop Loss:</b> ₹{stop:,.2f} (<code>-{risk_pct:.1f}%</code>)  •  <b>R/R:</b> 1:{rr:.1f}
 • <b>Profit Target:</b> ₹{target:,.2f} <i>(Listing High)</i>
-• <b>Risk/Reward:</b> 1:{rr:.1f}
-
-📈 <b>SETUP METRICS</b>
-• <b>Volume Surge:</b> <b>{vol_spike:.1f}x</b> <i>(vs 20d avg)</i>
-• <b>Base High:</b> ₹{base_range_high:,.2f}
-• <b>Distance to LH:</b> {dist_below_high:.1f}% below Listing High
-• <b>IPO Age:</b> {days_since} days post-listing
-• <b>Market Regime:</b> <b>{regime}</b>
-
+• <b>Volume Surge:</b> <b>{vol_spike:.1f}x</b>  •  <b>Base High:</b> ₹{base_range_high:,.2f}
 {dna_section}
 
-⚡ <b>Action:</b> Place Limit Buy order at or below ₹{limit_buy_price:,.2f}
-━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
 
 
@@ -2215,18 +2170,16 @@ def format_watchlist_alert(breakout_data):
     distance_pct = ((listing_high - current_price) / listing_high * 100) if listing_high > 0 else 0
     days_since = breakout_data.get('days_since_listing', 0)
     
-    return f"""👀 <b>AlphaPulse</b> | <b>WATCHLIST RADAR</b>
-━━━━━━━━━━━━━━━━━━━━
-📊 <b>{symbol}</b>  •  <b>{distance_pct:.1f}% to Pivot</b>
+    return f"""👀 <b>AlphaPulse | WATCHLIST RADAR</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-💰 <b>RADAR STATUS</b>
-• <b>Current LTP:</b> ₹{current_price:,.2f}
-• <b>Breakout Pivot:</b> ₹{listing_high:,.2f}
-• <b>Volume Trend:</b> {vol_spike:.1f}x avg (Pre-breakout buildup)
-• <b>IPO Age:</b> {days_since} days
+📊 <b>{symbol}</b>  •  <b>{distance_pct:.1f}% to Pivot</b> <i>({days_since}d post-IPO)</i>
 
-⚡ <b>Status:</b> Approaching breakout level. A confirmed close above ₹{listing_high:,.2f} triggers entry.
-━━━━━━━━━━━━━━━━━━━━
+• <b>Current LTP:</b> ₹{current_price:,.2f}  •  <b>Pivot:</b> ₹{listing_high:,.2f}
+• <b>Volume Buildup:</b> <b>{vol_spike:.1f}x</b> 20d avg
+• <i>Confirmed close above ₹{listing_high:,.2f} triggers entry.</i>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
 
 def save_watchlist_signal(breakout_data):
@@ -2599,30 +2552,18 @@ def scan_listing_day_breakouts():
                         if success:
                             # Send Alert
                             limit_buy = live_price * 1.02
-                            msg = f"""⚡ <b>AlphaPulse</b> | <b>RE-ENTRY BREAKOUT</b>
-━━━━━━━━━━━━━━━━━━━━
-📊 <b>{symbol}</b>  •  <b>Re-Entry Ignition</b> (100% Size)
+                            msg = f"""⚡ <b>AlphaPulse | RE-ENTRY BREAKOUT</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 <b>{symbol}</b>  •  Re-Entry Ignition  •  Size <b>100%</b>
 📋 <i>Momentum Continuation above Prior Peak (₹{peak_price:.2f})</i>
 
-💰 <b>TRADE EXECUTION</b>
-• <b>Trigger Level:</b> ₹{peak_price:,.2f}
-• <b>Current LTP:</b> ₹{live_price:,.2f} <i>({live_source})</i>
-• <b>Limit Buy Max:</b> ≤ ₹{limit_buy:,.2f} <i>(+2.0% cap)</i>
-• <b>Stop Loss:</b> ₹{breakout['stop_loss']:,.2f} (<code>-8.0%</code>)
-• <b>Profit Target:</b> ₹{breakout['target_price']:,.2f} (<code>+20.0%</code>)
+• <b>Trigger / LTP:</b> ₹{live_price:,.2f}  <i>(Limit Max: ≤ ₹{limit_buy:,.2f})</i>
+• <b>Stop Loss:</b> ₹{breakout['stop_loss']:,.2f} (<code>-8.0%</code>)  •  <b>Target:</b> ₹{breakout['target_price']:,.2f} (<code>+20.0%</code>)
+• <b>Volume Surge:</b> <b>{vol_spike_calc:.1f}x</b>  •  <b>Extension:</b> +{entry_extension_pct:.1f}%
+• <b>Setup Validation:</b> Upper 50% Body Passed • Base PRNG: {prng_calc:.1f}%
 
-📈 <b>SETUP METRICS</b>
-• <b>Extension from Peak:</b> +{entry_extension_pct:.1f}% <i>(≤ 8.0% Guard)</i>
-• <b>Volume Surge:</b> <b>{vol_spike_calc:.1f}x</b> <i>(vs 20d avg)</i>
-• <b>Base Coil (PRNG):</b> {prng_calc:.1f}%
-
-🧬 <b>PROVEN SETUP DNA</b>
-• <b>Archetype:</b> Re-Entry Momentum Ignition
-• <b>Supply Absorption:</b> Upper 50% Body Confirmed
-• <b>Anti-Chasing:</b> Safe Entry within +8.0% Pivot Band
-
-⚡ <b>Action:</b> Place Limit Buy order at or below ₹{limit_buy:,.2f}
-━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
                             if portfolio_full:
                                 msg = f"⚠️ <b>[PORTFOLIO FULL - PAPER ONLY]</b> (Active: {active_count})\n" + msg
@@ -2662,16 +2603,18 @@ def scan_listing_day_breakouts():
     if breakouts_found > 0:
         db_status = '✅ OK' if db_stats.get('db_failures', 0) == 0 else f"❌ {db_stats.get('db_failures')} FAILURES"
         detection_msg = '🎯 New listing breakouts detected! Check alerts above.' if breakouts_found > 0 else '✅ No new breakouts at this time.'
-        summary = f"""📊 <b>AlphaPulse</b> | <b>LISTING BREAKOUT SUMMARY</b>
-━━━━━━━━━━━━━━━━━━━━
-🔍 <b>Scan Telemetry:</b>
-• <b>Listings Monitored:</b> {len(active_listings)}
-• <b>Breakouts Found:</b> {breakouts_found}
-• <b>System DB Health:</b> {db_status}
+        summary = f"""📊 <b>AlphaPulse | LISTING BREAKOUT SUMMARY</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📅 <b>{datetime.now().strftime('%d %b %Y, %H:%M IST')}</b>
+
+• <b>Listings Monitored:</b> {len(active_listings)}  •  <b>DB Health:</b> {db_status}
+• <b>Breakouts Found:</b> <b>{breakouts_found}</b>
 
 {detection_msg}
-━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%Y-%m-%d %H:%M IST')}</i>"""
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ <i>AlphaPulse v{SCANNER_VERSION}</i>"""
         send_telegram(summary)
 
 def main():

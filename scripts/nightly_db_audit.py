@@ -271,14 +271,14 @@ def run_nightly_audit():
     ist_now_str = (now_utc + timedelta(hours=5, minutes=30)).strftime('%Y-%m-%d %H:%M:%S IST')
     from utils import escape_html_text
 
-    tg_msg = f"""🔍 <b>AlphaPulse</b> | <b>NIGHTLY DB AUDIT REPORT</b>
-━━━━━━━━━━━━━━━━━━━━
-📅 <i>Run Time: {ist_now_str} ({utc_now_str})</i>
+    tg_msg = f"""🔍 <b>AlphaPulse | NIGHTLY DB AUDIT REPORT</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📅 <b>{ist_now_str}</b>
 Status: {status_emoji} <b>{status_label}</b>
 
-📊 <b>Summary:</b>
-• Anomalies: <b>{len(anomalies)}</b>
-• Warnings: <b>{len(warnings)}</b>
+📊 <b>Audit Telemetry</b>
+• Anomalies: <b>{len(anomalies)}</b>  •  Warnings: <b>{len(warnings)}</b>
 • Active Positions Checked: <b>{len(active_positions)}</b>
 """
 
@@ -299,7 +299,7 @@ Status: {status_emoji} <b>{status_label}</b>
     if not anomalies and not warnings:
         tg_msg += "\n✅ All structural and distribution integrity audits passed successfully."
 
-    tg_msg += "\n━━━━━━━━━━━━━━━━━━━━\n⚡ <i>AlphaPulse Automated DB Guardian</i>"
+    tg_msg += "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚡ <i>AlphaPulse Automated DB Guardian</i>"
 
     send_telegram_alert(tg_msg)
 

@@ -139,29 +139,29 @@ def run_monthly_audit(send_alert: bool = True) -> dict:
     month_name = datetime.now().strftime('%B %Y')
     now_str = datetime.now().strftime('%d %b %Y, %H:%M IST')
 
-    msg = f"""🏛️ <b>AlphaPulse</b> | <b>MONTHLY STRATEGY AUDIT</b>
-━━━━━━━━━━━━━━━━━━━━
-📅 <b>Review Period:</b> {month_name}
-📊 <b>Clean Cohort Sample:</b> {total_trades} Trades ({len(active_trades)} Active / {len(closed_trades)} Closed)
+    msg = f"""🏛️ <b>AlphaPulse | MONTHLY STRATEGY AUDIT</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-💰 <b>MONTHLY PERFORMANCE</b>
-• <b>System Win Rate:</b> <b>{win_rate:.1f}%</b> ({win_count}W / {loss_count}L)
-• <b>Average Realized PnL:</b> <b>{avg_pnl:+.2f}%</b>
-• <b>Average Peak Runup:</b> <b>+{avg_runup:.2f}%</b>
-• <b>Top Performers:</b> {winner_str}
+📅 <b>{month_name}</b>  •  ⏱️ {now_str}
+📊 <b>Clean Cohort:</b> {total_trades} Trades ({len(active_trades)} Active / {len(closed_trades)} Closed)
 
-🚨 <b>ACTION REQUIRED</b>
+💰 <b>Monthly Performance</b>
+• Win Rate: <b>{win_rate:.1f}%</b> ({win_count}W / {loss_count}L)  •  Avg PnL: <b>{avg_pnl:+.2f}%</b>
+• Peak Runup: <b>+{avg_runup:.2f}%</b>
+• Top Performers: {winner_str}
+
+🚨 <b>Action Required</b>
 {chr(10).join(action_items)}
 
-🛡️ <b>RESOLVED SAFEGUARDS (Done)</b>
+🛡️ <b>Resolved Safeguards</b>
 {chr(10).join(resolved_items)}
 
-🏆 <b>PROVEN ALPHA DIRECTIVES</b>
-• <b>High Volume Surge (≥3.0x):</b> Average runup +11.2%; [v3.5.0 SuperTrend trailing].
-• <b>Tight Base Coils (PRNG ≤15%):</b> Narrow risk floors allow 3:1+ payouts [v3.3.0].
+🏆 <b>Alpha Directives</b>
+• Volume Surge (≥3.0x): Avg runup +11.2% [SuperTrend trail]
+• Tight Base Coils (PRNG ≤15%): Narrow floors for 3:1+ payouts
 
-━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION} • Monthly Intelligence Digest • {now_str}</i>"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ <i>AlphaPulse v{SCANNER_VERSION}</i>"""
 
     print("\n" + "="*85)
     print(f"🏛️ AlphaPulse — Monthly Strategy Audit ({month_name})")

@@ -1453,56 +1453,51 @@ def _build_telegram_message(
     from utils import escape_html_text
 
     lines = [
-        f"📋 <b>AlphaPulse</b> | <b>WEEKLY SYSTEM AUDIT</b>",
-        f"━━━━━━━━━━━━━━━━━━━━",
-        f"📅 <i>{ist_now}</i>",
-        f"🔖 <code>{escape_html_text(audit_id)}</code>",
-        f"Status: {status_icon} <b>{status_label}</b>",
-        f"Errors: <b>{n_errors}</b>  |  Warnings: <b>{n_warnings}</b>",
+        f"📋 <b>AlphaPulse | WEEKLY SYSTEM AUDIT</b>",
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "",
+        f"📅 <b>{ist_now}</b>  •  🔖 <code>{escape_html_text(audit_id)}</code>",
+        f"Status: {status_icon} <b>{status_label}</b>  •  Errors: <b>{n_errors}</b> | Warns: <b>{n_warnings}</b>",
         "",
         "📈 <b>Performance Snapshot</b>",
-        f"• Closed trades  : <b>{n_c}</b> <i>(edge, ex-INTRADAY)</i>",
+        f"• Closed trades: <b>{n_c}</b>  •  Active: <b>{n_a}</b>",
     ]
-    if wr is not None:
-        lines.append(f"• Win rate       : <b>{wr:.1%}</b>")
-    if ap is not None:
-        lines.append(f"• Avg closed PnL : <b>{ap:+.2f}%</b>")
-    if ca is not None:
-        lines.append(f"• Full cohort avg: <b>{ca:+.2f}%</b>")
-    lines.append(f"• Active positions: <b>{n_a}</b>")
+    if wr is not None and ap is not None:
+        lines.append(f"• Win rate: <b>{wr:.1%}</b>  •  Avg closed: <b>{ap:+.2f}%</b>")
+    elif wr is not None:
+        lines.append(f"• Win rate: <b>{wr:.1%}</b>")
+    elif ap is not None:
+        lines.append(f"• Avg closed: <b>{ap:+.2f}%</b>")
 
     ev_c = perf_data.get("evidence_count")
     if ev_c is not None:
         ev_t = perf_data.get("evidence_target", 50)
         lines.append("")
         if ev_c >= ev_t:
-            lines.append(f"🎯 <b>Evidence Milestone: {ev_c}/{ev_t} Samples REACHED!</b>")
-            lines.append("<i>Ready for statistical significance & rule review.</i>")
+            lines.append(f"🎯 <b>Evidence Milestone: {ev_c}/{ev_t}</b> ✅ <i>Reached!</i>")
         else:
-            lines.append(f"⏳ <b>Evidence Store: {ev_c}/{ev_t} samples</b> ({(ev_c/ev_t)*100:.1f}%)")
-            lines.append("<i>Passive gathering active (gates locked until 50 samples).</i>")
+            lines.append(f"⏳ <b>Evidence Store:</b> <b>{ev_c}/{ev_t}</b> ({(ev_c/ev_t)*100:.0f}%) — <i>Gathering active</i>")
 
-    # Error + warning summary
     error_findings = [f for f in findings if f["level"] == "ERROR"]
     warn_findings  = [f for f in findings if f["level"] == "WARN"]
 
     if error_findings:
         lines.append("")
         lines.append("🛑 <b>Critical Errors:</b>")
-        for f in error_findings[:8]:
+        for f in error_findings[:6]:
             clean = f["message"].replace("❌ ", "").replace("⚠️  ", "")
             lines.append(f"• {escape_html_text(clean)}")
-        if len(error_findings) > 8:
-            lines.append(f"<i>...and {len(error_findings) - 8} more errors.</i>")
+        if len(error_findings) > 6:
+            lines.append(f"<i>...and {len(error_findings) - 6} more errors.</i>")
 
     if warn_findings:
         lines.append("")
         lines.append("⚠️ <b>Warnings:</b>")
-        for f in warn_findings[:8]:
+        for f in warn_findings[:6]:
             clean = f["message"].replace("⚠️  ", "").replace("❌ ", "")
             lines.append(f"• {escape_html_text(clean)}")
-        if len(warn_findings) > 8:
-            lines.append(f"<i>...and {len(warn_findings) - 8} more warnings.</i>")
+        if len(warn_findings) > 6:
+            lines.append(f"<i>...and {len(warn_findings) - 6} more warnings.</i>")
 
     if not error_findings and not warn_findings:
         lines.append("")
@@ -1512,13 +1507,14 @@ def _build_telegram_message(
     if fixes_log:
         lines.append("")
         lines.append(f"🔧 <b>Fixes Applied ({len(fixes_log)}):</b>")
-        for fx in fixes_log[:6]:
+        for fx in fixes_log[:4]:
             short = fx.split(":", 2)[-1].strip()[:80]
             lines.append(f"• {escape_html_text(short)}")
-        if len(fixes_log) > 6:
-            lines.append(f"<i>...and {len(fixes_log) - 6} more fixes.</i>")
+        if len(fixes_log) > 4:
+            lines.append(f"<i>...and {len(fixes_log) - 4} more fixes.</i>")
 
-    lines.append("━━━━━━━━━━━━━━━━━━━━")
+    lines.append("")
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     lines.append("⚡ <i>AlphaPulse Automated System Audit</i>")
     return "\n".join(lines)
 
