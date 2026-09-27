@@ -266,7 +266,9 @@ def run_nightly_audit():
         status_emoji = "⚠️"
         status_label = "WARNINGS FOUND"
 
-    utc_now_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+    now_utc = datetime.now(timezone.utc)
+    utc_now_str = now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')
+    ist_now_str = (now_utc + timedelta(hours=5, minutes=30)).strftime('%Y-%m-%d %H:%M:%S IST')
     from utils import escape_html_text
 
     tg_msg = f"""🔍 <b>AlphaPulse</b> | <b>NIGHTLY DB AUDIT REPORT</b>

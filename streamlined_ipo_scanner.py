@@ -2366,6 +2366,31 @@ def detect_live_patterns(symbols, listing_map):
                 if not is_live_breakout:
                     continue
 
+                # 5b. Upper 50% Candle Body Gate (v3.5.0 Anti-Rejection Rule)
+                # Rejects shooting-star wicks and supply traps on historical confirmed candles.
+                # Matches the gate already live in listing_day_breakout_scanner.py (lines 1494-1513).
+                # Live/intraday candles (j == len(df)-1) are deferred — the gate fires on the next
+                # EOD scan cycle once the candle is fully formed.
+                if j < len(df) - 1:
+                    _c = df["CLOSE"].iat[j]
+                    _h = df["HIGH"].iat[j]
+                    _l = df["LOW"].iat[j]
+                    _candle_range = _h - _l
+                    if _candle_range > 0 and (_c - _l) / _candle_range < 0.50:
+                        _close_loc_pct = round((_c - _l) / _candle_range * 100, 1)
+                        logger.info(
+                            f"⏭️ Skipping {sym} - upper wick exhaustion: candle closed at "
+                            f"{_close_loc_pct:.1f}% of range (need ≥ 50.0%). "
+                            f"H={_h:.2f} L={_l:.2f} C={_c:.2f}"
+                        )
+                        _log_consolidation_reject_once({
+                            "reason": "upper_wick_rejection",
+                            "close_location_pct": _close_loc_pct,
+                            "max_allowed": 50.0,
+                            **current_metrics,
+                        })
+                        continue
+
                 # 6. Institutional Liquidity & Microcap Guardrails (Phase 2.5)
                 # Fetch fresh liquidity metrics (Turnover, Circuits, Market Cap)
                 avg_turnover_cr, circuit_days_15, mcap_cr = get_liquidity_metrics(sym, df)
@@ -4542,9 +4567,12 @@ def stop_loss_update_scan():
                         exit_reason = f"Time Stop - Dead Money (14-Day Velocity Gate, PnL {pnl:+.1f}%, Peak +{new_max_runup:.1f}%)"
 
                     # Secondary Stagnant Position Guard (applies to flat / non-winner positions)
+                    # v3.5.0 Tightened: Only cut positions that NEVER moved (peak runup < 8%) AND are
+                    # currently underwater. Positions with prior meaningful runup (>= 8%) that are
+                    # consolidating gains are protected by the trailing stop engine instead.
                     if not exit_reason and days_held >= 40:
-                        if pnl < 10.0:
-                            exit_reason = f"Time Stop - Stagnant Position (40d underperforming < 10% PnL)"
+                        if pnl <= 0.0 and new_max_runup < 8.0:
+                            exit_reason = f"Time Stop - Stagnant Position (40d, no momentum: peak +{new_max_runup:.1f}%, PnL {pnl:+.1f}%)"
 
                 # --- VOLUME EXHAUSTION EARLY EXIT ---
                 # Exits stagnant flat positions BEFORE day 40 when volume is collapsing relative

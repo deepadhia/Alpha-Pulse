@@ -27,7 +27,7 @@ def main():
     parser.add_argument("--vs-winners", action="store_true", help="For diagnose: compare with winning breakouts")
     parser.add_argument("--system", action="store_true", help="For diagnose: run system-wide strategy self-diagnosis")
 
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
 
     if args.task == "fill":
         if not args.symbol or args.price is None:
@@ -69,7 +69,7 @@ def main():
         run_script(path, ["--days", str(args.days), "--limit", str(args.limit)])
 
     elif args.task == "backtest":
-        run_script("run_latest_rules_backtest.py")
+        run_script("run_latest_rules_backtest.py", unknown)
 
     elif args.task == "diagnose":
         d_args = []
