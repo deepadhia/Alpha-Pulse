@@ -10,13 +10,111 @@ import time
 import threading
 import pandas as pd
 import requests
+import html
+import re
 import logging
+from typing import Optional, Union
 
 logger = logging.getLogger(__name__)
 
 # Global rate limiter for Upstox API
 _upstox_last_request = 0.0
 _upstox_lock = threading.Lock()
+
+def escape_html_text(text: str) -> str:
+    """Escapes dynamic text safely for Telegram HTML parse_mode."""
+    if text is None:
+        return ""
+    if not isinstance(text, str):
+        text = str(text)
+    return html.escape(text, quote=False)
+
+def chunk_telegram_text(text: str, max_chars: int = 4000) -> list:
+    """Split a message into Telegram-safe chunks respecting line boundaries."""
+    if len(text) <= max_chars:
+        return [text]
+    
+    chunks = []
+    lines = text.split('\n')
+    current_chunk = []
+    current_len = 0
+    
+    for line in lines:
+        if current_len + len(line) + 1 > max_chars:
+            if current_chunk:
+                chunks.append('\n'.join(current_chunk))
+                current_chunk = [line]
+                current_len = len(line)
+            else:
+                for i in range(0, len(line), max_chars):
+                    chunks.append(line[i:i+max_chars])
+                current_chunk = []
+                current_len = 0
+        else:
+            current_chunk.append(line)
+            current_len += len(line) + 1
+            
+    if current_chunk:
+        chunks.append('\n'.join(current_chunk))
+        
+    return chunks
+
+def strip_html_tags(text: str) -> str:
+    """Strip HTML tags for fallback plain-text dispatch."""
+    return re.sub(r'<[^>]+>', '', text)
+
+def send_telegram_msg(msg: str, bot_token: Optional[str] = None, chat_id: Optional[str] = None, disable_notification: bool = False, logger_inst=None) -> bool:
+    """
+    Robust institutional Telegram dispatcher with:
+    - Automatic length chunking (<=4000 chars)
+    - HTML entity parsing with auto plain-text fallback on parse errors (HTTP 400)
+    - Connection timeout & retry protection
+    """
+    log = logger_inst or logger
+    token = bot_token or os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
+    chat = chat_id or os.getenv("CHAT_ID") or os.getenv("TELEGRAM_CHAT_ID")
+    
+    if not token or not chat:
+        log.warning(f"[Telegram disabled] Token: {'SET' if token else 'MISSING'}, Chat: {'SET' if chat else 'MISSING'}")
+        return False
+        
+    chunks = chunk_telegram_text(msg)
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    all_success = True
+    
+    for chunk in chunks:
+        payload = {
+            "chat_id": chat,
+            "text": chunk,
+            "parse_mode": "HTML",
+            "disable_notification": disable_notification
+        }
+        try:
+            resp = requests.post(url, json=payload, timeout=12)
+            if resp.status_code == 200:
+                log.info("✅ Telegram message sent successfully!")
+            elif resp.status_code == 400 and ("can't parse entities" in resp.text.lower() or "bad request" in resp.text.lower()):
+                log.warning(f"⚠️ Telegram HTML parse failed ({resp.text}). Retrying with plain text fallback...")
+                plain_payload = {
+                    "chat_id": chat,
+                    "text": strip_html_tags(chunk),
+                    "disable_notification": disable_notification
+                }
+                fallback_resp = requests.post(url, json=plain_payload, timeout=12)
+                if fallback_resp.status_code == 200:
+                    log.info("✅ Telegram fallback message sent successfully!")
+                else:
+                    log.error(f"❌ Telegram fallback failed: {fallback_resp.status_code} - {fallback_resp.text}")
+                    all_success = False
+            else:
+                log.error(f"❌ Telegram API error: {resp.status_code} - {resp.text}")
+                all_success = False
+        except Exception as e:
+            log.error(f"❌ Telegram communication error: {e}")
+            all_success = False
+            
+    return all_success
+
 
 def fetch_from_upstox(symbol, start_date, end_date):
     """Fetch historical data from Upstox API with rate limiting"""

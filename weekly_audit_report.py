@@ -103,26 +103,16 @@ def send_telegram_alert(msg: str):
         print("[Telegram] Bypassed — local run. Message not sent.")
         return
 
-    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    chat_id   = os.getenv("TELEGRAM_CHAT_ID", "")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "") or os.getenv("BOT_TOKEN", "")
+    chat_id   = os.getenv("TELEGRAM_CHAT_ID", "") or os.getenv("CHAT_ID", "")
 
     if not bot_token or not chat_id:
         print("[Telegram] Disabled — TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing.")
         return
 
-    import requests
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     try:
-        resp = requests.post(url, json={
-            "chat_id":             chat_id,
-            "text":                msg,
-            "parse_mode":          "HTML",
-            "disable_notification": False,
-        }, timeout=15)
-        if resp.status_code == 200:
-            print("[Telegram] Alert sent successfully.")
-        else:
-            print(f"[Telegram] API error {resp.status_code}: {resp.text}")
+        from utils import send_telegram_msg
+        send_telegram_msg(msg, bot_token=bot_token, chat_id=chat_id)
     except Exception as e:
         print(f"[Telegram] Communication error: {e}")
 
@@ -1460,38 +1450,26 @@ def _build_telegram_message(
     n_c = perf_data.get("n_closed", "?")
     n_a = perf_data.get("n_active", "?")
 
-    msg = (
-        f"\U0001f4cb <b>Weekly System Audit</b>\n"
-        f"\U0001f4c5 <i>{ist_now}</i>\n"
-        f"<code>{audit_id}</code>\n"
-        f"{'=' * 36}\n"
-        f"Status: {status_icon} <b>{status_label}</b>\n"
-        f"Errors: <b>{n_errors}</b>  |  Warnings: <b>{n_warnings}</b>\n"
-        f"\n"
-        f"\U0001f4c8 <b>Performance Snapshot</b>\n"
-        f"\u2022 Closed trades  : <b>{n_c}</b>\n"
-        f"\u2022 Win rate       : <b>{wr:.1%}</b>\n" if wr is not None else
-        f"\u2022 Win rate       : N/A\n"
-    )
-    # rebuild cleanly to avoid f-string nesting issues
+    from utils import escape_html_text
+
     lines = [
-        f"\U0001f4cb <b>Weekly System Audit</b>",
-        f"\U0001f4c5 <i>{ist_now}</i>",
-        f"<code>{audit_id}</code>",
-        "=" * 34,
+        f"📋 <b>AlphaPulse</b> | <b>WEEKLY SYSTEM AUDIT</b>",
+        f"━━━━━━━━━━━━━━━━━━━━",
+        f"📅 <i>{ist_now}</i>",
+        f"🔖 <code>{escape_html_text(audit_id)}</code>",
         f"Status: {status_icon} <b>{status_label}</b>",
         f"Errors: <b>{n_errors}</b>  |  Warnings: <b>{n_warnings}</b>",
         "",
-        "\U0001f4c8 <b>Performance Snapshot</b>",
-        f"\u2022 Closed trades  : <b>{n_c}</b> <i>(edge, ex-INTRADAY)</i>",
+        "📈 <b>Performance Snapshot</b>",
+        f"• Closed trades  : <b>{n_c}</b> <i>(edge, ex-INTRADAY)</i>",
     ]
     if wr is not None:
-        lines.append(f"\u2022 Win rate       : <b>{wr:.1%}</b>")
+        lines.append(f"• Win rate       : <b>{wr:.1%}</b>")
     if ap is not None:
-        lines.append(f"\u2022 Avg closed PnL : <b>{ap:+.2f}%</b>")
+        lines.append(f"• Avg closed PnL : <b>{ap:+.2f}%</b>")
     if ca is not None:
-        lines.append(f"\u2022 Full cohort avg: <b>{ca:+.2f}%</b>")
-    lines.append(f"\u2022 Active positions: <b>{n_a}</b>")
+        lines.append(f"• Full cohort avg: <b>{ca:+.2f}%</b>")
+    lines.append(f"• Active positions: <b>{n_a}</b>")
 
     ev_c = perf_data.get("evidence_count")
     if ev_c is not None:
@@ -1510,38 +1488,38 @@ def _build_telegram_message(
 
     if error_findings:
         lines.append("")
-        lines.append("\U0001f6d1 <b>Critical Errors:</b>")
+        lines.append("🛑 <b>Critical Errors:</b>")
         for f in error_findings[:8]:
-            # Strip emoji prefix for cleaner Telegram look
-            clean = f["message"].replace("\u274c ", "").replace("\u26a0\ufe0f  ", "")
-            lines.append(f"\u2022 {clean}")
+            clean = f["message"].replace("❌ ", "").replace("⚠️  ", "")
+            lines.append(f"• {escape_html_text(clean)}")
         if len(error_findings) > 8:
             lines.append(f"<i>...and {len(error_findings) - 8} more errors.</i>")
 
     if warn_findings:
         lines.append("")
-        lines.append("\u26a0\ufe0f <b>Warnings:</b>")
+        lines.append("⚠️ <b>Warnings:</b>")
         for f in warn_findings[:8]:
-            clean = f["message"].replace("\u26a0\ufe0f  ", "").replace("\u274c ", "")
-            lines.append(f"\u2022 {clean}")
+            clean = f["message"].replace("⚠️  ", "").replace("❌ ", "")
+            lines.append(f"• {escape_html_text(clean)}")
         if len(warn_findings) > 8:
             lines.append(f"<i>...and {len(warn_findings) - 8} more warnings.</i>")
 
     if not error_findings and not warn_findings:
         lines.append("")
-        lines.append("\u2705 All integrity checks passed.")
+        lines.append("✅ All integrity checks passed.")
 
     # Fixes applied
     if fixes_log:
         lines.append("")
-        lines.append(f"\U0001f527 <b>Fixes Applied ({len(fixes_log)}):</b>")
+        lines.append(f"🔧 <b>Fixes Applied ({len(fixes_log)}):</b>")
         for fx in fixes_log[:6]:
-            # Shorten for Telegram
             short = fx.split(":", 2)[-1].strip()[:80]
-            lines.append(f"\u2022 {short}")
+            lines.append(f"• {escape_html_text(short)}")
         if len(fixes_log) > 6:
             lines.append(f"<i>...and {len(fixes_log) - 6} more fixes.</i>")
 
+    lines.append("━━━━━━━━━━━━━━━━━━━━")
+    lines.append("⚡ <i>AlphaPulse Automated System Audit</i>")
     return "\n".join(lines)
 
 

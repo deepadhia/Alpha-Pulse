@@ -15,7 +15,7 @@ def run_script(script_name, args=None):
 
 def main():
     parser = argparse.ArgumentParser(description="IPO Scanner MongoDB Management Tool")
-    parser.add_argument("task", choices=["test", "backfill-all", "validate", "backup", "analyze", "quality", "recent", "backtest", "diagnose", "fill"], 
+    parser.add_argument("task", choices=["test", "backfill-all", "validate", "backup", "analyze", "quality", "recent", "backtest", "diagnose", "fill", "reconcile-delisted"], 
                         help="Task to perform")
     parser.add_argument("--today", action="store_true", help="For validation: logs only for today")
     parser.add_argument("--days", type=int, default=3, help="For analysis/quality/recent: number of days")
@@ -80,6 +80,9 @@ def main():
         if args.vs_winners:
             d_args.append("--vs-winners")
         run_script("diagnose_trade.py", d_args)
+
+    elif args.task == "reconcile-delisted":
+        run_script("fetch.py", ["--purge-delisted"])
 
 if __name__ == "__main__":
     main()

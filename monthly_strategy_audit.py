@@ -131,7 +131,7 @@ def run_monthly_audit(send_alert: bool = True) -> dict:
 
     # 3. Best Performers
     top_winners = df.nlargest(3, 'pnl_pct')
-    winner_str = ", ".join([f"<b>{r['symbol']}</b> (+{r['pnl_pct']:.1f}%)" for _, r in top_winners.iterrows() if r['pnl_pct'] > 0])
+    winner_str = ", ".join([f"<b>{r['symbol']}</b> (+{r['pnl_pct']:.1f}% · {int(r.get('days_held', 0))}d)" for _, r in top_winners.iterrows() if r['pnl_pct'] > 0])
     if not winner_str:
         winner_str = "N/A (Accumulation phase)"
 

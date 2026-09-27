@@ -68,27 +68,9 @@ SCANNER_VERSION = "3.5.0"  # v3.5.0: Upper 50% Candle Body Gate, 14-Day Velocity
 # write_daily_log is now imported from scanner_module above (shared writer).
 
 def send_telegram(msg):
-    """Send Telegram notification"""
-    if not BOT_TOKEN or not CHAT_ID:
-        logger.warning(f"[Telegram disabled] BOT_TOKEN: {'SET' if BOT_TOKEN else 'MISSING'}, CHAT_ID: {'SET' if CHAT_ID else 'MISSING'}")
-        return
-    
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    
-    try:
-        response = requests.post(url, json={
-            "chat_id": CHAT_ID, 
-            "text": msg, 
-            "parse_mode": "HTML",
-            "disable_notification": False
-        }, timeout=10)
-        
-        if response.status_code == 200:
-            logger.info("✅ Telegram message sent successfully!")
-        else:
-            logger.error(f"❌ Telegram API error: {response.status_code} - {response.text}")
-    except Exception as e:
-        logger.error(f"❌ Telegram error: {e}")
+    """Send Telegram alert using robust dispatcher with chunking and HTML-parse fallback"""
+    from utils import send_telegram_msg
+    return send_telegram_msg(msg, bot_token=BOT_TOKEN, chat_id=CHAT_ID, logger_inst=logger)
 
 def load_watchlist():
     """Load active symbols from MongoDB watchlist collection."""
@@ -557,7 +539,8 @@ def detect_intraday_breakout(df, symbol, bulk_prices=None):
 
 def format_intraday_alert(breakout_data):
     """Format production-grade intraday breakout alert with entry distance forensics."""
-    symbol = breakout_data.get('symbol', '?')
+    from utils import escape_html_text
+    symbol = escape_html_text(breakout_data.get('symbol', '?'))
     entry = float(breakout_data.get('entry_price') or 0.0)
     stop = float(breakout_data.get('stop_loss') or 0.0)
     target = float(breakout_data.get('target_price') or 0.0)
@@ -566,7 +549,7 @@ def format_intraday_alert(breakout_data):
     vol_spike = float(breakout_data.get('volume_spike') or 1.0)
     rr = float(breakout_data.get('risk_reward') or 0.0)
     strength = breakout_data.get('breakout_strength', 3)
-    regime = breakout_data.get('market_regime', 'NORMAL')
+    regime = escape_html_text(breakout_data.get('market_regime', 'NORMAL'))
     
     risk_pct = ((entry - stop) / entry * 100) if entry > 0 else 0
     reward_pct = ((target - entry) / entry * 100) if entry > 0 else 0
@@ -871,14 +854,18 @@ def scan_watchlist():
     
     # Send summary
     if breakouts_found > 0:
-        summary = f"""📊 <b>Hourly Breakout Scan Summary</b>
+        db_status = '✅ OK' if db_stats.get('db_failures', 0) == 0 else f"❌ {db_stats.get('db_failures')} FAILURES"
+        detection_msg = '🎉 New intraday breakouts detected! Check alerts above.' if breakouts_found > 0 else '✅ No new breakouts at this time.'
+        summary = f"""⚡ <b>AlphaPulse</b> | <b>HOURLY WATCHLIST SUMMARY</b>
+━━━━━━━━━━━━━━━━━━━━
+🔍 <b>Scan Telemetry:</b>
+• <b>Watchlist Symbols:</b> {len(symbols)}
+• <b>Breakouts Found:</b> {breakouts_found}
+• <b>System DB Health:</b> {db_status}
 
-🔍 Symbols Scanned: {len(symbols)}
-🎯 Breakouts Found: {breakouts_found}
-⏰ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-🧯 DB Status: {'✅ OK' if db_stats.get('db_failures', 0) == 0 else f"❌ {db_stats.get('db_failures')} FAILURES"}
-
-{'🎉 New breakouts detected! Check alerts above.' if breakouts_found > 0 else '✅ No new breakouts at this time.'}"""
+{detection_msg}
+━━━━━━━━━━━━━━━━━━━━
+⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%Y-%m-%d %H:%M IST')}</i>"""
         send_telegram(summary)
 
 def main():

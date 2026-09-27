@@ -74,18 +74,13 @@ def get_db():
 
 
 def send_telegram_notification(msg):
-    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN") or os.getenv("BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("CHAT_ID")
     if not bot_token or not chat_id:
         return
-    import requests
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     try:
-        requests.post(url, json={
-            "chat_id": chat_id,
-            "text": msg,
-            "parse_mode": "HTML"
-        }, timeout=10)
+        from utils import send_telegram_msg
+        send_telegram_msg(msg, bot_token=bot_token, chat_id=chat_id)
     except Exception:
         pass
 

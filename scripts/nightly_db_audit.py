@@ -28,8 +28,8 @@ except ImportError:
     sys.exit(1)
 
 # Telegram Configurations
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "") or os.getenv("BOT_TOKEN", "")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "") or os.getenv("CHAT_ID", "")
 
 def send_telegram_alert(msg: str):
     """Send HTML-formatted message to Telegram."""
@@ -42,18 +42,9 @@ def send_telegram_alert(msg: str):
         print("[Telegram disabled] TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing.")
         return
 
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     try:
-        response = requests.post(url, json={
-            "chat_id": CHAT_ID,
-            "text": msg,
-            "parse_mode": "HTML",
-            "disable_notification": False
-        }, timeout=15)
-        if response.status_code == 200:
-            print("[OK] Telegram notification sent successfully.")
-        else:
-            print(f"[Error] Telegram API Error: {response.status_code} - {response.text}")
+        from utils import send_telegram_msg
+        send_telegram_msg(msg, bot_token=BOT_TOKEN, chat_id=CHAT_ID)
     except Exception as e:
         print(f"[Error] Telegram Communication Error: {e}")
 
@@ -276,11 +267,11 @@ def run_nightly_audit():
         status_label = "WARNINGS FOUND"
 
     utc_now_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
-    ist_now_str = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).strftime('%Y-%m-%d %H:%M:%S IST')
+    from utils import escape_html_text
 
-    tg_msg = f"""🔍 <b>IPO-Base-Scanner Nightly Audit Report</b>
+    tg_msg = f"""🔍 <b>AlphaPulse</b> | <b>NIGHTLY DB AUDIT REPORT</b>
+━━━━━━━━━━━━━━━━━━━━
 📅 <i>Run Time: {ist_now_str} ({utc_now_str})</i>
-======================================
 Status: {status_emoji} <b>{status_label}</b>
 
 📊 <b>Summary:</b>
@@ -292,19 +283,21 @@ Status: {status_emoji} <b>{status_label}</b>
     if anomalies:
         tg_msg += "\n🛑 <b>Anomalies:</b>\n"
         for a in anomalies[:15]:
-            tg_msg += f"• {a}\n"
+            tg_msg += f"• {escape_html_text(a)}\n"
         if len(anomalies) > 15:
             tg_msg += f"<i>...and {len(anomalies) - 15} more anomalies.</i>\n"
 
     if warnings:
         tg_msg += "\n⚠️ <b>Warnings / Review Needed:</b>\n"
         for w in warnings[:15]:
-            tg_msg += f"• {w}\n"
+            tg_msg += f"• {escape_html_text(w)}\n"
         if len(warnings) > 15:
             tg_msg += f"<i>...and {len(warnings) - 15} more warnings.</i>\n"
 
     if not anomalies and not warnings:
         tg_msg += "\n✅ All structural and distribution integrity audits passed successfully."
+
+    tg_msg += "\n━━━━━━━━━━━━━━━━━━━━\n⚡ <i>AlphaPulse Automated DB Guardian</i>"
 
     send_telegram_alert(tg_msg)
 

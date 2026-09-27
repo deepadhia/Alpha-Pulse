@@ -2110,7 +2110,8 @@ def _format_dna_section(breakout_data):
 
 def format_listing_breakout_alert(breakout_data):
     """Format production-grade Listing Day High breakout alert with all essential details"""
-    symbol = breakout_data['symbol']
+    from utils import escape_html_text
+    symbol = escape_html_text(breakout_data['symbol'])
     entry = breakout_data['entry_price']
     stop = breakout_data['stop_loss']
     target = breakout_data['target_price']
@@ -2118,9 +2119,9 @@ def format_listing_breakout_alert(breakout_data):
     vol_spike = breakout_data.get('volume_spike', 0)
     rr = breakout_data.get('risk_reward', 0)
     days_since_listing = breakout_data.get('days_since_listing', 0)
-    tier = breakout_data.get('tier', 'A')
+    tier = escape_html_text(str(breakout_data.get('tier', 'A')))
     pos_size = breakout_data.get('position_size_pct', 60)
-    regime = breakout_data.get('market_regime', 'NORMAL')
+    regime = escape_html_text(breakout_data.get('market_regime', 'NORMAL'))
     
     lh_ref = listing_high
     limit_buy_price = lh_ref * 1.035 if lh_ref is not None else entry
@@ -2156,7 +2157,8 @@ def format_listing_breakout_alert(breakout_data):
 
 def format_base_breakout_alert(breakout_data):
     """Format production-grade Tier B base breakout alert with all essential details"""
-    symbol = breakout_data['symbol']
+    from utils import escape_html_text
+    symbol = escape_html_text(breakout_data['symbol'])
     entry = breakout_data['entry_price']
     stop = breakout_data['stop_loss']
     target = breakout_data['target_price']
@@ -2168,7 +2170,7 @@ def format_base_breakout_alert(breakout_data):
     base_range_high = breakout_data.get('base_range_high') or 0
     dist_below_high = ((listing_high - current_price) / listing_high * 100) if listing_high > 0 else 0
     position_size = breakout_data.get('position_size_pct', 40)
-    regime = breakout_data.get('market_regime', 'NORMAL')
+    regime = escape_html_text(breakout_data.get('market_regime', 'NORMAL'))
 
     risk_pct = ((entry - stop) / entry * 100) if entry > 0 else 0
     limit_buy_price = entry * 1.02
@@ -2202,7 +2204,8 @@ def format_base_breakout_alert(breakout_data):
 
 def format_watchlist_alert(breakout_data):
     """Format production-grade watchlist alert for near-breakout candidates"""
-    symbol = breakout_data['symbol']
+    from utils import escape_html_text
+    symbol = escape_html_text(breakout_data['symbol'])
     current_price = breakout_data['current_price']
     listing_high = breakout_data['listing_day_high']
     vol_spike = breakout_data.get('volume_spike', 0)
@@ -2654,14 +2657,18 @@ def scan_listing_day_breakouts():
     
     # Send summary
     if breakouts_found > 0:
-        summary = f"""📊 <b>Listing Day Breakout Scan Summary</b>
+        db_status = '✅ OK' if db_stats.get('db_failures', 0) == 0 else f"❌ {db_stats.get('db_failures')} FAILURES"
+        detection_msg = '🎯 New listing breakouts detected! Check alerts above.' if breakouts_found > 0 else '✅ No new breakouts at this time.'
+        summary = f"""📊 <b>AlphaPulse</b> | <b>LISTING BREAKOUT SUMMARY</b>
+━━━━━━━━━━━━━━━━━━━━
+🔍 <b>Scan Telemetry:</b>
+• <b>Listings Monitored:</b> {len(active_listings)}
+• <b>Breakouts Found:</b> {breakouts_found}
+• <b>System DB Health:</b> {db_status}
 
-🔍 Listings Monitored: {len(active_listings)}
-🎯 Breakouts Found: {breakouts_found}
-⏰ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-🧯 DB Status: {'✅ OK' if db_stats.get('db_failures', 0) == 0 else f"❌ {db_stats.get('db_failures')} FAILURES"}
-
-{'🎉 New breakouts detected! Check alerts above.' if breakouts_found > 0 else '✅ No breakouts at this time.'}"""
+{detection_msg}
+━━━━━━━━━━━━━━━━━━━━
+⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%Y-%m-%d %H:%M IST')}</i>"""
         send_telegram(summary)
 
 def main():

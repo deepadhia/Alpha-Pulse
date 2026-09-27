@@ -165,6 +165,9 @@ def update_mapping_from_db():
         for symbol in recent_symbols:
             if symbol in existing_symbols:
                 continue
+            if any(pat in symbol for pat in ['-RE', '-SM', 'RE1']):
+                logger.info(f"Skipping rights entitlement / SME symbol: {symbol}")
+                continue
 
             logger.info(f"Processing {symbol}...")
             mapping = search_instrument_key(symbol)
