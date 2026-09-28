@@ -3883,7 +3883,7 @@ def monthly_review():
     send_telegram(msg)
 
 def format_alphapulse_portfolio_report():
-    """Format a unified, institutional EOD Daily Portfolio & Risk Report for AlphaPulse."""
+    """Format a streamlined, institutional EOD Daily Portfolio & Risk Report for AlphaPulse."""
     try:
         from db import db
         positions = list(db.positions.find())
@@ -3907,6 +3907,26 @@ def format_alphapulse_portfolio_report():
             return f"Grade {g}"
         return g
 
+    def clean_exit_reason(raw_reason: str) -> str:
+        if not raw_reason:
+            return "Exit"
+        r = str(raw_reason).strip()
+        if "14-Day Velocity Gate" in r or "Dead Money" in r:
+            return "14-Day Velocity Gate"
+        if "Early Base Break" in r:
+            return "Early Base Breakdown"
+        if "Stop Loss" in r:
+            return "Stop Loss Hit"
+        if "Partial Take" in r:
+            return "Target Hit (Partial Take)"
+        if "Trailing Stop" in r:
+            return "Trailing Stop Hit"
+        if "Time Stop" in r:
+            return "Time Stop"
+        if "(" in r:
+            r = r.split("(")[0].strip()
+        return r
+
     now_ist = datetime.now()
     active_live = [p for p in positions if p.get('status') == 'ACTIVE']
     active_paper = [p for p in positions if p.get('status') == 'PAPER_ONLY']
@@ -3927,17 +3947,21 @@ def format_alphapulse_portfolio_report():
         days = int(float(p.get('days_held') or 0))
         w_score = p.get('winner_score') or p.get('winner_traits_score') or 0
         w_label = p.get('winner_label')
-        
-        pnl_c = '🟢' if pnl >= 0 else '🔴'
-        pnl_s = '+' if pnl >= 0 else ''
-        sl_dist = ((sl - curr) / curr * 100) if curr > 0 else 0.0
-        w_badge = f" | 💎 Score: {w_score}/4" if w_score else ""
+        try:
+            w_score_int = int(float(w_score))
+        except (ValueError, TypeError):
+            w_score_int = w_score
+        w_badge = f" | 💎 {w_score_int}/4" if w_score_int else ""
         if w_label == "POSSIBLE_WINNER":
             w_badge += " 🔥"
             
+        pnl_c = '🟢' if pnl >= 0 else '🔴'
+        pnl_s = '+' if pnl >= 0 else ''
+        sl_dist = ((sl - curr) / curr * 100) if curr > 0 else 0.0
+
         live_lines.append(
-            f"• <b>{sym}</b> ({grd}) · Held {days}d{w_badge}\n"
-            f"  CMP: <b>₹{curr:,.2f}</b> ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>)  •  SL: ₹{sl:,.2f} ({sl_dist:.1f}%)"
+            f"• <b>{sym}</b> ({grd} · {days}d){w_badge}\n"
+            f"  CMP: ₹{curr:,.2f} ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>)  •  SL: ₹{sl:,.2f} ({sl_dist:.1f}%)"
         )
 
     avg_live_pnl = (total_live_pnl / len(active_live)) if active_live else 0.0
@@ -3957,76 +3981,27 @@ def format_alphapulse_portfolio_report():
         days = int(float(p.get('days_held') or 0))
         w_score = p.get('winner_score') or p.get('winner_traits_score') or 0
         w_label = p.get('winner_label')
-        
-        pnl_c = '🟢' if pnl >= 0 else '🔴'
-        pnl_s = '+' if pnl >= 0 else ''
-        sl_dist = ((sl - curr) / curr * 100) if curr > 0 else 0.0
-        w_badge = f" | 💎 Score: {w_score}/4" if w_score else ""
+        try:
+            w_score_int = int(float(w_score))
+        except (ValueError, TypeError):
+            w_score_int = w_score
+        w_badge = f" | 💎 {w_score_int}/4" if w_score_int else ""
         if w_label == "POSSIBLE_WINNER":
             w_badge += " 🔥"
             
+        pnl_c = '🟢' if pnl >= 0 else '🔴'
+        pnl_s = '+' if pnl >= 0 else ''
+        sl_dist = ((sl - curr) / curr * 100) if curr > 0 else 0.0
+
         paper_lines.append(
-            f"• <b>{sym}</b> ({grd}) · Held {days}d{w_badge}\n"
-            f"  CMP: <b>₹{curr:,.2f}</b> ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>)  •  SL: ₹{sl:,.2f} ({sl_dist:.1f}%)"
+            f"• <b>{sym}</b> ({grd} · {days}d){w_badge}\n"
+            f"  CMP: ₹{curr:,.2f} ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>)  •  SL: ₹{sl:,.2f} ({sl_dist:.1f}%)"
         )
 
     avg_paper_pnl = (total_paper_pnl / len(active_paper)) if active_paper else 0.0
     avg_paper_color = '🟢' if avg_paper_pnl >= 0 else '🔴'
 
-    # 3. Shadow Tracking Counts & Active Shadow-Only Positions
-    sh_8_act = sum(1 for p in positions if p.get('shadow_status_8pct') == 'ACTIVE')
-    sh_10_act = sum(1 for p in positions if p.get('shadow_status_10pct') == 'ACTIVE')
-    sh_12_act = sum(1 for p in positions if p.get('shadow_status_12pct') == 'ACTIVE')
-
-    shadow_only = [
-        p for p in positions 
-        if p.get('status') in ['CLOSED', 'PAPER_CLOSED'] and (
-            p.get('shadow_status_8pct') == 'ACTIVE' or 
-            p.get('shadow_status_10pct') == 'ACTIVE' or 
-            p.get('shadow_status_12pct') == 'ACTIVE'
-        )
-    ]
-
-    shadow_only_lines = []
-    for p in shadow_only:
-        sym = escape_html_text(p.get('symbol'))
-        grd = format_grade(p.get('grade'))
-        entry = float(p.get('entry_price') or 0.0)
-        curr = float(p.get('current_price') or entry)
-        pnl = float(p.get('pnl_pct') or (((curr - entry) / entry * 100) if entry else 0.0))
-        days = int(float(p.get('days_held') or 0))
-        pnl_c = '🟢' if pnl >= 0 else '🔴'
-        pnl_s = '+' if pnl >= 0 else ''
-        active_sh = []
-        if p.get('shadow_status_8pct') == 'ACTIVE': active_sh.append('8%')
-        if p.get('shadow_status_10pct') == 'ACTIVE': active_sh.append('10%')
-        if p.get('shadow_status_12pct') == 'ACTIVE': active_sh.append('12%')
-        sh_str = '/'.join(active_sh)
-        shadow_only_lines.append(f"  ↳ <b>{sym}</b> ({grd}): <b>₹{curr:,.2f}</b> ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>) | {sh_str} · Held {days}d")
-
-    # 4. Top 5 Shadow Performers & Defensive Loss Cuts
-    def get_pnl(p):
-        entry = float(p.get('entry_price') or 0.0)
-        curr = float(p.get('current_price') or entry)
-        return float(p.get('pnl_pct') or (((curr - entry) / entry * 100) if entry else 0.0))
-
-    sorted_by_pnl = sorted(positions, key=get_pnl, reverse=True)
-    top_winners = [p for p in sorted_by_pnl if get_pnl(p) > 0][:5]
-    top_losers = [p for p in reversed(sorted_by_pnl) if get_pnl(p) < 0][:3]
-
-    top_win_lines = []
-    for i, p in enumerate(top_winners, 1):
-        sym = escape_html_text(p.get('symbol'))
-        grd = format_grade(p.get('grade'))
-        pnl = get_pnl(p)
-        days = int(float(p.get('days_held') or 0))
-        status_label = 'Active' if p.get('status') in ['ACTIVE', 'PAPER_ONLY'] else 'Closed'
-        top_win_lines.append(f"  {i}. <b>{sym}</b> ({grd}): 🟢 <b>+{pnl:.1f}%</b> ({status_label} · Held {days}d)")
-
-    losers_items = [f"<b>{escape_html_text(p.get('symbol'))}</b> (🔴 {get_pnl(p):.1f}% · Held {int(float(p.get('days_held') or 0))}d)" for p in top_losers]
-    losers_summary = ', '.join(losers_items) if losers_items else "None"
-
-    # 5. Recent Exits
+    # 3. Recent Exits
     def get_exit_sort_key(p):
         ex_d = p.get('exit_date')
         if isinstance(ex_d, datetime):
@@ -4044,49 +4019,33 @@ def format_alphapulse_portfolio_report():
     for p in recent_exits:
         sym = escape_html_text(p.get('symbol'))
         pnl = float(p.get('pnl_pct') or 0.0)
-        reason = escape_html_text(p.get('exit_reason', 'Exit'))
+        reason = escape_html_text(clean_exit_reason(p.get('exit_reason')))
         pnl_c = '🟢' if pnl >= 0 else '🔴'
         pnl_s = '+' if pnl >= 0 else ''
         days = int(float(p.get('days_held') or 0))
-        exit_lines.append(f"• <b>{sym}</b>: {pnl_c} <b>{pnl_s}{pnl:.1f}%</b> · Held {days}d ({reason})")
+        exit_lines.append(f"• <b>{sym}</b>: {pnl_c} <b>{pnl_s}{pnl:.1f}%</b> · Held {days}d <i>({reason})</i>")
 
     report = f"""📊 <b>AlphaPulse | DAILY PORTFOLIO &amp; RISK REPORT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📅 <b>{now_ist.strftime('%d %b %Y')}</b>  •  ⏱️ <b>{now_ist.strftime('%H:%M IST')}</b>  •  🛡️ Clean Cohort Active
 
-🟢 <b>LIVE POSITIONS ({len(active_live)})</b>
 """
-    if live_lines:
-        report += '\n'.join(live_lines) + f"\n<i>Book Avg Unrealized: {avg_live_color} <b>{avg_live_pnl:+.1f}%</b></i>\n\n"
+
+    if active_live:
+        report += f"🟢 <b>LIVE BOOK ({len(active_live)} Active)</b>  •  Avg: {avg_live_color} <b>{avg_live_pnl:+.1f}%</b>\n"
+        report += '\n'.join(live_lines) + "\n\n"
     else:
-        report += "• <i>No active live positions.</i>\n\n"
+        report += "🟢 <b>LIVE BOOK (0 Active)</b>\n• <i>No active live positions.</i>\n\n"
 
-    report += f"""📋 <b>PAPER / FORWARD RESEARCH ({len(active_paper)} Positions)</b>
-"""
-    if paper_lines:
-        report += '\n'.join(paper_lines) + f"\n<i>Paper Avg Unrealized: {avg_paper_color} <b>{avg_paper_pnl:+.1f}%</b></i>\n\n"
+    if active_paper:
+        report += f"📋 <b>PAPER BOOK ({len(active_paper)} Active)</b>  •  Avg: {avg_paper_color} <b>{avg_paper_pnl:+.1f}%</b>\n"
+        report += '\n'.join(paper_lines) + "\n\n"
     else:
-        report += "• <i>No active paper positions.</i>\n\n"
-
-    report += f"""👥 <b>SHADOW MULTI-STOP TRACKING</b>
-• Active Floors: 8%: <b>{sh_8_act}</b>  •  10%: <b>{sh_10_act}</b>  •  12%: <b>{sh_12_act}</b>
-"""
-    if shadow_only_lines:
-        report += "• <b>Shadow-Only Runners:</b>\n" + '\n'.join(shadow_only_lines) + "\n\n"
-    else:
-        report += "\n"
-
-    report += f"""🏆 <b>TOP SHADOW TRADES & INSIGHTS (Good vs Bad)</b>
-🟢 <b>Top 5 Performers:</b>
-""" + ('\n'.join(top_win_lines) if top_win_lines else "  • <i>No positive shadow trades recorded yet.</i>") + f"""
-🔴 <b>Defensive Loss Cuts:</b> {losers_summary}
-
-"""
+        report += "📋 <b>PAPER BOOK (0 Active)</b>\n• <i>No active paper positions.</i>\n\n"
 
     if exit_lines:
-        report += f"""🚪 <b>RECENT EXITS</b>
-""" + '\n'.join(exit_lines) + "\n\n"
+        report += f"🚪 <b>RECENT EXITS</b>\n" + '\n'.join(exit_lines) + "\n\n"
 
     report += """━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse EOD Snapshot</i>"""
