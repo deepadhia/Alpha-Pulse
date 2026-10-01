@@ -15,7 +15,7 @@ import pandas as pd
 import numpy as np
 import requests
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 import logging
 
@@ -65,7 +65,8 @@ write_daily_log = scanner_module.write_daily_log  # Use shared writer — preven
 
 SCANNER_VERSION = "3.5.0"  # v3.5.0: Upper 50% Candle Body Gate, 14-Day Velocity Gate, Anti-Chasing Extension Guard
 
-# write_daily_log is now imported from scanner_module above (shared writer).
+def _now_ist():
+    return (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).replace(tzinfo=None)
 
 def send_telegram(msg):
     """Send Telegram alert using robust dispatcher with chunking and HTML-parse fallback"""
@@ -572,7 +573,7 @@ def format_intraday_alert(breakout_data):
 • <b>Volume Surge:</b> <b>{vol_spike:.1f}x</b>  •  <b>RSI (14):</b> {rsi:.1f}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
+⚡ <i>AlphaPulse v{SCANNER_VERSION} • {_now_ist().strftime('%d %b %Y, %H:%M IST')}</i>"""
     return msg
 
 def save_breakout_signal(breakout_data):
@@ -844,24 +845,7 @@ def scan_watchlist():
         db_stats = {"symbols_scanned": len(symbols), "signals_found": breakouts_found}
 
     write_daily_log("watchlist", "SYSTEM", "SCAN_COMPLETED", db_stats)
-    
-    # Send summary
-    if breakouts_found > 0:
-        db_status = '✅ OK' if db_stats.get('db_failures', 0) == 0 else f"❌ {db_stats.get('db_failures')} FAILURES"
-        detection_msg = '🎉 New intraday breakouts detected! Check alerts above.' if breakouts_found > 0 else '✅ No new breakouts at this time.'
-        summary = f"""⚡ <b>AlphaPulse | HOURLY WATCHLIST SUMMARY</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📅 <b>{datetime.now().strftime('%d %b %Y, %H:%M IST')}</b>
-
-• <b>Watchlist Symbols:</b> {len(symbols)}  •  <b>DB Health:</b> {db_status}
-• <b>Breakouts Found:</b> <b>{breakouts_found}</b>
-
-{detection_msg}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION}</i>"""
-        send_telegram(summary)
+    logger.info(f"Hourly scan complete telemetry logged: {breakouts_found} breakouts found.")
 
 def main():
     """Main function"""

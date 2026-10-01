@@ -29,10 +29,6 @@ import threading
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
-def _now_ist():
-    """Return current naive datetime in IST (UTC+5:30). Single source of truth."""
-    return datetime.now(timezone.utc).astimezone(IST).replace(tzinfo=None)
-
 # Institutional Analytics & Enrichment (Phase 2.2 Upgrade)
 try:
     from core.repository import MongoRepository
@@ -1038,37 +1034,29 @@ def format_signal_alert(symbol, grade, entry_price, stop_loss, target_price, sco
 ⚡ <i>AlphaPulse v{SCANNER_VERSION} • {date_str}</i>"""
     return msg
 
-def format_exit_alert(symbol, exit_reason, exit_price, pnl_pct, days_held, entry_price, outcome_type=None, peak_runup=None, is_paper=False):
-    """Format clean, institutional exit alert with broker-grade P&L colors and integrated outcome telemetry"""
+def format_exit_alert(symbol, exit_reason, exit_price, pnl_pct, days_held, entry_price):
+    """Format clean, compact exit alert with broker-grade P&L colors"""
     from utils import escape_html_text
-    
-    r = str(exit_reason).strip()
-    if "14-Day Velocity Gate" in r or "Dead Money" in r:
-        clean_reason = "14-Day Velocity Gate"
-        emoji = "⏰"
-    elif "Volume Exhaustion" in r:
-        clean_reason = "Volume Exhaustion"
-        emoji = "📉"
-    elif "Early Base Break" in r:
-        clean_reason = "Early Base Breakdown"
-        emoji = "⚡"
-    elif "Stop Loss" in r:
-        clean_reason = "Stop Loss Hit"
-        emoji = "🛑"
-    elif "Partial Take" in r:
-        clean_reason = "Target Hit (Partial Take)"
-        emoji = "💰"
-    elif "Trailing Stop" in r:
-        clean_reason = "Trailing Stop Hit"
-        emoji = "📉"
-    elif "Time Stop" in r:
-        clean_reason = "Time Stop"
-        emoji = "⏰"
-    else:
-        clean_reason = r.split("(")[0].strip() if "(" in r else r
-        emoji = "📊"
-
+    exit_emojis = {
+        "Stop Loss": "🛑",
+        "Early Base Break": "⚡",
+        "Time Stop -5%": "⏰",
+        "Time Stop -8%": "⏰",
+        "Time Stop - Dead Money (14-Day Velocity Gate)": "⏰",
+        "Partial Take": "💰"
+    }
+    emoji = exit_emojis.get(exit_reason, "📊")
     clean_sym = escape_html_text(symbol)
+    
+    friendly_reasons = {
+        "Time Stop - Dead Money (14-Day Velocity Gate)": "14-Day Velocity Gate",
+        "Early Base Break": "Early Base Breakdown",
+        "Stop Loss": "Stop Loss Hit",
+        "Partial Take": "Target Hit (Partial Take)",
+        "Trailing Stop": "Trailing Stop Hit",
+    }
+    clean_reason = escape_html_text(friendly_reasons.get(exit_reason, exit_reason))
+    
     pnl_abs = exit_price - entry_price
     if pnl_pct > 0:
         pnl_badge = f"🟢 <b>+{pnl_pct:.2f}%</b> (▲ +₹{pnl_abs:,.2f}/sh)"
@@ -1077,26 +1065,17 @@ def format_exit_alert(symbol, exit_reason, exit_price, pnl_pct, days_held, entry
     else:
         pnl_badge = f"⚪ <b>0.00%</b> (₹0.00/sh)"
     
-    paper_prefix = "⚠️ <b>[PAPER ONLY EXIT]</b>\n" if is_paper else ""
-    header_title = f"{emoji} <b>AlphaPulse | POSITION CLOSED</b>"
-    
-    outcome_line = ""
-    if outcome_type:
-        outcome_disp = outcome_type.replace("_", " ").title()
-        peak_str = f" (Peak: +{peak_runup:.1f}%)" if peak_runup is not None else ""
-        outcome_line = f"\n🎯 <b>Outcome:</b> {outcome_disp}{peak_str}"
+    msg = f"""{emoji} <b>AlphaPulse | POSITION EXIT</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    days_held_int = int(float(days_held))
-    days_str = f"{days_held_int} day{'s' if days_held_int != 1 else ''}"
+📊 <b>{clean_sym}</b>  •  <b>{clean_reason}</b>
+{pnl_badge}
 
-    msg = f"""{paper_prefix}{header_title}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 <b>{clean_sym}</b> ({days_str} held)
-{pnl_badge} │ ₹{entry_price:,.2f} → <b>₹{exit_price:,.2f}</b>
+• <b>Price:</b> ₹{entry_price:,.2f} → <b>₹{exit_price:,.2f}</b>
+• <b>Held:</b> {int(float(days_held))} day{'s' if int(float(days_held)) != 1 else ''}
 
-📋 <b>Exit:</b> {clean_reason}{outcome_line}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION} • {_now_ist().strftime('%d %b %Y, %H:%M IST')}</i>"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
     return msg
 
 
@@ -1720,7 +1699,7 @@ def fetch_data(symbol, start_date, live_today_data=None):
                 else:
                     # If live_today_data not passed but today's candle is needed, we check if it's market hours
                     from datetime import time as dt_time
-                    now_ist = _now_ist()
+                    now_ist = datetime.utcnow() + timedelta(hours=5, minutes=30)
                     if now_ist.time() < dt_time(15, 45):
                         try:
                             # Mark network call since get_live_price hits the Upstox/yfinance API
@@ -1766,7 +1745,7 @@ def fetch_data(symbol, start_date, live_today_data=None):
                 # Determine what candles to cache
                 completed_df = df[df['DATE'].dt.date < today].copy()
                 from datetime import time as dt_time  # needed in both cache-hit and API-miss paths
-                now_ist = _now_ist()
+                now_ist = datetime.utcnow() + timedelta(hours=5, minutes=30)
                 if df.iloc[-1]['DATE'].date() == today and now_ist.time() >= dt_time(15, 45):
                     completed_df = df.copy()
                 
@@ -1914,7 +1893,7 @@ def update_positions():
 ⚠️ <i>DB updates paused. Manual corporate action check required.</i>
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION} • {_now_ist().strftime('%d %b %Y, %H:%M IST')}</i>"""
+⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
                 send_telegram(split_alert)
                 continue
 
@@ -4078,8 +4057,8 @@ def format_consolidated_sl_updates(sl_updates, logic_version=None):
         return ""
     from utils import escape_html_text
     version_label = logic_version or f"v{SCANNER_VERSION}"
-    now_str = _now_ist().strftime('%Y-%m-%d')
-    time_str = _now_ist().strftime('%H:%M IST')
+    now_str = datetime.now().strftime('%Y-%m-%d')
+    time_str = datetime.now().strftime('%H:%M IST')
     lines = [
         f"🛑 <b>AlphaPulse | STOP LOSS ADJUSTMENTS</b>",
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
@@ -4143,7 +4122,7 @@ def format_position_update_alert(symbol, current_price, entry_price, old_trailin
 • <b>Unrealized P&amp;L:</b> {pnl_badge}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION} • {_now_ist().strftime('%d %b %Y, %H:%M IST')}</i>"""
+⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
     return msg
 
 def stop_loss_update_scan():
@@ -4305,7 +4284,7 @@ def stop_loss_update_scan():
   📈 Close P&L: {pnl_badge} | 📅 Total Days: {days_held}
   👥 Tracking: {shadows_str}\n\n"""
 
-    pre_scan_msg += f"⏰ <i>{_now_ist().strftime('%d %b %Y, %H:%M IST')}</i>"
+    pre_scan_msg += f"⏰ <i>{datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"
     logger.info("Pre-scan summary generated (suppressed telegram noise)")
     
     updates_made = 0
@@ -4410,7 +4389,7 @@ def stop_loss_update_scan():
 💡 <i>Auto-retry on next scan cycle.</i>
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION} • {_now_ist().strftime('%d %b %Y, %H:%M IST')}</i>"""
+⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
                     send_telegram(failed_msg)
                     continue
                 
@@ -4444,7 +4423,7 @@ def stop_loss_update_scan():
 • <b>Last Price:</b> ₹{last_px:,.2f}  •  <b>Entry:</b> {pos.get('entry_date')}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION} • {_now_ist().strftime('%d %b %Y, %H:%M IST')}</i>"""
+⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
                     send_telegram(stale_msg)
                     continue
                 
@@ -4474,7 +4453,7 @@ def stop_loss_update_scan():
 ⚠️ <i>DB updates paused. Manual corporate action check required.</i>
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION} • {_now_ist().strftime('%d %b %Y, %H:%M IST')}</i>"""
+⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
                     send_telegram(split_alert)
                     failed_updates.append(sym)
                     continue
@@ -4649,10 +4628,10 @@ def stop_loss_update_scan():
                     })
                     
                     is_paper_trade = (pos["status"] == "PAPER_ONLY")
-                    exit_msg = format_exit_alert(
-                        sym, exit_reason, current_price, pnl, days_held, entry_price,
-                        outcome_type=outcome_type, peak_runup=new_max_runup, is_paper=is_paper_trade
-                    )
+                    exit_msg = format_exit_alert(sym, exit_reason, current_price, pnl, days_held, entry_price)
+                    if is_paper_trade:
+                        exit_msg = "⚠️ <b>[PAPER ONLY EXIT]</b>\n" + exit_msg
+                    exit_msg += f"\n\n📊 <b>Outcome:</b> {outcome_type} (Peak: +{new_max_runup:.1f}%)"
                     send_telegram(exit_msg)
 
                     try:
@@ -4985,7 +4964,7 @@ def stop_loss_update_scan():
 • <b>Last Price:</b> ₹{last_px:,.2f}  •  <b>Entry:</b> {pos.get('entry_date')}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION} • {_now_ist().strftime('%d %b %Y, %H:%M IST')}</i>"""
+⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
             send_telegram(error_msg)
             continue
     
@@ -5017,7 +4996,7 @@ def heartbeat():
 ✅ <b>All automated engines operational</b>
 
 • <b>Active Positions:</b> <b>{active_positions}</b>
-• <b>Time:</b> {_now_ist().strftime('%d %b %Y, %H:%M IST')}
+• <b>Time:</b> {datetime.now().strftime('%d %b %Y, %H:%M IST')}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION}</i>"""

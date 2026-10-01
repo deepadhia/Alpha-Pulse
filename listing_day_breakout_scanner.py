@@ -18,7 +18,7 @@ import numpy as np
 import requests
 import time
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 import logging
 from datetime import time as dt_time
@@ -649,7 +649,7 @@ def save_pending_breakouts(data):
         if db is not None:
             db["pending_states"].update_one(
                 {"_id": "listing_pending_breakouts"},
-                {"$set": {"data": data, "updated_at": datetime.utcnow()}},
+                {"$set": {"data": data, "updated_at": datetime.now(timezone.utc)}},
                 upsert=True
             )
     except Exception as db_e:
@@ -665,7 +665,7 @@ def save_pending_breakouts(data):
 
 def _now_ist():
     # Keep one IST source for consistent timestamps
-    return datetime.utcnow() + timedelta(hours=5, minutes=30)
+    return (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).replace(tzinfo=None)
 
 
 def _market_is_open_ist():
@@ -2074,15 +2074,21 @@ def classify_listing_winner_traits(
 
 def _format_dna_section(breakout_data):
     """Format compact DNA edge summary for breakout alerts"""
-    winner_score = breakout_data.get('winner_traits_score', 0)
+    # Use 'winner_score' — the key populated by classify_listing_winner_traits()
+    winner_score = breakout_data.get('winner_score', 0) or 0
+    vol_spike = breakout_data.get('volume_spike', 0) or 0
+    prng = breakout_data.get('listing_range_pct', 0) or 0
     if winner_score >= 4:
         conviction = "🟢 High Conviction"
     elif winner_score >= 2:
         conviction = "🟡 Standard Edge"
     else:
         conviction = "⚪ Base Profile"
-        
-    return f"• <b>Setup Edge:</b> Score <b>{winner_score}/5</b> ({conviction}) • Upper 50% Body Passed"
+
+    return (
+        f"• <b>Setup Edge:</b> Score <b>{winner_score}/5</b> ({conviction})"
+        f" • Vol <b>{vol_spike:.1f}x</b> • Base Coil <b>{prng:.1f}%</b> • Upper 50% Body ✅"
+    )
 
 
 def format_listing_breakout_alert(breakout_data):
@@ -2120,7 +2126,7 @@ def format_listing_breakout_alert(breakout_data):
 {dna_section}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
+⚡ <i>AlphaPulse v{SCANNER_VERSION} • {_now_ist().strftime('%d %b %Y, %H:%M IST')}</i>"""
 
 
 def format_base_breakout_alert(breakout_data):
@@ -2157,7 +2163,7 @@ def format_base_breakout_alert(breakout_data):
 {dna_section}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
+⚡ <i>AlphaPulse v{SCANNER_VERSION} • {_now_ist().strftime('%d %b %Y, %H:%M IST')}</i>"""
 
 
 def format_watchlist_alert(breakout_data):
@@ -2180,7 +2186,7 @@ def format_watchlist_alert(breakout_data):
 • <i>Confirmed close above ₹{listing_high:,.2f} triggers entry.</i>
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
+⚡ <i>AlphaPulse v{SCANNER_VERSION} • {_now_ist().strftime('%d %b %Y, %H:%M IST')}</i>"""
 
 def save_watchlist_signal(breakout_data):
     """Save watchlist signal to prevent duplicate alerts"""
@@ -2552,6 +2558,10 @@ def scan_listing_day_breakouts():
                         if success:
                             # Send Alert
                             limit_buy = live_price * 1.02
+                            # Enrich breakout dict with live metrics for DNA formatter
+                            breakout['volume_spike'] = vol_spike_calc
+                            breakout['listing_range_pct'] = prng_calc
+                            re_entry_dna = _format_dna_section(breakout)
                             msg = f"""⚡ <b>AlphaPulse | RE-ENTRY BREAKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -2560,11 +2570,11 @@ def scan_listing_day_breakouts():
 
 • <b>Trigger / LTP:</b> ₹{live_price:,.2f}  <i>(Limit Max: ≤ ₹{limit_buy:,.2f})</i>
 • <b>Stop Loss:</b> ₹{breakout['stop_loss']:,.2f} (<code>-8.0%</code>)  •  <b>Target:</b> ₹{breakout['target_price']:,.2f} (<code>+20.0%</code>)
-• <b>Volume Surge:</b> <b>{vol_spike_calc:.1f}x</b>  •  <b>Extension:</b> +{entry_extension_pct:.1f}%
-• <b>Setup Validation:</b> Upper 50% Body Passed • Base PRNG: {prng_calc:.1f}%
+• <b>Extension:</b> +{entry_extension_pct:.1f}%
+{re_entry_dna}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION} • {datetime.now().strftime('%d %b %Y, %H:%M IST')}</i>"""
+⚡ <i>AlphaPulse v{SCANNER_VERSION} • {_now_ist().strftime('%d %b %Y, %H:%M IST')}</i>"""
                             if portfolio_full:
                                 msg = f"⚠️ <b>[PORTFOLIO FULL - PAPER ONLY]</b> (Active: {active_count})\n" + msg
                             send_telegram(msg)
@@ -2598,24 +2608,7 @@ def scan_listing_day_breakouts():
         db_stats = {"listings_monitored": len(active_listings), "signals_found": breakouts_found}
 
     write_daily_log("listing_day", "SYSTEM", "SCAN_COMPLETED", db_stats)
-    
-    # Send summary
-    if breakouts_found > 0:
-        db_status = '✅ OK' if db_stats.get('db_failures', 0) == 0 else f"❌ {db_stats.get('db_failures')} FAILURES"
-        detection_msg = '🎯 New listing breakouts detected! Check alerts above.' if breakouts_found > 0 else '✅ No new breakouts at this time.'
-        summary = f"""📊 <b>AlphaPulse | LISTING BREAKOUT SUMMARY</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📅 <b>{datetime.now().strftime('%d %b %Y, %H:%M IST')}</b>
-
-• <b>Listings Monitored:</b> {len(active_listings)}  •  <b>DB Health:</b> {db_status}
-• <b>Breakouts Found:</b> <b>{breakouts_found}</b>
-
-{detection_msg}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION}</i>"""
-        send_telegram(summary)
+    logger.info(f"Scan complete telemetry logged: {breakouts_found} breakouts found.")
 
 def main():
     """Main function"""
@@ -2626,8 +2619,8 @@ def main():
     try:
         print("IPO Listing Day Breakout Scanner")
         print("=" * 60)
-        print(f"Date: {datetime.now().strftime('%Y-%m-%d')}")
-        print(f"Time: {datetime.now().strftime('%H:%M:%S')}")
+        print(f"Date: {_now_ist().strftime('%Y-%m-%d')} IST")
+        print(f"Time: {_now_ist().strftime('%H:%M:%S')} IST")
         print("=" * 60)
     except:
         print("IPO Listing Day Breakout Scanner")

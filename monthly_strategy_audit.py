@@ -136,8 +136,9 @@ def run_monthly_audit(send_alert: bool = True) -> dict:
         winner_str = "N/A (Accumulation phase)"
 
     # 4. Build Telegram Alert Card
-    month_name = datetime.now().strftime('%B %Y')
-    now_str = datetime.now().strftime('%d %b %Y, %H:%M IST')
+    ist_now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
+    month_name = ist_now.strftime('%B %Y')
+    now_str = ist_now.strftime('%d %b %Y, %H:%M IST')
 
     msg = f"""🏛️ <b>AlphaPulse | MONTHLY STRATEGY AUDIT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
