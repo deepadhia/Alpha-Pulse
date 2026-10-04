@@ -88,6 +88,22 @@ def run_monthly_audit(send_alert: bool = True) -> dict:
     df['prng'] = df['setup_dna'].apply(lambda x: _to_float(x.get('prng_10d_pct'), 15.0) if isinstance(x, dict) else 15.0)
     df['upper_wick'] = df['setup_dna'].apply(lambda x: _to_float(x.get('upper_wick_pct'), 0.0) if isinstance(x, dict) else 0.0)
     df['archetype'] = df['forensics'].apply(lambda x: x.get('archetype', 'UNKNOWN') if isinstance(x, dict) else 'UNKNOWN')
+    df['version'] = df.get('version', '3.5.0').fillna('3.5.0')
+    df['entry_date_str'] = df['entry_date'].astype(str).str[:10]
+    if '_backfilled' in df.columns:
+        df['_backfilled'] = df['_backfilled'].fillna(False).astype(bool)
+    else:
+        df['_backfilled'] = False
+
+    # Version-Isolated Cohorts:
+    # 1. Native Live v3.5.0 Forward-Test Cohort (entered natively under v3.5.0 rules on/after 2026-09-29)
+    v35_df = df[(df['version'] == '3.5.0') & (~df['_backfilled']) & (df['entry_date_str'] >= '2026-09-29')]
+    v35_total = len(v35_df)
+    v35_wins = len(v35_df[v35_df['is_win']])
+    v35_losses = v35_total - v35_wins
+    v35_win_rate = (v35_wins / v35_total * 100) if v35_total > 0 else 0.0
+    v35_avg_pnl = v35_df['pnl_pct'].mean() if v35_total > 0 else 0.0
+    v35_avg_runup = v35_df['max_runup_pct'].mean() if v35_total > 0 else 0.0
 
     # Metrics
     win_count = len(df[df['is_win']])
@@ -144,11 +160,11 @@ def run_monthly_audit(send_alert: bool = True) -> dict:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📅 <b>{month_name}</b>  •  ⏱️ {now_str}
-📊 <b>Clean Cohort:</b> {total_trades} Trades ({len(active_trades)} Active / {len(closed_trades)} Closed)
-
-💰 <b>Monthly Performance</b>
-• Win Rate: <b>{win_rate:.1f}%</b> ({win_count}W / {loss_count}L)  •  Avg PnL: <b>{avg_pnl:+.2f}%</b>
-• Peak Runup: <b>+{avg_runup:.2f}%</b>
+📊 <b>Strategy Performance & Version-Isolated Scorecard:</b>
+• 🟢 <b>v3.5.0 Native Forward Scorecard:</b> {v35_total} Trades ({v35_wins}W / {v35_losses}L)
+  └─ Win Rate: <b>{v35_win_rate:.1f}%</b>  •  Avg PnL: <b>{v35_avg_pnl:+.2f}%</b>  •  Peak: <b>+{v35_avg_runup:.2f}%</b>
+• 📑 <b>Historical Benchmark Proof:</b> {total_trades} Clean Trades ({win_count}W / {loss_count}L)
+  └─ Overall Win Rate: <b>{win_rate:.1f}%</b>  •  Avg PnL: <b>{avg_pnl:+.2f}%</b>
 • Top Performers: {winner_str}
 
 🚨 <b>Action Required</b>
@@ -167,7 +183,8 @@ def run_monthly_audit(send_alert: bool = True) -> dict:
     print("\n" + "="*85)
     print(f"🏛️ AlphaPulse — Monthly Strategy Audit ({month_name})")
     print("="*85)
-    print(f"Win Rate: {win_rate:.1f}% | Avg PnL: {avg_pnl:+.2f}% | Avg Peak Runup: +{avg_runup:.2f}%")
+    print(f"🟢 v3.5.0 Native Forward-Test: {v35_total} Trades | Win Rate: {v35_win_rate:.1f}% | Avg PnL: {v35_avg_pnl:+.2f}%")
+    print(f"📑 Historical Benchmark Proof: {total_trades} Trades | Win Rate: {win_rate:.1f}% | Avg PnL: {avg_pnl:+.2f}% | Avg Peak Runup: +{avg_runup:.2f}%")
     print("\nAction Items:")
     for item in action_items:
         print(f" - {item.replace('<b>', '').replace('</b>', '').replace('<i>', '').replace('</i>', '')}")

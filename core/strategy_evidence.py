@@ -243,7 +243,16 @@ def build_trade_evidence_doc(trade: dict, db=None, fetch_data_fn=None) -> dict:
     elif not is_win and is_concluded:
         cohorts.append("STOPPED_OUT_LOSER")
 
+    is_native_v350 = bool(trade.get("version") == "3.5.0" and not trade.get("_backfilled", False) and entry_date_str >= "2026-09-29")
+    is_backfilled = bool(trade.get("_backfilled", False))
+    if is_native_v350:
+        cohorts.append("NATIVE_V350_FORWARD")
+    elif is_backfilled:
+        cohorts.append("HISTORICAL_BACKFILLED")
+
     doc = {
+        "is_native_v350": is_native_v350,
+        "_backfilled": is_backfilled,
         "evidence_id": evidence_id,
         "symbol": sym,
         "entry_date": entry_date_str,

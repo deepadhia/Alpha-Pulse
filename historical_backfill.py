@@ -151,7 +151,8 @@ def run_historical_backfill(lookback_days=180):
                     "source_type": _data_src,
                     "data_quality": "CONFIRMED" if _data_src == "Upstox API" else "FALLBACK",
                     "decision_snapshot": _snapshot_l,
-                    "source": "backfill_v2"
+                    "source": "backfill_v2",
+                    "_backfilled": True
                 }
                 if status_l == "CLOSED":
                     lp = float(df["CLOSE"].iloc[-1])
@@ -294,7 +295,8 @@ def run_historical_backfill(lookback_days=180):
                     "source_type": _data_src,
                     "data_quality": "CONFIRMED" if _data_src == "Upstox API" else "FALLBACK",
                     "decision_snapshot": _snapshot,
-                    "source": "backfill_v2"
+                    "source": "backfill_v2",
+                    "_backfilled": True
                 }
 
                 # Calculate PnL for closed trades

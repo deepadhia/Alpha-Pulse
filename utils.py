@@ -457,6 +457,49 @@ def get_last_trading_day(target_date: Optional[Union[date, datetime, str]] = Non
     return target_date - timedelta(days=1)
 
 
+def count_trading_days(start_date: Optional[Union[date, datetime, str]], end_date: Optional[Union[date, datetime, str]] = None) -> int:
+    """
+    Count the number of active NSE trading sessions (weekdays excluding NSE holidays)
+    between start_date and end_date (inclusive).
+    """
+    if start_date is None:
+        return 0
+    try:
+        if isinstance(start_date, str):
+            start_date = datetime.strptime(start_date[:10], "%Y-%m-%d").date()
+        elif isinstance(start_date, datetime):
+            start_date = start_date.date()
+        elif hasattr(start_date, 'date'):
+            start_date = start_date.date()
+
+        if end_date is None:
+            end_date = datetime.now(IST).date()
+        elif isinstance(end_date, str):
+            end_date = datetime.strptime(end_date[:10], "%Y-%m-%d").date()
+        elif isinstance(end_date, datetime):
+            end_date = end_date.date()
+        elif hasattr(end_date, 'date'):
+            end_date = end_date.date()
+
+        if start_date > end_date:
+            return 0
+
+        holidays = get_dynamic_nse_holidays(start_date.year)
+        if end_date.year != start_date.year:
+            holidays = holidays.union(get_dynamic_nse_holidays(end_date.year))
+
+        cur = start_date
+        trading_sessions = 0
+        while cur <= end_date:
+            if cur.weekday() < 5 and cur.strftime("%Y-%m-%d") not in holidays:
+                trading_sessions += 1
+            cur += timedelta(days=1)
+        return trading_sessions
+    except Exception as e:
+        logger.warning(f"⚠️ [count_trading_days] Error counting trading days ({e}). Defaulting to 0.")
+        return 0
+
+
 def send_holiday_notification_once(scanner_name: str, today_str: Optional[str] = None, send_telegram_fn=None) -> bool:
     """
     Send a market holiday Telegram notification exactly once per day across all scanners.

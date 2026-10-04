@@ -1950,6 +1950,7 @@ def commit_trade_to_db(breakout_data):
             "tier": tier,
             "market_regime": mr,
             "version": SCANNER_VERSION,
+            "_backfilled": False,
             "strategy_version": f"{SCANNER_VERSION}-listing-day",
             "execution_version": f"{SCANNER_VERSION}-single-writer",
             "risk_model_version": f"{SCANNER_VERSION}-archetype-velocity",
@@ -1986,6 +1987,7 @@ def commit_trade_to_db(breakout_data):
             "market_regime": mr,
             "position_size_pct": breakout_data.get('position_size_pct', 60),
             "version": SCANNER_VERSION,
+            "_backfilled": False,
             "strategy_version": f"{SCANNER_VERSION}-listing-day",
             "execution_version": f"{SCANNER_VERSION}-single-writer",
             "risk_model_version": f"{SCANNER_VERSION}-archetype-velocity",
@@ -2223,6 +2225,7 @@ def save_watchlist_signal(breakout_data):
             "distance_pct": round(distance_pct, 2),
             "notes": "Within 5% of listing high",
             "version": SCANNER_VERSION,
+            "_backfilled": False,
             "scanner": "listing_day"
         }
         

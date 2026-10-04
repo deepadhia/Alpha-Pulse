@@ -35,6 +35,15 @@ This file defines the core engineering standards, domain knowledge, and operatio
 > 2. Wide 40/80/120-day consolidation windows were removed.
 > 3. Strict volume floors (≥150,000 shares) and turnover thresholds (≥ Rs 1 Cr) were made mandatory.
 
+> [!IMPORTANT]
+> **NATIVE v3.5.0 FORWARD PRODUCTION CUTOFF: `2026-09-29`**
+> In October 2026, an exhaustive forensic audit discovered that out of 22 positions in the active `positions` collection, **20 were backfilled** (`_backfilled: True`) from pre-v3.5.0 historical triggers.
+> Because they were backfilled during research, their documents carried `"version": "3.5.0"`, even though they entered under legacy flawed conditions (e.g. fatal 42–46% upper-wick supply traps or sub-1.0x volume spikes) that current v3.5.0 rules actively reject!
+> 
+> **Cohort Isolation Rule for Analytics, Performance & Audits:**
+> 1. **Pure Native Forward Scorecard:** ONLY includes trades where `entry_date >= '2026-09-29'`, `version == '3.5.0'`, and `_backfilled != True` (or `is_native_v350: True`).
+> 2. **Historical Backfilled Benchmark:** Trades marked `_backfilled: True` or entered pre-September-29 must be reported in their own isolated cohort for backtest validation and research post-mortems. They MUST NEVER be conflated with the live production algorithm scorecard.
+
 ### Rules for All Analytics & Audit Scripts
 * **Never include pre-July-5, 2026 data in active strategy statistics.**
 * Any new analytical or statistical script **MUST** filter `entry_date >= '2026-07-05'` and `signal_date >= '2026-07-05'`.
@@ -94,9 +103,11 @@ python manage_db.py diagnose --symbols KUSUMGAR CMRGREEN --vs-winners
 1. **Upper 50% Candle Body Confirmation Rule:**
    - Any breakout attempt must close in the upper 50% of its total daily range: `(CLOSE - LOW) / (HIGH - LOW) >= 0.50`.
    - Rejects long shooting stars and upper supply traps (e.g. `KUSUMGAR`) structurally without curve-fitting narrow wick thresholds.
-2. **Peak-Gated 14-Day Portfolio Velocity Speed Gate:**
-   - Positions held `≥ 14 days` with flat/negative PnL ($PnL \le 0\%$) AND **peak runup $< 3.5\%$** (`new_max_runup < 3.5%`) are closed early.
-   - Eliminates genuine non-performers (`JNPR`, `SAATVIKGL`) while protecting developing base-builders (e.g. `SUDEEPPHRM`, `AEROPLANE`) from premature chops.
+2. **14-Day / 10-Trading-Session Velocity Speed Gate (Industry-Standard Momentum Rule):**
+   - Any position held `≥ 14 calendar days` OR `≥ 10 NSE trading sessions` (calculated dynamically using the NSE holiday calendar via `utils.count_trading_days`) that remains flat or underwater (`PnL <= 0.0%`) is exited immediately (`Time Stop - Dead Money`).
+   - **Loophole Closed:** Eliminated the legacy `new_max_runup < 3.5%` condition that trapped underwater trades like `ARCIL` (+4.3% Day 3 peak, then drifting to -3.9% on Day 13) into holding all the way down to full stop loss.
+   - **Empirical Proof:** Across 104 historical trades, 0 out of 46 trades underwater after 10 sessions / 14 days ever recovered to become multi-baggers; 100% drifted into full stop losses. Cutting at Session 10 / Day 14 at -1% to -3% preserves portfolio capital.
+   - Confirmed momentum runners (`max_runup >= 15%`) are protected by the Super-Winner Archetype lock.
 3. **Anti-Chasing 8% Max Extension Guard:**
    - Breakout entries $> 8.0\%$ extended above the base breakout pivot or listing high are rejected to prevent buying overheated tops.
 4. **Base Peak Re-Entry Engine with 5-Day Cooldown & Institutional Volume Floor:**

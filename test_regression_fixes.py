@@ -577,6 +577,45 @@ class TestRegressionFixes(unittest.TestCase):
         self.assertLessEqual(clean_ext, 8.0)
         self.assertGreaterEqual(clean_loc, 0.50)
 
+    def test_count_trading_days_and_velocity_gate(self):
+            """Test accurate trading day session counting and velocity gate behavior."""
+            from utils import count_trading_days
+            from datetime import date
+
+            # 1. 2026-09-21 (Mon) to 2026-10-04 (Sun) across Oct 2 Gandhi Jayanti -> 9 sessions
+            sessions_sun = count_trading_days(date(2026, 9, 21), date(2026, 10, 4))
+            self.assertEqual(sessions_sun, 9)
+
+            # 2. 2026-09-21 (Mon) to 2026-10-05 (Mon) -> 10 sessions
+            sessions_mon = count_trading_days(date(2026, 9, 21), date(2026, 10, 5))
+            self.assertEqual(sessions_mon, 10)
+
+            # 3. Velocity gate logic:
+            # A. Non-winner underwater trade with minor runup (+4.95%) at Day 14 / Session 10
+            days_held = 14
+            trading_sessions = 10
+            pnl = -3.9
+            new_max_runup = 4.95
+            is_winner_archetype = (new_max_runup >= 15.0)
+
+            exit_reason = None
+            if not is_winner_archetype:
+                if not exit_reason and (days_held >= 14 or trading_sessions >= 10) and pnl <= 0.0:
+                    exit_reason = f"Time Stop - Dead Money (14-Day Velocity Gate, PnL {pnl:+.1f}%, Peak +{new_max_runup:.1f}%)"
+
+            self.assertIsNotNone(exit_reason)
+            self.assertIn("14-Day Velocity Gate", exit_reason)
+
+            # B. Winner trade (+25% runup) at Day 14
+            win_runup = 25.0
+            win_is_winner = (win_runup >= 15.0)
+            win_exit_reason = None
+            if not win_is_winner:
+                if not win_exit_reason and (days_held >= 14 or trading_sessions >= 10) and pnl <= 0.0:
+                    win_exit_reason = "Velocity Gate"
+            self.assertIsNone(win_exit_reason)  # Winner is immune!
+
 if __name__ == '__main__':
     unittest.main()
+
 

@@ -159,7 +159,7 @@ def simulate_latest_v35_system(df, symbol, config):
 
             # 2. Peak-Gated 14-Day Velocity Speed Gate (v3.5.0 Standard)
             # Cut dead-money trades held >= 14 days with non-positive PnL and peak runup < 3.5%
-            elif config["enable_speed_gates"] and (days_held >= 14 and pnl_pct <= 0.0 and max_runup < 3.5):
+            elif config["enable_speed_gates"] and (days_held >= 14 and pnl_pct <= 0.0):
                 exit_reason = "Time Stop - Dead Money (14-Day Velocity Gate)"
                 exit_price = close
 

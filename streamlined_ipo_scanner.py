@@ -595,7 +595,8 @@ from utils import (
     get_dynamic_nse_holidays,
     is_market_day,
     get_last_trading_day,
-    send_holiday_notification_once
+    send_holiday_notification_once,
+    count_trading_days
 )
 
 class DynamicNSEHolidays(set):
@@ -1844,6 +1845,8 @@ def update_positions():
         # Get current price - prefer LIVE price, fallback to latest historical close
         current_price = None
         price_source = "Historical Close"
+        _vol = 0.0  # Safe sentinel -- overwritten by get_live_price() if successful
+
         
         # Try to get live price first (more accurate for exit decisions)
         try:
@@ -2847,6 +2850,7 @@ def detect_live_patterns(symbols, listing_map):
                     "days_held": 0,
                     "signal_type": "CONSOLIDATION",
                     "version": SCANNER_VERSION,
+                    "_backfilled": False,
                     "scanner": "consolidation_live",
                     # --- Tier fields (additive, backward-compatible) ---
                     "tier": grade,
@@ -3048,6 +3052,7 @@ def detect_live_patterns(symbols, listing_map):
                     "status": "PAPER_ONLY",
                     "next_day_open": None,
                     "version": SCANNER_VERSION,
+                    "_backfilled": False,
                     "strategy_version": f"{SCANNER_VERSION}-consolidation",
                     "execution_version": f"{SCANNER_VERSION}-single-writer",
                     "risk_model_version": f"{SCANNER_VERSION}-archetype-velocity",
@@ -3602,7 +3607,7 @@ def detect_scan(symbols, listing_map):
                     "winner_flags": winner_info["winner_flags"],
                     "tier": "B",
                     "position_size_weight": size_mult,
-                    "version": SCANNER_VERSION, "scanner": "consolidation_scan",
+                    "version": SCANNER_VERSION, "_backfilled": False, "scanner": "consolidation_scan",
                     "strategy_version": f"{SCANNER_VERSION}-consolidation",
                     "exit_version": SCANNER_VERSION,
                     "execution_version": f"{SCANNER_VERSION}-single-writer",
@@ -3621,6 +3626,7 @@ def detect_scan(symbols, listing_map):
                     "position_size_weight": size_mult,
                     "market_regime": _mr,
                     "version": SCANNER_VERSION,
+                    "_backfilled": False,
                     "strategy_version": f"{SCANNER_VERSION}-consolidation",
                     "exit_version": SCANNER_VERSION,
                     "execution_version": f"{SCANNER_VERSION}-single-writer",
@@ -4318,6 +4324,7 @@ def stop_loss_update_scan():
         
         # Calculate days held first to skip 0-day positions
         days_held = 0
+        trading_sessions = 0
         try:
             entry_date = pos["entry_date"]
             if isinstance(entry_date, pd.Timestamp):
@@ -4329,6 +4336,7 @@ def stop_loss_update_scan():
             
             today_date = datetime.today().date()
             days_held = (today_date - entry_date).days
+            trading_sessions = count_trading_days(entry_date, today_date)
             
             # Skip positions with 0 days held (just added today)
             if days_held <= 0:
@@ -4380,6 +4388,8 @@ def stop_loss_update_scan():
             current_price = None
             price_source = "Historical Close"
             current_data = None
+            _vol = 0.0  # Safe sentinel -- overwritten by get_live_price() if successful
+
             
             # Try to get live price first (more accurate for exit decisions)
             try:
@@ -4536,7 +4546,10 @@ def stop_loss_update_scan():
                     # 14-Day Portfolio Velocity Speed Gate (v3.5.0 Standard):
                     # Cut true dead-money positions held >= 14 days that never achieved momentum (peak runup < 3.5% and flat/negative PnL).
                     # Protects healthy base-builders (max_runup >= 3.5%) while eliminating non-performers.
-                    if not exit_reason and days_held >= 14 and pnl <= 0.0 and new_max_runup < 3.5:
+                    # 14-Day / 10-Session Portfolio Velocity Speed Gate (Industry-Standard Momentum Rule):
+                    # Cut true dead-money positions held >= 14 calendar days (or >= 10 trading sessions) that remain flat or underwater (pnl <= 0.0%).
+                    # Confirmed winners (new_max_runup >= 15%) are protected by is_winner_archetype above.
+                    if not exit_reason and (days_held >= 14 or trading_sessions >= 10) and pnl <= 0.0:
                         exit_reason = f"Time Stop - Dead Money (14-Day Velocity Gate, PnL {pnl:+.1f}%, Peak +{new_max_runup:.1f}%)"
 
                     # Secondary Stagnant Position Guard (applies to flat / non-winner positions)

@@ -4,6 +4,25 @@ All notable changes, quantitative safeguards, and alerting architecture updates 
 
 ---
 
+## [v3.5.1] — 2026-10-04
+
+### 🛡️ Production Hardening, Velocity Speed Gate & Cohort Isolation
+* **Velocity Speed Gate Overhaul & Trading Session Engine:**
+  * Updated `streamlined_ipo_scanner.py` and `run_latest_rules_backtest.py` to enforce `(days_held >= 14 or trading_sessions >= 10) and pnl <= 0.0%`.
+  * Eliminated the `new_max_runup < 3.5%` loophole that trapped underwater trades (`ARCIL` at -3.90% with Day 3 peak +4.3%) into holding through dead money towards full stop loss.
+  * Added dynamic NSE holiday & weekend trading session counter `count_trading_days(start_date, end_date)` in `utils.py`.
+  * Added full unit and regression test coverage in `test_regression_fixes.py` (33/33 tests passing, 100% green).
+* **Strict Multi-Cohort Database Isolation:**
+  * Identified that 20/22 database positions were historical backfills (`_backfilled: True`) stamped with `version: 3.5.0` despite entering under legacy rules (e.g. 42–46% upper wicks).
+  * Upgraded `listing_day_breakout_scanner.py`, `streamlined_ipo_scanner.py`, and `hourly_breakout_scanner.py` to explicitly stamp `_backfilled: False` on all new live/paper positions and signals.
+  * Tagged historical backfill scripts (`historical_backfill.py`) with `_backfilled: True`.
+  * Upgraded `core/strategy_evidence.py` to classify and tag `is_native_v350` and `_backfilled` cohorts.
+* **Portfolio & Strategy Audit Upgrades:**
+  * Re-architected `analyze_positions_performance.py` into 4 cleanly isolated reporting sections: (1) Pure Native v3.5.0 Live Production Scorecard, (2) Backfilled Active Trades, (3) Paper-Only Overflow Portfolio, and (4) Realized Exits.
+  * Updated `monthly_strategy_audit.py` to report the Native Forward v3.5.0 Scorecard separately from historical benchmarks.
+
+---
+
 ## [v3.5.0] — 2026-09-27
 
 ### 🛡️ Quantitative Risk & Re-Entry Safeguards

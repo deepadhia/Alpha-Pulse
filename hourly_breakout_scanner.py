@@ -700,6 +700,7 @@ def save_breakout_signal(breakout_data):
             "status": position_status,
             "next_day_open": None,
             "version": SCANNER_VERSION,
+            "_backfilled": False,
             "strategy_version": f"{SCANNER_VERSION}-intraday",
             "exit_version": SCANNER_VERSION,
             "execution_version": f"{SCANNER_VERSION}-single-writer",

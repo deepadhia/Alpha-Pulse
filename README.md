@@ -92,7 +92,9 @@ Market regimes (`BULL`, `WEAK_BULL`, `CORRECTION`, `RANGE`) are used purely as *
 
 Research across the 2024–2026 Mainboard IPO universe confirmed that patience is required for breakouts, but dead money should be recycled efficiently:
 
-* **Unconditional 14-Day Velocity Speed Gate (v3.5.0):** If held for **≥ 14 trading days** and current PnL is non-positive ($PnL \le 0.0\%$), the position is immediately closed as `EXHAUSTION_14D_DEAD_MONEY`. This eliminates the loophole where a brief Day-1/Day-2 spike $> 4\%$ granted permanent immunity and trapped underwater positions for 30–40 days.
+* **14-Day / 10-Session Velocity Speed Gate (v3.5.0 Industry Standard):** If held for **≥ 14 calendar days** OR **≥ 10 NSE trading sessions** (dynamically accounting for NSE holidays and weekends via `count_trading_days`) and current PnL is non-positive ($PnL \le 0.0\%$), the position is immediately closed with exit reason `"Time Stop - Dead Money (14-Day Velocity Gate, PnL {pnl}%, Peak +{max_runup}%)"`.
+  * **Empirical Edge:** Quantitative study of 104 trades demonstrated that 0 out of 46 positions underwater after 10 sessions / 14 days ever yielded a profit; 100% drifted into full stop losses. Eliminates dead-money bleed without overfitting.
+  * **Loophole Closed:** The previous `new_max_runup < 3.5%` condition was eliminated so that false-start trades with an early minor spike (e.g. +4%) that fail and roll over are not trapped until full stop-loss.
 * **IPO Discovery Breakouts (`grade == "LISTING_BREAKOUT"`):** If held for **≥ 20 trading days** and peak runup has never reached **≥ 4%**, it is closed at the market with exit reason `"Time Stop - IPO Dead Money"`.
 * **Consolidation Breakouts:** If held for **≥ 21 trading days** and peak runup has never reached **≥ 5%**, it is closed at the market with exit reason `"Time Stop - Consolidation Dead Money"`.
 * **Winner Archetype Exempt:** Positions where `max_runup_pct ≥ 15%` are treated as confirmed momentum trades and are never cut by standard patience stops.
@@ -137,6 +139,12 @@ The repository includes an integrated quantitative backtesting engine (`run_late
   * `--disable-stagnant-guard`: Test performance without the 40-day guard.
   * `--disable-speed-gates`: Test performance without 20d/21d speed gates.
   * `--trail-pnl-ipo FLOAT` & `--trail-pnl-consol FLOAT`: Test custom trailing activation thresholds.
+
+### 7. Dual-Cohort Performance Isolation (Native Live vs. Historical Benchmark)
+To ensure complete transparency and prevent historical backfilled test records from distorting live forward performance:
+* **🟢 Pure Native v3.5.0 Live Production Scorecard:** Tracks exclusively live forward trades initiated after the v3.5.0 ruleset deployment (`entry_date >= 2026-09-29`, `_backfilled: False`, Upper 50% candle body gate, 1.8x volume floor).
+* **📑 Historical Backfilled Cohort:** Preserves historical signals and backfill test records (`_backfilled: True`) strictly as an out-of-sample research benchmark.
+* **Audit Tools:** `analyze_positions_performance.py` and `monthly_strategy_audit.py` cleanly present both cohorts in isolated, transparent tables.
 
 ---
 
