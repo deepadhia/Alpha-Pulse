@@ -23,6 +23,11 @@ This file defines the core engineering standards, domain knowledge, and operatio
    - Requires ≥1.5x breakout-bar volume; never overwrites open daily positions.
 4. **Trade Diagnostics & Strategy Evidence Engine (`diagnose_trade.py` & `core/strategy_evidence.py`):**
    - Self-diagnosing intelligence layer that evaluates trade DNA (volume surges, base PRNG %, upper wick exhaustion) against real trade outcomes to continuously uncover proven strengths and eliminate strategy leaks.
+5. **IPO High Shelf Breakout Engine (`SHELF_BREAKOUT` - Inculcated in Main Listing Logic):**
+   - Eliminates the historical coverage dead zone on Days 3–30 between the standard listing breakout (≤3.5% extension cap) and consolidation scanner (≥10-day history requirement).
+   - Automatically detects 3–8 bar consolidation shelves formed above/near listing high (`PRNG ≤ 18%`).
+   - Breakouts within ≤5% of shelf pivot qualify as `SHELF_BREAKOUT` with stops anchored at the shelf floor (12% hard cap) and Upper 50% Body Gate protection.
+   - Reuses single-writer exit ownership, 2-stage trailing stop, and 14-day velocity speed gate. Backtested across 2024–2026 IPO universe: **62.8% win rate, +18.04% avg peak runup** (N=145).
 
 ---
 

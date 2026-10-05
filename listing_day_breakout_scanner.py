@@ -118,6 +118,14 @@ MIN_VOLUME_MULTIPLIER = _env_float(
 MAX_ENTRY_ABOVE_HIGH_PCT = _env_float(
     "LISTING_MAX_ENTRY_ABOVE_HIGH_PCT", 3.5 if LISTING_STRICT_QUALITY else 5.0
 )
+
+# High Shelf (Wave 2) Breakout Parameters
+LISTING_SHELF_BREAKOUT_ENABLED = _env_bool("LISTING_SHELF_BREAKOUT_ENABLED", True)
+LISTING_SHELF_MAX_AGE_DAYS = _env_int("LISTING_SHELF_MAX_AGE_DAYS", 30)
+LISTING_SHELF_MIN_AGE_DAYS = _env_int("LISTING_SHELF_MIN_AGE_DAYS", 3)
+LISTING_SHELF_MAX_PRNG = _env_float("LISTING_SHELF_MAX_PRNG", 18.0)
+LISTING_SHELF_MAX_ENTRY_ABOVE_PIVOT_PCT = _env_float("LISTING_SHELF_MAX_ENTRY_ABOVE_PIVOT_PCT", 5.0)
+LISTING_SHELF_MIN_TURNOVER_CR = _env_float("LISTING_SHELF_MIN_TURNOVER_CR", 5.0)
 MIN_RISK_REWARD = _env_float(
     "LISTING_MIN_RISK_REWARD", 1.25 if LISTING_STRICT_QUALITY else 1.0
 )
@@ -495,6 +503,52 @@ def _evaluate_watchlist_perfect_base(
     return True, "", checklist
 
 
+def _detect_high_shelf_breakout(
+    df: pd.DataFrame,
+    current_price: float,
+    current_high: float,
+    listing_day_high: float,
+    days_since_listing: int,
+    max_prng: float = LISTING_SHELF_MAX_PRNG,
+    max_entry_above_pivot_pct: float = LISTING_SHELF_MAX_ENTRY_ABOVE_PIVOT_PCT,
+) -> tuple:
+    """
+    Detect High Shelf / Wave 2 consolidation pattern above/near listing high.
+    Evaluates prior completed bars (excluding today) to identify a tight base.
+    Returns: (is_shelf_ok, shelf_high, shelf_low, shelf_prng, reason_description)
+    """
+    if days_since_listing < LISTING_SHELF_MIN_AGE_DAYS or days_since_listing > LISTING_SHELF_MAX_AGE_DAYS:
+        return False, None, None, None, f"age {days_since_listing}d outside shelf window [{LISTING_SHELF_MIN_AGE_DAYS}d, {LISTING_SHELF_MAX_AGE_DAYS}d]"
+
+    if len(df) < 4:
+        return False, None, None, None, f"history length {len(df)} < 4 bars"
+
+    completed = df.iloc[:-1] if len(df) > 1 else df
+
+    for lookback in [3, 4, 5, 6, 8]:
+        if len(completed) < lookback:
+            continue
+        shelf = completed.tail(lookback)
+        s_high = float(shelf['HIGH'].max())
+        s_low = float(shelf['LOW'].min())
+
+        # Base floor guard: base low must not have collapsed deeply below listing high
+        if s_low < listing_day_high * 0.88:
+            continue
+
+        s_prng = (s_high - s_low) / s_low * 100.0 if s_low > 0 else 999.0
+        if s_prng > max_prng:
+            continue
+
+        # Breakout condition: price breaks above shelf high
+        if current_high > s_high and current_price >= s_high * 0.99:
+            entry_above_pivot = (current_price - s_high) / s_high * 100.0
+            if entry_above_pivot <= max_entry_above_pivot_pct:
+                return True, s_high, s_low, s_prng, f"{lookback}-bar shelf (high {s_high:.2f}, PRNG {s_prng:.1f}%)"
+
+    return False, None, None, None, "no valid tight shelf base found"
+
+
 def _assign_breakout_tier(
     signal_type: str,
     confirmed: bool,
@@ -570,6 +624,17 @@ def _assign_breakout_tier(
         return (
             "B", LISTING_TIER_B_POSITION_SIZE_PCT,
             "Accumulation base breakout below listing high — medium conviction, normal swing trade"
+        )
+
+    if signal_type == "SHELF_BREAKOUT":
+        if volume_ratio >= 2.0 or (volume_ratio >= 1.5 and perfect_base):
+            return (
+                "A", 60,
+                f"High shelf breakout above listing high with strong volume surge ({volume_ratio:.2f}x)"
+            )
+        return (
+            "B", LISTING_TIER_B_POSITION_SIZE_PCT,
+            f"High shelf breakout above listing high ({volume_ratio:.2f}x volume)"
         )
 
     # WATCHLIST is never a trade
@@ -1346,15 +1411,39 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
             # This prevents generating signals when breakout happened long ago
             # Only apply for actual BREAKOUTs, not WATCHLIST
             if signal_type == 'BREAKOUT' and entry_above_high_pct > MAX_ENTRY_ABOVE_HIGH_PCT:
-                rejection_reason = f"Entry ({entry_price:.2f}) is {entry_above_high_pct:.1f}% above listing high ({listing_day_high:.2f}) - too far from breakout level"
-                logger.info(f"⏭️ Skipping {symbol}: {rejection_reason}")
-                return None
+                if LISTING_SHELF_BREAKOUT_ENABLED and days_since_listing >= LISTING_SHELF_MIN_AGE_DAYS:
+                    shelf_ok, s_high, s_low, s_prng, s_desc = _detect_high_shelf_breakout(
+                        df=df,
+                        current_price=entry_price,
+                        current_high=current_high,
+                        listing_day_high=listing_day_high,
+                        days_since_listing=days_since_listing,
+                    )
+                    if shelf_ok:
+                        signal_type = 'SHELF_BREAKOUT'
+                        base_range_high = s_high
+                        perfect_base_ok = (s_prng <= 12.0)
+                        breakout_conditions.append(
+                            f"High Shelf Breakout: Price {current_high:.2f} broke {s_desc} (+{entry_above_high_pct:.1f}% above Day 0 high)"
+                        )
+                        logger.info(f"🚀 {symbol}: Qualified as SHELF_BREAKOUT ({s_desc}, entry ₹{entry_price:.2f})")
+                    else:
+                        rejection_reason = (
+                            f"Entry ({entry_price:.2f}) is {entry_above_high_pct:.1f}% above listing high ({listing_day_high:.2f}) "
+                            f"- too far from Day 0 breakout and {s_desc}"
+                        )
+                        logger.info(f"⏭️ Skipping {symbol}: {rejection_reason}")
+                        return None
+                else:
+                    rejection_reason = f"Entry ({entry_price:.2f}) is {entry_above_high_pct:.1f}% above listing high ({listing_day_high:.2f}) - too far from breakout level"
+                    logger.info(f"⏭️ Skipping {symbol}: {rejection_reason}")
+                    return None
             
             # Days since listing (calculated at top of function)
             pass
             
             # Age-Dependent Close Confirmation: Downgrade breakout to WATCHLIST during trading hours if age < 5 days
-            if signal_type == 'BREAKOUT' and days_since_listing < 5 and _market_is_open_ist():
+            if signal_type in ('BREAKOUT', 'SHELF_BREAKOUT') and days_since_listing < 5 and _market_is_open_ist():
                 logger.info(f"⏳ Downgrading breakout on {symbol} to WATCHLIST (listing age {days_since_listing}d < 5d during market hours, requires EOD close verification)")
                 signal_type = 'WATCHLIST'
                 
@@ -1466,16 +1555,17 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
             # Day 2+ avg baseline check (vol_vs_avg >= MIN_VOLUME_MULTIPLIER above).
             volume_vs_listing_day = current_volume / listing_day_volume if listing_day_volume > 0 else 0
 
-            # --- Strict quality gate (default): full-quality BREAKOUT and BASE_BREAKOUT ---
+            # --- Strict quality gate (default): full-quality BREAKOUT, BASE_BREAKOUT, and SHELF_BREAKOUT ---
             # Tier B previously skipped the volume spike gate under strict mode.
-            if LISTING_STRICT_QUALITY and signal_type in ('BREAKOUT', 'BASE_BREAKOUT'):
+            if LISTING_STRICT_QUALITY and signal_type in ('BREAKOUT', 'BASE_BREAKOUT', 'SHELF_BREAKOUT'):
                 if signal_type == 'BREAKOUT' and days_since_listing > MAX_DAYS_SINCE_LISTING_FOR_BREAKOUT:
                     rejection_reason = (
                         f"Strict: {days_since_listing}d since listing (max {MAX_DAYS_SINCE_LISTING_FOR_BREAKOUT}d)"
                     )
                     logger.info(f"⏭️ Skipping {symbol}: {rejection_reason}")
                     return None
-                if not volume_spike:
+                has_shelf_turnover = (signal_type == 'SHELF_BREAKOUT' and (current_price * current_volume >= LISTING_SHELF_MIN_TURNOVER_CR * 1e7))
+                if not volume_spike and not has_shelf_turnover:
                     rejection_reason = (
                         f"Strict: volume spike required for {signal_type} "
                         f"(current {current_volume:,.0f} vs avg {avg_volume:,.0f}, need {MIN_VOLUME_MULTIPLIER}x)"
@@ -1496,7 +1586,7 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
                 # This eliminates long shooting stars / heavy upper rejection wicks (e.g. KUSUMGAR).
                 current_low = float(latest['LOW']) if 'LOW' in latest else current_price
                 candle_range = current_high - current_low
-                if candle_range > 0 and signal_type in ('BREAKOUT', 'BASE_BREAKOUT'):
+                if candle_range > 0 and signal_type in ('BREAKOUT', 'BASE_BREAKOUT', 'SHELF_BREAKOUT'):
                     close_location = (current_price - current_low) / candle_range
                     if close_location < 0.50:
                         rejection_reason = (
@@ -1708,6 +1798,14 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
                     target_price = max(listing_day_high, entry_price * (1.0 + LISTING_MIN_TARGET_RETURN_PCT))
                     reward = target_price - entry_price
                     risk_reward = reward / risk if risk > 0 else 0
+            elif signal_type == 'SHELF_BREAKOUT':
+                post_confirm_move_pct = (
+                    (current_high - base_range_high) / base_range_high * 100.0
+                    if base_range_high > 0 else 0.0
+                )
+                target_price = entry_price * (1.0 + max(LISTING_MIN_TARGET_RETURN_PCT, listing_range_pct / 100.0))
+                reward = target_price - entry_price
+                risk_reward = reward / risk if risk > 0 else 0
             else:
                 post_confirm_move_pct = float(entry_above_high_pct)
 
@@ -1733,7 +1831,7 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
                 position_size_pct = 20 # Standard size for C tier
 
             # --- Analytics & Score Components ---
-            if signal_type == 'BASE_BREAKOUT':
+            if signal_type in ('BASE_BREAKOUT', 'SHELF_BREAKOUT'):
                 breakout_level_for_calc = base_range_high
                 consolidation_range_pct = (base_range_high - df['LOW'].min()) / df['LOW'].min() * 100.0 if df['LOW'].min() > 0 else None
             else:
@@ -1805,7 +1903,7 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
                 'pullback_from_high_pct': round(pullback_from_high_pct, 2),
                 'max_extension_pct': round(max_extension_pct, 2),
                 # --- Institutional Research Metadata (v2.5.0) ---
-                'pattern_type': classify_pattern_type("LISTING_BREAKOUT" if signal_type == "BREAKOUT" else "CONSOLIDATION", days_since_listing, vol_ratio_for_tier, listing_range_pct),
+                'pattern_type': classify_pattern_type("LISTING_BREAKOUT" if signal_type in ("BREAKOUT", "SHELF_BREAKOUT") else "CONSOLIDATION", days_since_listing, vol_ratio_for_tier, listing_range_pct),
                 'market_regime': get_market_regime(current_date),
                 # --- Tier fields ---
                 'tier': tier,
@@ -1914,17 +2012,20 @@ def commit_trade_to_db(breakout_data):
         
         # Generate signal_id (deterministic format)
         today_str = datetime.now().strftime("%Y%m%d")
-        signal_id = f"BREAKOUT_{symbol}_{today_str}"
+        sig_prefix = "SHELF" if breakout_data.get('type') == 'SHELF_BREAKOUT' else "BREAKOUT"
+        signal_id = f"{sig_prefix}_{symbol}_{today_str}"
 
         # Position grade must be LISTING_BREAKOUT so stop_loss_update_scan applies
         # IPO dead-money / volume-exhaustion / trail thresholds (not consol defaults).
         position_grade = "LISTING_BREAKOUT"
         
         tier = breakout_data.get('tier', 'A')
-        lh_ref = breakout_data.get('listing_day_high')
+        is_shelf = breakout_data.get('type') == 'SHELF_BREAKOUT'
+        lh_ref = breakout_data.get('base_range_high') if is_shelf else breakout_data.get('listing_day_high')
         entry_p = breakout_data['entry_price']
-        limit_buy_price = round(lh_ref * 1.035 if lh_ref is not None and lh_ref > 0 else entry_p * 1.02, 2)
-        max_chase = 3.5 if tier == 'A' else 2.0
+        chase_mult = 1.05 if is_shelf else 1.035
+        limit_buy_price = round(lh_ref * chase_mult if lh_ref is not None and lh_ref > 0 else entry_p * 1.02, 2)
+        max_chase = 5.0 if is_shelf else (3.5 if tier == 'A' else 2.0)
 
         # Create signal doc
         signal_doc = {
@@ -2125,6 +2226,42 @@ def format_listing_breakout_alert(breakout_data):
 • <b>Stop Loss:</b> ₹{stop:,.2f} (<code>-{risk_pct:.1f}%</code>)  •  <b>R/R:</b> 1:{rr:.1f}
 • <b>Profit Target:</b> ₹{target:,.2f} (<code>+{reward_pct:.1f}%</code>)
 • <b>Volume Surge:</b> <b>{vol_spike:.1f}x</b>  •  <b>Listing High:</b> ₹{listing_high:,.2f}
+{dna_section}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ <i>AlphaPulse v{SCANNER_VERSION} • {_now_ist().strftime('%d %b %Y, %H:%M IST')}</i>"""
+
+
+def format_shelf_breakout_alert(breakout_data):
+    """Format production-grade High Shelf (Wave 2) breakout alert with all essential details"""
+    from utils import escape_html_text
+    symbol = escape_html_text(breakout_data['symbol'])
+    entry = breakout_data['entry_price']
+    stop = breakout_data['stop_loss']
+    target = breakout_data['target_price']
+    listing_high = breakout_data['listing_day_high']
+    base_high = breakout_data.get('base_range_high') or listing_high
+    vol_spike = breakout_data.get('volume_spike', 0)
+    rr = breakout_data.get('risk_reward', 0)
+    days_since_listing = breakout_data.get('days_since_listing', 0)
+    tier = escape_html_text(str(breakout_data.get('tier', 'A')))
+    pos_size = breakout_data.get('position_size_pct', 60)
+
+    limit_buy_price = base_high * 1.05 if base_high is not None else entry
+    risk_pct = ((entry - stop) / entry * 100) if entry > 0 else 0
+    reward_pct = ((target - entry) / entry * 100) if entry > 0 else 0
+    dna_section = _format_dna_section(breakout_data)
+
+    return f"""🚀 <b>AlphaPulse | HIGH SHELF BREAKOUT (Wave 2)</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 <b>{symbol}</b>  •  Tier <b>{tier}</b>  •  Size <b>{pos_size}%</b>
+📋 <i>High Shelf Consolidation Breakout ({days_since_listing}d post-IPO)</i>
+
+• <b>Trigger / Entry:</b> ₹{entry:,.2f}  <i>(Limit Max: ≤ ₹{limit_buy_price:,.2f})</i>
+• <b>Stop Loss:</b> ₹{stop:,.2f} (<code>-{risk_pct:.1f}%</code>)  •  <b>R/R:</b> 1:{rr:.1f}
+• <b>Profit Target:</b> ₹{target:,.2f} (<code>+{reward_pct:.1f}%</code>)
+• <b>Volume Surge:</b> <b>{vol_spike:.1f}x</b>  •  <b>Shelf Pivot:</b> ₹{base_high:,.2f} (Day 0: ₹{listing_high:,.2f})
 {dna_section}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2394,6 +2531,21 @@ def scan_listing_day_breakouts():
                         update_listing_status(symbol, 'BASE_BREAKOUT')
 
                         alert_msg = format_base_breakout_alert(breakout)
+                        if portfolio_full:
+                            alert_msg = f"⚠️ <b>[PORTFOLIO FULL - PAPER ONLY]</b>\n" + alert_msg
+                        send_telegram(alert_msg)
+                        breakouts_found += 1
+
+                elif signal_type == 'SHELF_BREAKOUT':
+                    logger.info(f"🚀 HIGH SHELF BREAKOUT for {symbol}! [Tier {breakout.get('tier', '?')} | {breakout.get('position_size_pct', 60)}% size]")
+                    logger.info(f"   Entry: ₹{breakout['entry_price']:.2f}  Target: ₹{breakout['target_price']:.2f}")
+
+                    # Save signal and position atomically
+                    success, portfolio_full, active_count, _mr, size_mult = commit_trade_to_db(breakout)
+                    if success:
+                        update_listing_status(symbol, 'SHELF_BREAKOUT')
+
+                        alert_msg = format_shelf_breakout_alert(breakout)
                         if portfolio_full:
                             alert_msg = f"⚠️ <b>[PORTFOLIO FULL - PAPER ONLY]</b>\n" + alert_msg
                         send_telegram(alert_msg)

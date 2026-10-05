@@ -615,6 +615,76 @@ class TestRegressionFixes(unittest.TestCase):
                     win_exit_reason = "Velocity Gate"
             self.assertIsNone(win_exit_reason)  # Winner is immune!
 
+    def test_high_shelf_breakout_qualification(self):
+        """Test High Shelf (Wave 2) breakout qualification, anti-chasing guardrails, and quality gates."""
+        from listing_day_breakout_scanner import _detect_high_shelf_breakout, check_listing_day_breakout
+        import listing_day_breakout_scanner as lds
+
+        # 1. Synthetic 7-day IPO DataFrame (MILKYMIST-style pattern)
+        dates = pd.date_range("2026-08-18", periods=7, freq="B")
+        df = pd.DataFrame({
+            "DATE": dates,
+            "OPEN": [165.0, 190.0, 207.8, 190.0, 191.0, 198.0, 201.9],
+            "HIGH": [181.5, 199.65, 211.8, 194.7, 199.1, 205.7, 222.11],
+            "LOW": [165.0, 190.0, 181.5, 183.5, 186.2, 197.0, 198.0],
+            "CLOSE": [181.5, 199.65, 184.89, 189.2, 196.6, 201.9, 222.11],
+            "VOLUME": [90000000, 29000000, 56000000, 32000000, 19000000, 15000000, 20878033]
+        })
+
+        # Test A: Helper _detect_high_shelf_breakout on Day 6
+        ok, s_high, s_low, s_prng, reason = _detect_high_shelf_breakout(
+            df=df,
+            current_price=222.11,
+            current_high=222.11,
+            listing_day_high=181.50,
+            days_since_listing=6
+        )
+        self.assertTrue(ok)
+        self.assertEqual(s_high, 211.80)
+        self.assertEqual(s_low, 181.50)
+        self.assertAlmostEqual(s_prng, 16.69, places=1)
+        self.assertIn("shelf", reason)
+
+        # Test B: Anti-chasing rejection when price is > 5% above shelf high
+        ok_chase, _, _, _, reason_chase = _detect_high_shelf_breakout(
+            df=df,
+            current_price=235.0,  # +10.9% above shelf high 211.8
+            current_high=235.0,
+            listing_day_high=181.50,
+            days_since_listing=6
+        )
+        self.assertFalse(ok_chase)
+
+        # Test C: End-to-end check_listing_day_breakout qualification
+        listing_info = {
+            'symbol': 'MILKYMIST',
+            'listing_date': '2026-08-18',
+            'listing_day_high': 181.50,
+            'listing_day_low': 165.00,
+            'listing_day_volume': 90000000.0,
+            'listing_day_close': 181.50,
+        }
+
+        with patch('listing_day_breakout_scanner.fetch_data', return_value=df), \
+             patch('listing_day_breakout_scanner.get_live_price', return_value=(222.11, "MockLive", 222.11, 20878033.0)), \
+             patch.object(lds.scanner_module, 'get_liquidity_metrics', return_value=(50.0, 0, 5000.0)), \
+             patch('listing_day_breakout_scanner._market_is_open_ist', return_value=False), \
+             patch('listing_day_breakout_scanner.datetime') as mock_dt:
+
+            mock_dt.today.return_value = datetime(2026, 8, 26)
+            mock_dt.now.return_value = datetime(2026, 8, 26, 15, 30)
+            mock_dt.fromisoformat = datetime.fromisoformat
+
+            sig = check_listing_day_breakout('MILKYMIST', listing_info, {}, {})
+            self.assertIsNotNone(sig)
+            self.assertEqual(sig['type'], 'SHELF_BREAKOUT')
+            self.assertEqual(sig['entry_price'], 222.11)
+            self.assertAlmostEqual(sig['stop_loss'], 195.46, places=2)  # 12% max risk cap
+            self.assertAlmostEqual(sig['target_price'], 266.53, places=2)  # 20% floor
+            self.assertEqual(sig['tier'], 'B')
+            self.assertEqual(sig['position_size_pct'], 40)
+
+
 if __name__ == '__main__':
     unittest.main()
 

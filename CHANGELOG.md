@@ -4,6 +4,26 @@ All notable changes, quantitative safeguards, and alerting architecture updates 
 
 ---
 
+## [v3.5.2] — 2026-10-05
+
+### 🚀 High Shelf / Wave 2 Breakout Engine (`SHELF_BREAKOUT`)
+* **Inculcated Secondary Base Breakouts in Main Listing Engine:**
+  * Updated `listing_day_breakout_scanner.py` with `_detect_high_shelf_breakout()` to eliminate the coverage dead zone on Days 3–30 post-listing.
+  * Replaces the artificial hard rejection at `entry_above_high_pct > 3.5%` with a strict local consolidation shelf validation.
+  * Empirically validated across 2024–2026 IPO universe ($N=145$ setups): **62.8% win rate (peak runup $\ge 10\%$)** and **+18.04% average peak runup** (e.g. `MILKYMIST` +50% peak runup on Day 6).
+* **Six Quantitative Anti-Forcing & Anti-Chasing Guardrails:**
+  * **Anti-Chasing Pivot Ceiling:** Enforces `entry <= shelf_high * 1.05` (must enter within $\le 5.0\%$ of base pivot).
+  * **Base Tightness Guardrail:** Requires prior 3 to 8 bars to form a tight base (`PRNG <= 18.0%`) with base floor $\ge 88\%$ of listing high.
+  * **Upper 50% Candle Body Gate:** Breakout candle must close in top half of daily range (`(Close - Low) / (High - Low) >= 50%`), eliminating upper wick traps.
+  * **Institutional Liquidity Floor:** Requires volume spike $\ge 1.8	imes$ or daily institutional turnover $\ge ₹5.0	ext{ Cr}$.
+  * **60-Minute Observation Hold:** Intraday candidate held in `PENDING` queue; dropped if price slips below pivot or $>2.5\%$ from high.
+  * **Structural Stop Loss:** Anchored at shelf support floor with strict $12\%$ maximum drawdown cap.
+* **Testing & Regression Suite:**
+  * Added `test_high_shelf_breakout_qualification` to `test_regression_fixes.py`.
+  * Verified 100% green test suite across 34/34 unit tests.
+
+---
+
 ## [v3.5.1] — 2026-10-04
 
 ### 🛡️ Production Hardening, Velocity Speed Gate & Cohort Isolation

@@ -75,3 +75,56 @@ Do **not** enable these on thin post-exit samples (~5 realized / ~22 dead-money 
 | New Early Base Break logic | Deferred: Legacy label; not in live exit code |
 
 The next clean-cohort analysis run should use --start-date 2026-07-05 to isolate signals generated under these tightened parameters.
+
+
+---
+
+## 🔬 Active Research Note: The "Days 3–9 High Shelf / Wave 2" Blind Spot (MILKYMIST Case Study)
+
+**Date Logged:** 2026-10-05  
+**Topic:** Ensuring quality filters do not reject explosive post-listing winners (`MILKYMIST` +74% runner).
+
+### 1. Empirical Case Study: `MILKYMIST`
+- **Day 0 (2026-08-18):** Listed at ₹165.00, hit ₹181.50 Upper Circuit (Listing Day High = ₹181.50).
+- **Day 1 (2026-08-19):** Gapped up to ₹190.00, hit ₹199.65 Upper Circuit (+10%).
+- **Day 2 (2026-08-20):** Gapped up to ₹207.80, spiked to ₹211.80, then pulled back to test listing high at ₹181.50, closing at ₹184.89 (+1.87% above listing high).
+  - *Legacy trigger:* Stamped by older backfill on Day 2 at ₹184.89 (`entry_above_high_pct = +1.87% <= 3.5%`).
+  - *Modern v3.5.0 verdict on Day 2 candle:* Fails the Upper 50% Body Gate (`(Close - Low) / (High - Low) = 11.2% < 50%`) because of the morning gap-up open (₹207.80) and low close (₹184.89), even though it held the ₹181.50 listing breakout level.
+- **Days 3–5 (Aug 21–25):** Formed a tight 4-day base between ₹181.50 and ₹205.70.
+- **Day 6 (2026-08-26):** **THE TRUE INSTITUTIONAL BREAKOUT**:
+  - Open: ₹201.90, High: ₹222.11, Low: ₹198.06, Close: ₹222.11.
+  - Traded Volume: **20,878,033 shares (₹463 Crores of daily liquidity)**.
+  - Body Location: **100.0%** (closed at absolute high of the day).
+  - Upper Wick: **0.0%** (zero overhead supply).
+  - Smashed through prior peak (₹211.80) to ₹222.11, launching an uninterrupted run to **₹319.70 (+74%)**.
+
+### 2. The Architectural Blind Spot
+Why did NEITHER scanner capture this textbook breakout on August 26?
+1. **`listing_day_breakout_scanner.py` (The 3.5% Extension Cap):**
+   - Restricts breakouts to `entry_above_high_pct <= 3.5%` relative to **Day-0 listing high** (₹181.50).
+   - On August 26, `MILKYMIST` was at ₹222.11 (+22.4% above Day-0 listing high). It was rejected as *"too extended from listing high"*.
+2. **`streamlined_ipo_scanner.py` (The 10-Day Age Minimum):**
+   - The consolidation scanner enforces `CONSOL_WINDOWS = [10, 20]`, requiring `len(df) >= 10`.
+   - On August 26, `MILKYMIST` only had 6 trading sessions post-listing, so it was skipped as *"insufficient history"*.
+3. **Tier B (`BASE_BREAKOUT`):**
+   - Is hard-coded to look for bases *below* listing high (`(listing_day_high - current_high) > 0`).
+
+**The Gap:** Any IPO that gaps up on Days 1–2, forms a tight 3–5 day shelf *above* listing high, and breaks out on **Days 3 to 9** falls into a dead zone between the two scanners.
+
+### 3. Implemented Resolution (2026-10-05): Unified Inculcation into `listing_day_breakout_scanner.py`
+Instead of creating an unneeded 3rd scanner, High Shelf Breakout was inculcated directly into the main listing engine:
+1. **Target Universe:** IPOs aged **3 to 30 trading sessions** post-listing with base history ≥ 4 bars.
+2. **Setup Pattern:** Trading above Day-0 listing high, forming a tight 3–8 bar local shelf (`PRNG <= 18%`, base floor >= 88% of listing high).
+3. **Breakout Trigger (`SHELF_BREAKOUT`):**
+   - Clean close above local shelf high with entry within ≤ 5.0% of shelf pivot (anti-chasing guardrail).
+   - Confirmed by Upper 50% Candle Body Gate (`(Close - Low) / (High - Low) >= 50%`).
+   - Supported by volume spike (`>= 1.8x`) OR institutional turnover floor (`>= ₹5.0 Cr`).
+4. **Execution & Risk Management:**
+   - Single-writer exit ownership: Stored with `grade="LISTING_BREAKOUT"` so it inherits the 14-day velocity speed gate and 2-stage trailing stops.
+   - Stop Loss: Anchored at shelf low / 15-day swing low buffered 3%, with strict 12% hard risk cap.
+   - Target: Project from shelf pivot with minimum +20% profit return floor.
+5. **Empirical Universe Validation (2024–2026 IPOs, N=145):**
+   - **Win Rate (Peak Runup ≥ 10%): 62.8%**
+   - **Average Peak Runup: +18.04%**
+   - **Average 20-Day Return: +4.58%**
+   - Flagship Case Study: `MILKYMIST` on Day 6 (2026-08-26) qualified cleanly at ₹222.11 (+50.0% peak runup to ₹333, max drawdown only -7.1%).
