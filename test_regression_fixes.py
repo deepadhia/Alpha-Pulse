@@ -685,6 +685,92 @@ class TestRegressionFixes(unittest.TestCase):
             self.assertEqual(sig['position_size_pct'], 40)
 
 
+    def test_high_shelf_breakout_pending_confirmation_and_limit_corridor(self):
+        """Test SHELF_BREAKOUT 60-min PENDING confirmation hold, rejection of below-pivot wicks, and 2% limit corridor."""
+        from datetime import datetime, timedelta
+        from listing_day_breakout_scanner import check_listing_day_breakout, commit_trade_to_db
+        import listing_day_breakout_scanner as lds
+
+        base_date = datetime.now() - timedelta(days=6)
+        dates = pd.date_range(base_date, periods=7, freq="D")
+        df = pd.DataFrame({
+            "DATE": dates,
+            "OPEN": [165.0, 190.0, 207.8, 190.0, 191.0, 198.0, 201.9],
+            "HIGH": [181.5, 199.65, 211.8, 194.7, 199.1, 205.7, 222.11],
+            "LOW": [165.0, 190.0, 181.5, 183.5, 186.2, 197.0, 198.0],
+            "CLOSE": [181.5, 199.65, 184.89, 189.2, 196.6, 201.9, 215.0],
+            "VOLUME": [90000000, 29000000, 56000000, 32000000, 19000000, 15000000, 20878033]
+        })
+        listing_info = {
+            'symbol': 'SHELF_TEST',
+            'listing_date': base_date.strftime('%Y-%m-%d'),
+            'listing_day_high': 181.50,
+            'listing_day_low': 165.00,
+            'listing_day_volume': 90000000.0,
+            'listing_day_close': 181.50,
+        }
+
+        pending = {}
+        # Step 1: Market is open -> initial breakout triggers PENDING hold with breakout_level = 205.70 (shelf high)
+        with patch('listing_day_breakout_scanner.fetch_data', return_value=df), \
+             patch('listing_day_breakout_scanner.get_live_price', return_value=(215.0, "MockLive", 218.0, 20878033.0)), \
+             patch.object(lds.scanner_module, 'get_liquidity_metrics', return_value=(50.0, 0, 5000.0)), \
+             patch('listing_day_breakout_scanner._market_is_open_ist', return_value=True):
+
+            res_p1 = check_listing_day_breakout('SHELF_TEST', listing_info, pending, {})
+            self.assertIsNotNone(res_p1)
+            self.assertEqual(res_p1['type'], 'PENDING')
+            self.assertIn('SHELF_TEST', pending)
+            self.assertEqual(pending['SHELF_TEST']['breakout_level'], 205.70)
+
+        # Step 2: During observation, price drops below shelf pivot 205.70 -> Rejected as fakeout
+        with patch('listing_day_breakout_scanner.fetch_data', return_value=df), \
+             patch('listing_day_breakout_scanner.get_live_price', return_value=(204.0, "MockLive", 218.0, 20878033.0)), \
+             patch.object(lds.scanner_module, 'get_liquidity_metrics', return_value=(50.0, 0, 5000.0)), \
+             patch('listing_day_breakout_scanner._market_is_open_ist', return_value=True):
+
+            res_rej = check_listing_day_breakout('SHELF_TEST', listing_info, pending, {})
+            self.assertIsNone(res_rej)
+            self.assertNotIn('SHELF_TEST', pending)  # Evicted on rejection!
+
+        # Step 3: Full 60-min hold confirmed -> Emits SHELF_BREAKOUT with entry >= pivot and >=2% execution corridor
+        started_time = datetime.now() - timedelta(minutes=65)
+        pending['SHELF_TEST'] = {
+            "started_at": started_time.isoformat(),
+            "breakout_level": 205.70,
+            "max_price_seen": 216.0,
+            "last_price": 215.0
+        }
+        with patch('listing_day_breakout_scanner.fetch_data', return_value=df), \
+             patch('listing_day_breakout_scanner.get_live_price', return_value=(215.0, "MockLive", 218.0, 20878033.0)), \
+             patch.object(lds.scanner_module, 'get_liquidity_metrics', return_value=(50.0, 0, 5000.0)), \
+             patch('listing_day_breakout_scanner._market_is_open_ist', return_value=True):
+
+            res_conf = check_listing_day_breakout('SHELF_TEST', listing_info, pending, {})
+            self.assertIsNotNone(res_conf)
+            self.assertEqual(res_conf['type'], 'SHELF_BREAKOUT')
+            self.assertGreaterEqual(res_conf['entry_price'], 205.70)
+            self.assertEqual(res_conf['entry_price'], 215.0)
+
+        # Step 4: Verify Limit Buy buffer in commit_trade_to_db provides >= 2% corridor
+        captured_signals = []
+        captured_positions = []
+        mock_db = MagicMock()
+        mock_db.positions.count_documents.return_value = 0
+        with patch('db.has_active_position', return_value=False), \
+             patch('db.db', mock_db), \
+             patch('db.upsert_signal', side_effect=lambda doc: captured_signals.append(doc)), \
+             patch('db.upsert_position', side_effect=lambda doc: captured_positions.append(doc)):
+            res_conf['breakout_date'] = datetime.now().strftime('%Y-%m-%d')
+            success, full, cnt, mr, mult = commit_trade_to_db(res_conf)
+            self.assertTrue(success)
+            self.assertEqual(len(captured_signals), 1)
+            sig = captured_signals[0]
+            self.assertGreaterEqual(sig['limit_buy_price'], round(sig['entry_price'] * 1.02, 2))
+            pos = captured_positions[0]
+            self.assertGreaterEqual(pos['limit_buy_price'], round(pos['entry_price'] * 1.02, 2))
+
+
 if __name__ == '__main__':
     unittest.main()
 

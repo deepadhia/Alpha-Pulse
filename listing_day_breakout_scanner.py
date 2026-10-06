@@ -37,11 +37,14 @@ except Exception:
     YFINANCE_AVAILABLE = False
 
 # Add current directory to path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+_cur_dir = os.path.dirname(os.path.abspath(__file__))
+if _cur_dir not in sys.path:
+    sys.path.insert(0, _cur_dir)
 
 # Import from main scanner
 import importlib.util
-spec = importlib.util.spec_from_file_location("scanner", "streamlined_ipo_scanner.py")
+_scanner_file = os.path.join(_cur_dir, "streamlined_ipo_scanner.py")
+spec = importlib.util.spec_from_file_location("scanner", _scanner_file)
 scanner_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(scanner_module)
 
@@ -125,7 +128,7 @@ LISTING_SHELF_MAX_AGE_DAYS = _env_int("LISTING_SHELF_MAX_AGE_DAYS", 30)
 LISTING_SHELF_MIN_AGE_DAYS = _env_int("LISTING_SHELF_MIN_AGE_DAYS", 3)
 LISTING_SHELF_MAX_PRNG = _env_float("LISTING_SHELF_MAX_PRNG", 18.0)
 LISTING_SHELF_MAX_ENTRY_ABOVE_PIVOT_PCT = _env_float("LISTING_SHELF_MAX_ENTRY_ABOVE_PIVOT_PCT", 5.0)
-LISTING_SHELF_MIN_TURNOVER_CR = _env_float("LISTING_SHELF_MIN_TURNOVER_CR", 5.0)
+LISTING_SHELF_MIN_TURNOVER_CR = _env_float("LISTING_SHELF_MIN_TURNOVER_CR", 10.0)
 MIN_RISK_REWARD = _env_float(
     "LISTING_MIN_RISK_REWARD", 1.25 if LISTING_STRICT_QUALITY else 1.0
 )
@@ -540,8 +543,8 @@ def _detect_high_shelf_breakout(
         if s_prng > max_prng:
             continue
 
-        # Breakout condition: price breaks above shelf high
-        if current_high > s_high and current_price >= s_high * 0.99:
+        # Breakout condition: price breaks above shelf high and holds at/above pivot
+        if current_high > s_high and current_price >= s_high:
             entry_above_pivot = (current_price - s_high) / s_high * 100.0
             if entry_above_pivot <= max_entry_above_pivot_pct:
                 return True, s_high, s_low, s_prng, f"{lookback}-bar shelf (high {s_high:.2f}, PRNG {s_prng:.1f}%)"
@@ -1342,6 +1345,7 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
         
         # Check for breakout
         is_breakout = False
+        state = None
         breakout_conditions = []
         rejection_reason = None
         volume_warnings = []  # Track volume-related warnings
@@ -1392,6 +1396,10 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
             # For Watchlist, use Listing High as the hypothetical entry price
             if signal_type == 'WATCHLIST':
                 entry_price = listing_day_high
+            elif signal_type == 'SHELF_BREAKOUT' and base_range_high > 0:
+                entry_price = max(current_price, base_range_high)
+            elif signal_type == 'BREAKOUT':
+                entry_price = max(current_price, listing_day_high)
             else:
                 entry_price = current_price  # For confirmed breakout, use current price
             
@@ -1422,12 +1430,21 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
                     if shelf_ok:
                         signal_type = 'SHELF_BREAKOUT'
                         base_range_high = s_high
+                        entry_price = max(entry_price, base_range_high)
+                        entry_above_high = entry_price - listing_day_high
+                        entry_above_high_pct = (entry_above_high / listing_day_high * 100) if listing_day_high > 0 else 0
                         perfect_base_ok = (s_prng <= 12.0)
                         breakout_conditions.append(
                             f"High Shelf Breakout: Price {current_high:.2f} broke {s_desc} (+{entry_above_high_pct:.1f}% above Day 0 high)"
                         )
                         logger.info(f"🚀 {symbol}: Qualified as SHELF_BREAKOUT ({s_desc}, entry ₹{entry_price:.2f})")
                     else:
+                        if pending_breakouts and symbol in pending_breakouts:
+                            pending_breakouts.pop(symbol, None)
+                            write_daily_log("listing_day", symbol, "PENDING_REJECTED", {
+                                "reason": "shelf_disqualified",
+                                "current_price": round(float(current_price), 2),
+                            }, log_type="REJECTED")
                         rejection_reason = (
                             f"Entry ({entry_price:.2f}) is {entry_above_high_pct:.1f}% above listing high ({listing_day_high:.2f}) "
                             f"- too far from Day 0 breakout and {s_desc}"
@@ -1435,6 +1452,8 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
                         logger.info(f"⏭️ Skipping {symbol}: {rejection_reason}")
                         return None
                 else:
+                    if pending_breakouts and symbol in pending_breakouts:
+                        pending_breakouts.pop(symbol, None)
                     rejection_reason = f"Entry ({entry_price:.2f}) is {entry_above_high_pct:.1f}% above listing high ({listing_day_high:.2f}) - too far from breakout level"
                     logger.info(f"⏭️ Skipping {symbol}: {rejection_reason}")
                     return None
@@ -1710,22 +1729,23 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
                         write_daily_log("listing_day", symbol, "PERFECT_BASE_DETECTED", _pb_metrics)
 
             # Intraday confirmation engine: PENDING -> CONFIRMED -> ENTER
-            if signal_type == 'BREAKOUT' and LISTING_CONFIRMATION_MINUTES > 0 and _market_is_open_ist():
+            if signal_type in ('BREAKOUT', 'SHELF_BREAKOUT') and LISTING_CONFIRMATION_MINUTES > 0 and _market_is_open_ist():
                 if pending_breakouts is None:
                     pending_breakouts = {}
                 state = pending_breakouts.get(symbol)
                 now_ts = _now_ist()
                 now_iso = now_ts.isoformat()
+                breakout_level = float(base_range_high if signal_type == 'SHELF_BREAKOUT' else listing_day_high)
                 if not state:
                     pending_breakouts[symbol] = {
                         "started_at": now_iso,
-                        "breakout_level": float(listing_day_high),
+                        "breakout_level": breakout_level,
                         "max_price_seen": float(current_price),
                         "last_price": float(current_price)
                     }
-                    logger.info(f"⏳ {symbol}: breakout moved to PENDING for {LISTING_CONFIRMATION_MINUTES}m confirmation")
+                    logger.info(f"⏳ {symbol}: {signal_type} moved to PENDING for {LISTING_CONFIRMATION_MINUTES}m confirmation")
                     write_daily_log("listing_day", symbol, "PENDING_STARTED", {
-                        "breakout_level": float(listing_day_high),
+                        "breakout_level": breakout_level,
                         "confirm_minutes": LISTING_CONFIRMATION_MINUTES,
                         "price": round(float(current_price), 2),
                         "leader_score": int(leader_score),
@@ -1735,6 +1755,7 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
                         "type": "PENDING",
                         "current_price": round(current_price, 2),
                         "listing_day_high": listing_day_high,
+                        "base_range_high": base_range_high if signal_type == 'SHELF_BREAKOUT' else None,
                         "confirm_minutes": LISTING_CONFIRMATION_MINUTES,
                     }
                 # update state
@@ -1746,14 +1767,14 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
                 # rejection filter during observation
                 max_seen = float(state["max_price_seen"])
                 rejection_pct = ((max_seen - current_price) / max_seen * 100) if max_seen > 0 else 0
-                if current_price < listing_day_high or rejection_pct > 2.5:
-                    rej_reason = "below_breakout" if current_price < listing_day_high else "rejection_from_high"
+                if current_price < breakout_level or rejection_pct > 2.5:
+                    rej_reason = "below_breakout" if current_price < breakout_level else "rejection_from_high"
                     pending_breakouts.pop(symbol, None)
                     logger.info(f"⏭️ {symbol}: pending confirmation rejected (price hold/rejection failed)")
                     write_daily_log("listing_day", symbol, "PENDING_REJECTED", {
                         "reason": rej_reason,
                         "current_price": round(float(current_price), 2),
-                        "breakout_level": float(listing_day_high),
+                        "breakout_level": breakout_level,
                         "rejection_pct": round(float(rejection_pct), 2),
                         "max_price_seen": round(float(max_seen), 2),
                         "elapsed_minutes": int((now_ts - started).total_seconds() // 60),
@@ -1768,13 +1789,14 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
                         "type": "PENDING",
                         "current_price": round(current_price, 2),
                         "listing_day_high": listing_day_high,
+                        "base_range_high": base_range_high if signal_type == 'SHELF_BREAKOUT' else None,
                         "confirm_minutes": LISTING_CONFIRMATION_MINUTES,
                     }
                 # Confirmed
                 pending_breakouts.pop(symbol, None)
                 breakout_conditions.append(f"Confirmed hold {LISTING_CONFIRMATION_MINUTES}m above breakout")
                 write_daily_log("listing_day", symbol, "PENDING_CONFIRMED", {
-                    "breakout_level": float(listing_day_high),
+                    "breakout_level": breakout_level,
                     "confirm_minutes": LISTING_CONFIRMATION_MINUTES,
                     "entry_reference": round(float(current_price), 2),
                     "leader_score": int(leader_score),
@@ -1841,17 +1863,19 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
             entry_vs_breakout_pct = ((entry_price - breakout_level_for_calc) / breakout_level_for_calc * 100.0) if breakout_level_for_calc > 0 else 0.0
             
             # Retrieve components computed during PENDING
-            state = pending_breakouts.get(symbol) if pending_breakouts else None
+            if state is None and pending_breakouts:
+                state = pending_breakouts.get(symbol)
             confirmation_time_min = 0
             max_extension_during_confirmation_pct = 0.0
             rejection_depth_pct = 0.0
             did_hold_breakout_level = True
             
-            if state and signal_type == 'BREAKOUT':
+            if state and signal_type in ('BREAKOUT', 'SHELF_BREAKOUT'):
                 started = datetime.fromisoformat(state.get("started_at", _now_ist().isoformat()))
                 confirmation_time_min = int((_now_ist() - started).total_seconds() // 60)
                 max_seen = float(state.get("max_price_seen", current_price))
-                max_extension_during_confirmation_pct = ((max_seen - listing_day_high) / listing_day_high * 100.0) if listing_day_high > 0 else 0.0
+                bo_level = base_range_high if signal_type == 'SHELF_BREAKOUT' else listing_day_high
+                max_extension_during_confirmation_pct = ((max_seen - bo_level) / bo_level * 100.0) if bo_level > 0 else 0.0
                 rejection_depth_pct = ((max_seen - current_price) / max_seen * 100.0) if max_seen > 0 else 0.0
                 
             score_comps = calculate_signal_score_components(tier, vol_ratio_for_tier, perfect_base_ok, post_confirm_move_pct)
@@ -2023,9 +2047,11 @@ def commit_trade_to_db(breakout_data):
         is_shelf = breakout_data.get('type') == 'SHELF_BREAKOUT'
         lh_ref = breakout_data.get('base_range_high') if is_shelf else breakout_data.get('listing_day_high')
         entry_p = breakout_data['entry_price']
-        chase_mult = 1.05 if is_shelf else 1.035
-        limit_buy_price = round(lh_ref * chase_mult if lh_ref is not None and lh_ref > 0 else entry_p * 1.02, 2)
         max_chase = 5.0 if is_shelf else (3.5 if tier == 'A' else 2.0)
+        limit_ceiling = round(lh_ref * (1.0 + max_chase / 100.0), 2) if lh_ref is not None and lh_ref > 0 else round(entry_p * 1.02, 2)
+        limit_buy_price = max(round(entry_p * 1.02, 2), limit_ceiling)
+        if limit_buy_price < entry_p:
+            limit_buy_price = round(entry_p * 1.02, 2)
 
         # Create signal doc
         signal_doc = {
@@ -2210,7 +2236,7 @@ def format_listing_breakout_alert(breakout_data):
     regime = escape_html_text(breakout_data.get('market_regime', 'NORMAL'))
     
     lh_ref = listing_high
-    limit_buy_price = lh_ref * 1.035 if lh_ref is not None else entry
+    limit_buy_price = max(round(entry * 1.02, 2), round(lh_ref * 1.035, 2)) if lh_ref is not None else round(entry * 1.02, 2)
 
     risk_pct = ((entry - stop) / entry * 100) if entry > 0 else 0
     reward_pct = ((target - entry) / entry * 100) if entry > 0 else 0
@@ -2247,7 +2273,7 @@ def format_shelf_breakout_alert(breakout_data):
     tier = escape_html_text(str(breakout_data.get('tier', 'A')))
     pos_size = breakout_data.get('position_size_pct', 60)
 
-    limit_buy_price = base_high * 1.05 if base_high is not None else entry
+    limit_buy_price = max(round(entry * 1.02, 2), round(base_high * 1.05, 2)) if base_high is not None else round(entry * 1.02, 2)
     risk_pct = ((entry - stop) / entry * 100) if entry > 0 else 0
     reward_pct = ((target - entry) / entry * 100) if entry > 0 else 0
     dna_section = _format_dna_section(breakout_data)
