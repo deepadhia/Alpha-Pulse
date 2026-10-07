@@ -129,6 +129,8 @@ LISTING_SHELF_MIN_AGE_DAYS = _env_int("LISTING_SHELF_MIN_AGE_DAYS", 3)
 LISTING_SHELF_MAX_PRNG = _env_float("LISTING_SHELF_MAX_PRNG", 18.0)
 LISTING_SHELF_MAX_ENTRY_ABOVE_PIVOT_PCT = _env_float("LISTING_SHELF_MAX_ENTRY_ABOVE_PIVOT_PCT", 5.0)
 LISTING_SHELF_MIN_TURNOVER_CR = _env_float("LISTING_SHELF_MIN_TURNOVER_CR", 10.0)
+ALERT_ON_PAPER_ONLY = _env_bool("ALERT_ON_PAPER_ONLY", False)
+LISTING_CONFIRMATION_MAX_MINUTES = _env_int("LISTING_CONFIRMATION_MAX_MINUTES", 120)
 MIN_RISK_REWARD = _env_float(
     "LISTING_MIN_RISK_REWARD", 1.25 if LISTING_STRICT_QUALITY else 1.0
 )
@@ -635,9 +637,14 @@ def _assign_breakout_tier(
                 "A", 60,
                 f"High shelf breakout above listing high with strong volume surge ({volume_ratio:.2f}x)"
             )
+        elif volume_ratio >= 1.5:
+            return (
+                "B", LISTING_TIER_B_POSITION_SIZE_PCT,
+                f"High shelf breakout above listing high ({volume_ratio:.2f}x volume)"
+            )
         return (
-            "B", LISTING_TIER_B_POSITION_SIZE_PCT,
-            f"High shelf breakout above listing high ({volume_ratio:.2f}x volume)"
+            None, None,
+            f"Shelf breakout rejected: volume ratio {volume_ratio:.2f}x < 1.5x minimum required"
         )
 
     # WATCHLIST is never a trade
@@ -685,28 +692,87 @@ def initialize_watchlist_data_csv():
     pass
 
 
-def load_pending_breakouts():
-    """Load pending breakout confirmation state from MongoDB with disk fallback."""
+def load_pending_breakouts(purge_stale: bool = True):
+    """Load pending breakout confirmation state from MongoDB with disk fallback.
+    Filters out any states not from today's active trading session (post 09:15 IST)
+    or where observation time exceeded max confirmation window.
+    """
+    raw_data = {}
     try:
         from db import db
         if db is not None:
             doc = db["pending_states"].find_one({"_id": "listing_pending_breakouts"})
-            if doc and "data" in doc:
-                return doc["data"]
+            if doc and "data" in doc and isinstance(doc["data"], dict):
+                raw_data = doc["data"]
     except Exception as db_e:
         logger.warning(f"Could not load pending breakouts from MongoDB: {db_e}")
 
     # Fall back to local disk file
-    if not os.path.exists(PENDING_BREAKOUTS_FILE):
-        return {}
+    if not raw_data and os.path.exists(PENDING_BREAKOUTS_FILE):
+        try:
+            with open(PENDING_BREAKOUTS_FILE, "r", encoding="utf-8") as f:
+                d = json.load(f)
+                if isinstance(d, dict):
+                    raw_data = d
+        except Exception:
+            pass
+
+    if not purge_stale or not raw_data:
+        return raw_data
+
+    # Filter out stale states
+    now_ist = _now_ist()
+    today_ist_str = now_ist.strftime("%Y-%m-%d")
+    filtered = {}
+    dirty = False
+
+    for sym, st in raw_data.items():
+        if not isinstance(st, dict) or "started_at" not in st:
+            dirty = True
+            continue
+        try:
+            started_dt = datetime.fromisoformat(st["started_at"])
+            if started_dt.tzinfo is not None:
+                started_dt = (started_dt.astimezone(timezone.utc) + timedelta(hours=5, minutes=30)).replace(tzinfo=None)
+            started_ist_date = started_dt.strftime("%Y-%m-%d")
+
+            # Must be from today's trading session
+            if started_ist_date != today_ist_str:
+                logger.info(f"Purging stale pending breakout for {sym} from previous session ({started_ist_date} != {today_ist_str})")
+                dirty = True
+                continue
+
+            # Max observation timeout (consistent IST clock comparison)
+            elapsed_m = int((now_ist - started_dt).total_seconds() // 60)
+            if elapsed_m > LISTING_CONFIRMATION_MAX_MINUTES:
+                logger.info(f"Purging expired pending breakout for {sym} (elapsed {elapsed_m}m > max {LISTING_CONFIRMATION_MAX_MINUTES}m)")
+                dirty = True
+                continue
+
+            filtered[sym] = st
+        except Exception as parse_e:
+            logger.warning(f"Failed parsing pending state for {sym}: {parse_e}")
+            dirty = True
+
+    if dirty:
+        save_pending_breakouts(filtered)
+
+    return filtered
+
+
+def _already_triggered_today(symbol: str, today_sig_suffix: str) -> bool:
+    """Return True if symbol already produced a breakout/shelf signal today."""
     try:
-        with open(PENDING_BREAKOUTS_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        if isinstance(data, dict):
-            return data
+        from db import db
+        if db is not None:
+            rec = db["signals"].find_one({
+                "symbol": symbol,
+                "signal_id": {"$regex": f"_{today_sig_suffix}$"}
+            })
+            return rec is not None
     except Exception:
         pass
-    return {}
+    return False
 
 
 def save_pending_breakouts(data):
@@ -1060,6 +1126,13 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
     if pd.isna(symbol) or '-RE' in str(symbol) or str(symbol).endswith('-SM') or 'RE1' in str(symbol):
         logger.info(f"⏭️ Skipping RE/SME symbol early: {symbol}")
         return None
+
+    # Same-day duplicate trigger lockout:
+    # If this symbol already produced a breakout/shelf signal today, lockout for rest of session
+    today_sig_suffix = _now_ist().strftime("%Y%m%d")
+    if _already_triggered_today(symbol, today_sig_suffix):
+        logger.info(f"⏭️ Skipping {symbol}: already generated a breakout signal today ({today_sig_suffix})")
+        return None
         
     _vol = 0.0
     try:
@@ -1158,6 +1231,16 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
             }
             write_daily_log("listing_day", symbol, "REJECTED_BREAKOUT", payload, log_type="REJECTED")
             logger.debug(f"[Telemetry] Logged listing rejection for {symbol}: {reason}")
+
+        def _eject_pending(reason: str):
+            if pending_breakouts and symbol in pending_breakouts:
+                pending_breakouts.pop(symbol, None)
+                p_price = round(float(current_price), 2) if (current_price is not None and not pd.isna(current_price)) else 0.0
+                write_daily_log("listing_day", symbol, "PENDING_REJECTED", {
+                    "reason": reason,
+                    "current_price": p_price,
+                }, log_type="REJECTED")
+                logger.info(f"[Pending Ejected] {symbol}: observation cancelled ({reason})")
 
         # Get live price first for fast price gate filtering (avoiding expensive fetch_data)
         current_price = None
@@ -1582,15 +1665,30 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
                         f"Strict: {days_since_listing}d since listing (max {MAX_DAYS_SINCE_LISTING_FOR_BREAKOUT}d)"
                     )
                     logger.info(f"⏭️ Skipping {symbol}: {rejection_reason}")
+                    _eject_pending("max_age_exceeded")
                     return None
-                has_shelf_turnover = (signal_type == 'SHELF_BREAKOUT' and (current_price * current_volume >= LISTING_SHELF_MIN_TURNOVER_CR * 1e7))
-                if not volume_spike and not has_shelf_turnover:
+
+                # Mandatory relative volume expansion: all breakouts must have volume_spike >= 1.5x
+                if not volume_spike:
                     rejection_reason = (
                         f"Strict: volume spike required for {signal_type} "
                         f"(current {current_volume:,.0f} vs avg {avg_volume:,.0f}, need {MIN_VOLUME_MULTIPLIER}x)"
                     )
                     logger.info(f"⏭️ Skipping {symbol}: {rejection_reason}")
+                    _eject_pending("volume_spike_failed")
                     return None
+
+                # For SHELF_BREAKOUT, mandatory institutional turnover floor (>= 10 Cr) IN ADDITION to volume_spike
+                if signal_type == 'SHELF_BREAKOUT':
+                    has_shelf_turnover = (current_price * current_volume >= LISTING_SHELF_MIN_TURNOVER_CR * 1e7)
+                    if not has_shelf_turnover:
+                        rejection_reason = (
+                            f"Strict: institutional turnover floor required for SHELF_BREAKOUT "
+                            f"(current turnover ₹{current_price * current_volume / 1e7:.2f} Cr < ₹{LISTING_SHELF_MIN_TURNOVER_CR:.1f} Cr)"
+                        )
+                        logger.info(f"⏭️ Skipping {symbol}: {rejection_reason}")
+                        _eject_pending("shelf_turnover_failed")
+                        return None
                 # Fallback: if listing day volume is missing/0, require a higher avg multiplier
                 # as a safety net (prevents low-liquidity edge cases).
                 if listing_day_volume == 0:
@@ -1619,6 +1717,7 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
                             threshold=50.0,
                             metrics={"close_location_pct": round(close_location * 100, 1)}
                         )
+                        _eject_pending("upper_wick_rejection")
                         return None
 
                 # Passed strict checks — treat as high-quality (no LOW_VOL grade)
@@ -1666,6 +1765,7 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
             
             # FILTER: Minimum risk/reward ratio (reward must be at least equal to risk)
             if risk_reward < MIN_RISK_REWARD:
+                _eject_pending("poor_risk_reward")
                 rejection_reason = f"Risk/Reward ratio ({risk_reward:.2f}) below minimum ({MIN_RISK_REWARD:.1f})"
                 logger.info(f"⏭️ Skipping {symbol}: Risk/Reward ratio ({risk_reward:.2f}) is below minimum ({MIN_RISK_REWARD:.1f})")
                 _log_listing_rejection(
@@ -2539,11 +2639,14 @@ def scan_listing_day_breakouts():
                         # Update listing status
                         update_listing_status(symbol, 'BREAKOUT')
 
-                        # Send alert
-                        alert_msg = format_listing_breakout_alert(breakout)
-                        if portfolio_full:
-                            alert_msg = f"⚠️ <b>[PORTFOLIO FULL - PAPER ONLY]</b>\n" + alert_msg
-                        send_telegram(alert_msg)
+                        # Send alert (suppress on PAPER_ONLY if configured)
+                        if portfolio_full and not ALERT_ON_PAPER_ONLY:
+                            logger.info(f"ℹ️ [PORTFOLIO FULL] {symbol} BREAKOUT recorded as PAPER_ONLY in DB. Telegram alert suppressed.")
+                        else:
+                            alert_msg = format_listing_breakout_alert(breakout)
+                            if portfolio_full:
+                                alert_msg = f"⚠️ <b>[PORTFOLIO FULL - PAPER ONLY]</b>\n" + alert_msg
+                            send_telegram(alert_msg)
 
                         breakouts_found += 1
 
@@ -2556,10 +2659,13 @@ def scan_listing_day_breakouts():
                     if success:
                         update_listing_status(symbol, 'BASE_BREAKOUT')
 
-                        alert_msg = format_base_breakout_alert(breakout)
-                        if portfolio_full:
-                            alert_msg = f"⚠️ <b>[PORTFOLIO FULL - PAPER ONLY]</b>\n" + alert_msg
-                        send_telegram(alert_msg)
+                        if portfolio_full and not ALERT_ON_PAPER_ONLY:
+                            logger.info(f"ℹ️ [PORTFOLIO FULL] {symbol} BASE_BREAKOUT recorded as PAPER_ONLY in DB. Telegram alert suppressed.")
+                        else:
+                            alert_msg = format_base_breakout_alert(breakout)
+                            if portfolio_full:
+                                alert_msg = f"⚠️ <b>[PORTFOLIO FULL - PAPER ONLY]</b>\n" + alert_msg
+                            send_telegram(alert_msg)
                         breakouts_found += 1
 
                 elif signal_type == 'SHELF_BREAKOUT':
@@ -2571,10 +2677,13 @@ def scan_listing_day_breakouts():
                     if success:
                         update_listing_status(symbol, 'SHELF_BREAKOUT')
 
-                        alert_msg = format_shelf_breakout_alert(breakout)
-                        if portfolio_full:
-                            alert_msg = f"⚠️ <b>[PORTFOLIO FULL - PAPER ONLY]</b>\n" + alert_msg
-                        send_telegram(alert_msg)
+                        if portfolio_full and not ALERT_ON_PAPER_ONLY:
+                            logger.info(f"ℹ️ [PORTFOLIO FULL] {symbol} SHELF_BREAKOUT recorded as PAPER_ONLY in DB. Telegram alert suppressed.")
+                        else:
+                            alert_msg = format_shelf_breakout_alert(breakout)
+                            if portfolio_full:
+                                alert_msg = f"⚠️ <b>[PORTFOLIO FULL - PAPER ONLY]</b>\n" + alert_msg
+                            send_telegram(alert_msg)
                         breakouts_found += 1
 
                 elif signal_type == 'WATCHLIST':

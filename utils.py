@@ -71,6 +71,16 @@ def send_telegram_msg(msg: str, bot_token: Optional[str] = None, chat_id: Option
     - Connection timeout & retry protection
     """
     log = logger_inst or logger
+    # Testing & stress regression guard: completely suppress outgoing network calls
+    if (
+        os.getenv("DISABLE_TELEGRAM", "").lower() in ("1", "true", "yes")
+        or os.getenv("TESTING", "").lower() in ("1", "true", "yes")
+        or os.getenv("PYTEST_CURRENT_TEST") is not None
+        or "unittest" in sys.modules
+    ):
+        log.info("[Telegram Suppressed] Testing/stress regression environment active — dispatch bypassed.")
+        return True
+
     token = bot_token or os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
     chat = chat_id or os.getenv("CHAT_ID") or os.getenv("TELEGRAM_CHAT_ID")
     

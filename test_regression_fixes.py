@@ -1,7 +1,11 @@
+import os
+os.environ["DISABLE_TELEGRAM"] = "1"
+os.environ["TESTING"] = "1"
+
 import unittest
 from unittest.mock import patch, MagicMock, mock_open
 import pandas as pd
-from datetime import datetime, date
+from datetime import datetime, date, timedelta, timezone
 import sys
 import os
 
@@ -628,7 +632,7 @@ class TestRegressionFixes(unittest.TestCase):
             "HIGH": [181.5, 199.65, 211.8, 194.7, 199.1, 205.7, 222.11],
             "LOW": [165.0, 190.0, 181.5, 183.5, 186.2, 197.0, 198.0],
             "CLOSE": [181.5, 199.65, 184.89, 189.2, 196.6, 201.9, 222.11],
-            "VOLUME": [90000000, 29000000, 56000000, 32000000, 19000000, 15000000, 20878033]
+            "VOLUME": [90000000, 29000000, 56000000, 32000000, 19000000, 15000000, 60000000]
         })
 
         # Test A: Helper _detect_high_shelf_breakout on Day 6
@@ -666,7 +670,7 @@ class TestRegressionFixes(unittest.TestCase):
         }
 
         with patch('listing_day_breakout_scanner.fetch_data', return_value=df), \
-             patch('listing_day_breakout_scanner.get_live_price', return_value=(222.11, "MockLive", 222.11, 20878033.0)), \
+             patch('listing_day_breakout_scanner.get_live_price', return_value=(222.11, "MockLive", 222.11, 60000000.0)), \
              patch.object(lds.scanner_module, 'get_liquidity_metrics', return_value=(50.0, 0, 5000.0)), \
              patch('listing_day_breakout_scanner._market_is_open_ist', return_value=False), \
              patch('listing_day_breakout_scanner.datetime') as mock_dt:
@@ -699,7 +703,7 @@ class TestRegressionFixes(unittest.TestCase):
             "HIGH": [181.5, 199.65, 211.8, 194.7, 199.1, 205.7, 222.11],
             "LOW": [165.0, 190.0, 181.5, 183.5, 186.2, 197.0, 198.0],
             "CLOSE": [181.5, 199.65, 184.89, 189.2, 196.6, 201.9, 215.0],
-            "VOLUME": [90000000, 29000000, 56000000, 32000000, 19000000, 15000000, 20878033]
+            "VOLUME": [90000000, 29000000, 56000000, 32000000, 19000000, 15000000, 60000000]
         })
         listing_info = {
             'symbol': 'SHELF_TEST',
@@ -713,7 +717,7 @@ class TestRegressionFixes(unittest.TestCase):
         pending = {}
         # Step 1: Market is open -> initial breakout triggers PENDING hold with breakout_level = 205.70 (shelf high)
         with patch('listing_day_breakout_scanner.fetch_data', return_value=df), \
-             patch('listing_day_breakout_scanner.get_live_price', return_value=(215.0, "MockLive", 218.0, 20878033.0)), \
+             patch('listing_day_breakout_scanner.get_live_price', return_value=(215.0, "MockLive", 218.0, 60000000.0)), \
              patch.object(lds.scanner_module, 'get_liquidity_metrics', return_value=(50.0, 0, 5000.0)), \
              patch('listing_day_breakout_scanner._market_is_open_ist', return_value=True):
 
@@ -725,7 +729,7 @@ class TestRegressionFixes(unittest.TestCase):
 
         # Step 2: During observation, price drops below shelf pivot 205.70 -> Rejected as fakeout
         with patch('listing_day_breakout_scanner.fetch_data', return_value=df), \
-             patch('listing_day_breakout_scanner.get_live_price', return_value=(204.0, "MockLive", 218.0, 20878033.0)), \
+             patch('listing_day_breakout_scanner.get_live_price', return_value=(204.0, "MockLive", 218.0, 60000000.0)), \
              patch.object(lds.scanner_module, 'get_liquidity_metrics', return_value=(50.0, 0, 5000.0)), \
              patch('listing_day_breakout_scanner._market_is_open_ist', return_value=True):
 
@@ -742,7 +746,7 @@ class TestRegressionFixes(unittest.TestCase):
             "last_price": 215.0
         }
         with patch('listing_day_breakout_scanner.fetch_data', return_value=df), \
-             patch('listing_day_breakout_scanner.get_live_price', return_value=(215.0, "MockLive", 218.0, 20878033.0)), \
+             patch('listing_day_breakout_scanner.get_live_price', return_value=(215.0, "MockLive", 218.0, 60000000.0)), \
              patch.object(lds.scanner_module, 'get_liquidity_metrics', return_value=(50.0, 0, 5000.0)), \
              patch('listing_day_breakout_scanner._market_is_open_ist', return_value=True):
 
@@ -769,6 +773,133 @@ class TestRegressionFixes(unittest.TestCase):
             self.assertGreaterEqual(sig['limit_buy_price'], round(sig['entry_price'] * 1.02, 2))
             pos = captured_positions[0]
             self.assertGreaterEqual(pos['limit_buy_price'], round(pos['entry_price'] * 1.02, 2))
+
+    def test_volume_conjunction_and_session_scoped_pending_engine(self):
+        """
+        Regression Test Suite for Volume Gate Conjunction, Session Scoping, and Telegram Suppression:
+        1. Shelf breakout requires relative volume expansion >= 1.5x AND institutional turnover >= 10 Cr.
+           Turnover alone must NOT bypass the volume gate (eliminates the PRASOLCHEM 0.30x false trigger).
+        2. Tier classification strictly rejects shelf breakouts with volume ratio < 1.5x.
+        3. Pending confirmation states from prior calendar days are automatically purged on load (eliminates the RENTOMOJO 1,100-minute overnight leak).
+        4. Outgoing Telegram alerts are fully suppressed in test/stress regression environments without network calls.
+        5. Same-day duplicate lockout prevents re-pending and repeat alert spam.
+        """
+        import listing_day_breakout_scanner as lds
+        from listing_day_breakout_scanner import (
+            _assign_breakout_tier,
+            load_pending_breakouts,
+            check_listing_day_breakout
+        )
+        from utils import send_telegram_msg
+
+        # 1. Telegram Dispatch Suppression in Test Mode
+        with patch.dict(os.environ, {"DISABLE_TELEGRAM": "1"}),              patch('requests.post') as mock_post:
+            result = send_telegram_msg("Critical Test Alert")
+            self.assertTrue(result)
+            mock_post.assert_not_called()  # Verified: Zero HTTP calls to Telegram
+
+        # 2. Tier classification rejects shelf breakouts with < 1.5x volume
+        tier_bad, size_bad, reason_bad = _assign_breakout_tier(
+            signal_type="SHELF_BREAKOUT",
+            confirmed=True,
+            perfect_base=False,
+            volume_ratio=0.30,  # PRASOLCHEM volume
+            days_since_listing=21,
+            post_confirm_move_pct=2.0
+        )
+        self.assertIsNone(tier_bad)
+        self.assertIn("rejected", reason_bad.lower())
+
+        tier_good, size_good, _ = _assign_breakout_tier(
+            signal_type="SHELF_BREAKOUT",
+            confirmed=True,
+            perfect_base=False,
+            volume_ratio=1.65,
+            days_since_listing=21,
+            post_confirm_move_pct=2.0
+        )
+        self.assertEqual(tier_good, "B")
+
+        # 3. Session-scoped pending engine purges overnight & expired states
+        test_trading_now = datetime(2026, 10, 8, 14, 0, 0)
+        fake_pending_db = {
+            "OVERNIGHT_STOCK": {
+                "started_at": (test_trading_now - timedelta(days=1)).isoformat(),
+                "breakout_level": 500.0,
+            },
+            "EXPIRED_STOCK": {
+                "started_at": (test_trading_now - timedelta(minutes=150)).isoformat(),
+                "breakout_level": 300.0,
+            },
+            "VALID_TODAY": {
+                "started_at": (test_trading_now - timedelta(minutes=20)).isoformat(),
+                "breakout_level": 100.0,
+            }
+        }
+        mock_mongo = MagicMock()
+        mock_mongo.__getitem__.return_value.find_one.return_value = {"_id": "listing_pending_breakouts", "data": fake_pending_db}
+        mock_mongo.__getitem__.return_value.update_one = MagicMock()
+
+        with patch('listing_day_breakout_scanner._now_ist', return_value=test_trading_now), \
+             patch('listing_day_breakout_scanner.save_pending_breakouts') as mock_save, \
+             patch('db.db', mock_mongo):
+            active_pending = load_pending_breakouts(purge_stale=True)
+            self.assertNotIn("OVERNIGHT_STOCK", active_pending)  # Purged!
+            self.assertNotIn("EXPIRED_STOCK", active_pending)    # Purged!
+            self.assertIn("VALID_TODAY", active_pending)         # Retained!
+
+        # 4. Strict Volume Conjunction Gate in check_listing_day_breakout:
+        # Stock with ₹15 Cr turnover but only 0.30x volume surge MUST be rejected
+        listing_date = (datetime.today() - timedelta(days=20)).date()
+        listing_info = {
+            'symbol': 'PRASOL_MOCK',
+            'listing_date': listing_date,
+            'listing_day_high': 800.0,
+            'listing_day_low': 700.0,
+            'listing_day_close': 750.0,
+            'listing_day_volume': 1000000.0,
+            'is_nse_addition': False,
+        }
+        # Build 10 daily candles with low volume
+        dates = [listing_date + timedelta(days=i) for i in range(10)]
+        df_low_vol = pd.DataFrame({
+            'DATE': dates,
+            'OPEN': [750.0] * 10,
+            'HIGH': [820.0] * 10,
+            'LOW': [740.0] * 10,
+            'CLOSE': [810.0] * 10,
+            'VOLUME': [500000.0] * 10  # Baseline average ~500k
+        })
+        # Current volume: 150,000 shares (< 500k avg -> volume_spike False), price 850 (Turnover: ₹12.75 Cr)
+        with patch('listing_day_breakout_scanner.fetch_data', return_value=df_low_vol),              patch('listing_day_breakout_scanner.get_live_price', return_value=(850.0, "MockLive", 855.0, 150000.0)),              patch.object(lds.scanner_module, 'get_liquidity_metrics', return_value=(50.0, 0, 5000.0)),              patch('listing_day_breakout_scanner._market_is_open_ist', return_value=True):
+
+            res = check_listing_day_breakout('PRASOL_MOCK', listing_info, {}, {})
+            self.assertIsNone(res)  # Strictly rejected! Volume conjunction enforced.
+
+        # 5. Immediate Ejection from Pending State on Upper-Wick Exhaustion
+        test_pending = {
+            'DEEPA_MOCK': {
+                'started_at': lds._now_ist().isoformat(),
+                'breakout_level': 800.0,
+                'max_price_seen': 855.0,
+                'last_price': 850.0
+            }
+        }
+        # Candle where high is 890, low is 800, but close is 810 (close_location = (810-800)/(890-800) = 11% < 50%)
+        df_wick = df_low_vol.copy()
+        df_wick.loc[df_wick.index[-1], 'HIGH'] = 890.0
+        df_wick.loc[df_wick.index[-1], 'LOW'] = 800.0
+        df_wick.loc[df_wick.index[-1], 'CLOSE'] = 810.0
+        df_wick.loc[df_wick.index[-1], 'VOLUME'] = 2000000.0  # high volume
+
+        with patch('listing_day_breakout_scanner.fetch_data', return_value=df_wick), \
+             patch('listing_day_breakout_scanner.get_live_price', return_value=(810.0, "MockLive", 890.0, 2000000.0)), \
+             patch.object(lds.scanner_module, 'get_liquidity_metrics', return_value=(50.0, 0, 5000.0)), \
+             patch('listing_day_breakout_scanner._market_is_open_ist', return_value=True):
+
+            res_wick = check_listing_day_breakout('DEEPA_MOCK', listing_info, test_pending, {})
+            self.assertIsNone(res_wick)
+            self.assertNotIn('DEEPA_MOCK', test_pending)  # Verified: Ejected from pending state!
 
 
 if __name__ == '__main__':
