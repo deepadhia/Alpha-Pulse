@@ -901,6 +901,147 @@ class TestRegressionFixes(unittest.TestCase):
             self.assertIsNone(res_wick)
             self.assertNotIn('DEEPA_MOCK', test_pending)  # Verified: Ejected from pending state!
 
+    def test_approach_a_pending_engine_and_cutoff_guards(self):
+        """
+        Regression Test Suite for Approach A (Intraday Cutoff, Closed Market Protection, Universal Eviction):
+        1. Intraday cutoff guard (14:30 IST): A candidate breaking out at 15:25 IST cannot start pending
+           (insufficient market time before 15:30 close).
+        2. Market closed protection: When _market_is_open_ist() is False, after-hours scans cannot bypass
+           pending to confirm live trades.
+        3. EOD unconfirmed pending cleanup: Running when market is closed evicts unconfirmed pending states.
+        4. Universal eviction on rejection: Any rejection via _log_listing_rejection automatically evicts from pending.
+        5. Atomic pending_states cleanup: commit_trade_to_db automatically unsets the symbol from MongoDB pending_states.
+        """
+        import listing_day_breakout_scanner as lds
+        from listing_day_breakout_scanner import (
+            check_listing_day_breakout,
+            commit_trade_to_db,
+            LISTING_PENDING_CUTOFF_TIME
+        )
+
+        listing_date = (datetime.today() - timedelta(days=20)).date()
+        listing_info = {
+            'symbol': 'CUTOFF_MOCK',
+            'listing_date': listing_date,
+            'listing_day_high': 200.0,
+            'listing_day_low': 180.0,
+            'listing_day_close': 195.0,
+            'listing_day_volume': 1000000.0,
+            'is_nse_addition': False,
+        }
+        dates = [listing_date + timedelta(days=i) for i in range(10)]
+        df_good = pd.DataFrame({
+            'DATE': dates,
+            'OPEN': [195.0] * 10,
+            'HIGH': [200.0] * 10,
+            'LOW': [190.0] * 10,
+            'CLOSE': [198.0] * 10,
+            'VOLUME': [100000.0] * 10
+        })
+
+        # 1. Candidate triggering at 15:25 IST (past 14:30 cutoff) -> Refused from starting pending
+        late_now = datetime(2026, 10, 8, 15, 25, 0)
+        pending_dict = {}
+        with patch('listing_day_breakout_scanner.fetch_data', return_value=df_good), \
+             patch('listing_day_breakout_scanner.get_live_price', return_value=(205.0, "MockLive", 205.0, 500000.0)), \
+             patch.object(lds.scanner_module, 'get_liquidity_metrics', return_value=(50.0, 0, 5000.0)), \
+             patch('listing_day_breakout_scanner._market_is_open_ist', return_value=True), \
+             patch('listing_day_breakout_scanner._now_ist', return_value=late_now):
+
+            res_late = check_listing_day_breakout('CUTOFF_MOCK', listing_info, pending_dict, {})
+            self.assertIsNone(res_late)
+            self.assertNotIn('CUTOFF_MOCK', pending_dict)  # Did NOT enter pending!
+
+        # 2. Outside market hours (e.g. 16:30 IST) -> Cannot bypass confirmation into live trade
+        pending_straddle = {
+            'CUTOFF_MOCK': {
+                'started_at': (datetime(2026, 10, 8, 14, 0, 0)).isoformat(),
+                'breakout_level': 200.0,
+                'max_price_seen': 205.0,
+                'last_price': 205.0
+            }
+        }
+        with patch('listing_day_breakout_scanner.fetch_data', return_value=df_good), \
+             patch('listing_day_breakout_scanner.get_live_price', return_value=(205.0, "MockLive", 205.0, 500000.0)), \
+             patch.object(lds.scanner_module, 'get_liquidity_metrics', return_value=(50.0, 0, 5000.0)), \
+             patch('listing_day_breakout_scanner._market_is_open_ist', return_value=False):
+
+            res_closed = check_listing_day_breakout('CUTOFF_MOCK', listing_info, pending_straddle, {})
+            self.assertIsNone(res_closed)
+            self.assertNotIn('CUTOFF_MOCK', pending_straddle)  # Evicted as market closed before confirmation!
+
+        # 3. Universal eviction on rejection: Low volume triggers _log_listing_rejection -> evicts pending
+        pending_active = {
+            'CUTOFF_MOCK': {
+                'started_at': (datetime(2026, 10, 8, 13, 0, 0)).isoformat(),
+                'breakout_level': 200.0,
+                'max_price_seen': 205.0,
+                'last_price': 205.0
+            }
+        }
+        # volume 50,000 < 150,000 floor
+        with patch('listing_day_breakout_scanner.fetch_data', return_value=df_good), \
+             patch('listing_day_breakout_scanner.get_live_price', return_value=(205.0, "MockLive", 205.0, 50000.0)), \
+             patch.object(lds.scanner_module, 'get_liquidity_metrics', return_value=(50.0, 0, 5000.0)), \
+             patch('listing_day_breakout_scanner._market_is_open_ist', return_value=True):
+
+            res_vol_rej = check_listing_day_breakout('CUTOFF_MOCK', listing_info, pending_active, {})
+            self.assertIsNone(res_vol_rej)
+            self.assertNotIn('CUTOFF_MOCK', pending_active)  # Universally evicted!
+
+        # 4. Atomic cleanup in commit_trade_to_db: Unsets pending_states in MongoDB
+        mock_mongo = MagicMock()
+        mock_mongo.positions.count_documents.return_value = 0
+        with patch('db.has_active_position', return_value=False), \
+             patch('db.db', mock_mongo), \
+             patch('db.upsert_signal'), \
+             patch('db.upsert_position'):
+
+            breakout_payload = {
+                'symbol': 'COMMIT_CLEAN_TEST',
+                'entry_price': 205.0,
+                'stop_loss': 190.0,
+                'target_price': 240.0,
+                'type': 'BREAKOUT',
+                'volume_spike': True,
+                'volume_ratio': 2.5,
+                'volume_vs_listing_day': 1.2,
+                'listing_range_pct': 5.0,
+                'risk_reward': 2.33,
+                'days_since_listing': 10,
+                'current_price': 205.0,
+                'tier': 'A'
+            }
+            commit_trade_to_db(breakout_payload)
+            mock_mongo.__getitem__.return_value.update_one.assert_called_with(
+                {"_id": "listing_pending_breakouts"},
+                {"$unset": {"data.COMMIT_CLEAN_TEST": ""}}
+            )
+
+        # 5. Defense-in-depth: commit_trade_to_db refuses live entry when market is closed
+        with patch('listing_day_breakout_scanner._market_is_open_ist', return_value=False),              patch.dict(os.environ, {"PYTEST_CURRENT_TEST": ""}):
+            # Clear test flag temporarily to simulate live production after-hours trigger
+            success_after_hours, _, _, _, _ = commit_trade_to_db(breakout_payload)
+            self.assertFalse(success_after_hours)
+
+        # 6. scan_listing_day_breakouts halts cleanly outside market hours
+        from listing_day_breakout_scanner import scan_listing_day_breakouts
+        with patch('listing_day_breakout_scanner._market_is_open_ist', return_value=False),              patch('listing_day_breakout_scanner.update_listing_data_for_new_ipos') as mock_update,              patch('listing_day_breakout_scanner.load_pending_breakouts') as mock_purge:
+            scan_listing_day_breakouts()
+            mock_update.assert_called_once()
+            mock_purge.assert_called_with(purge_stale=True)
+
+
+    def test_utils_telegram_dispatcher_integrity(self):
+        """
+        Verify utils.send_telegram_msg module imports sys and executes cleanly.
+        Guards against regression where 'unittest' in sys.modules crashed live production dispatch with NameError.
+        """
+        import utils
+        self.assertTrue(hasattr(utils, "sys"), "utils module must explicitly import sys")
+        with patch.dict(os.environ, {"DISABLE_TELEGRAM": "1", "PYTEST_CURRENT_TEST": ""}):
+            result = utils.send_telegram_msg("Test message for dispatcher integrity")
+            self.assertTrue(result)
 
 if __name__ == '__main__':
     unittest.main()

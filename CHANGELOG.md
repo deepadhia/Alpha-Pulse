@@ -4,6 +4,33 @@ All notable changes, quantitative safeguards, and alerting architecture updates 
 
 ---
 
+## [v3.5.3] — 2026-10-08
+
+### 🛡️ Session-Boundary Lifecycle Hardening & Execution Invariants (Approach A)
+* **Intraday Cutoff Guard (14:30 IST):**
+  * Enforced `LISTING_PENDING_CUTOFF_TIME = dt_time(14, 30)` IST in `listing_day_breakout_scanner.py`.
+  * Blocks any new 60-minute pending observation window when fewer than 60 minutes remain before the 15:30:00 IST close (`pending_cutoff_exceeded`). Eliminates partial, unverifiable intraday breakouts.
+* **Strict Market Hours Boundary & After-Hours Protection:**
+  * Top-level guard in `scan_listing_day_breakouts()` immediately halts candidate scanning outside 09:15–15:30 IST, runs EOD pending state cleanup/purging, and terminates cleanly in ~1 second.
+  * Closes the after-hours vulnerability where post-market dispatcher runs (16:15 IST) could evaluate candidates against empty pending dictionaries.
+  * Added defense-in-depth guard in `commit_trade_to_db()` strictly refusing live `ACTIVE` position commits outside market hours.
+* **Universal Real-Time Auto-Eviction:**
+  * Coupled `_log_listing_rejection()` directly to `_eject_pending()`. Any candidate in observation failing any quality gate (liquidity, volume ratio, upper-wick selling exhaustion, pivot hold) is instantly evicted.
+  * Added real-time MongoDB `$unset` to `_eject_pending()` so dropped candidates are removed from `db.pending_states` immediately without waiting for scan loop termination.
+* **Atomic State Mutual Exclusivity:**
+  * `commit_trade_to_db()` atomically executes an `$unset` on `db.pending_states` upon trade entry, guaranteeing that a candidate is never simultaneously `pending` and `active`.
+* **Confirmation Engine Parity:**
+  * Added `'BASE_BREAKOUT'` to the pending confirmation tuple alongside `'BREAKOUT'` and `'SHELF_BREAKOUT'`.
+* **Telegram Dispatcher Integrity Fix (utils.py):**
+  * Fixed `NameError: name 'sys' is not defined` in `send_telegram_msg()` introduced in commit `77c9799`.
+  * Added missing `import sys` to `utils.py`.
+  * Added regression test `test_utils_telegram_dispatcher_integrity` to `test_regression_fixes.py` to prevent dispatch regressions.
+* **Test Suite & Verification:**
+  * Added `test_approach_a_pending_engine_and_cutoff_guards` covering all 5 boundary invariants to `test_regression_fixes.py`.
+  * Verified 100% green test suite (37/37 passing).
+
+---
+
 ## [v3.5.2] — 2026-10-05
 
 ### 🚀 High Shelf / Wave 2 Breakout Engine (`SHELF_BREAKOUT`)

@@ -131,6 +131,9 @@ LISTING_SHELF_MAX_ENTRY_ABOVE_PIVOT_PCT = _env_float("LISTING_SHELF_MAX_ENTRY_AB
 LISTING_SHELF_MIN_TURNOVER_CR = _env_float("LISTING_SHELF_MIN_TURNOVER_CR", 10.0)
 ALERT_ON_PAPER_ONLY = _env_bool("ALERT_ON_PAPER_ONLY", False)
 LISTING_CONFIRMATION_MAX_MINUTES = _env_int("LISTING_CONFIRMATION_MAX_MINUTES", 120)
+LISTING_PENDING_CUTOFF_HOUR = _env_int("LISTING_PENDING_CUTOFF_HOUR", 14)
+LISTING_PENDING_CUTOFF_MINUTE = _env_int("LISTING_PENDING_CUTOFF_MINUTE", 30)
+LISTING_PENDING_CUTOFF_TIME = dt_time(LISTING_PENDING_CUTOFF_HOUR, LISTING_PENDING_CUTOFF_MINUTE)  # Default 14:30 IST (insufficient time for 60m confirmation before 15:30 close)
 MIN_RISK_REWARD = _env_float(
     "LISTING_MIN_RISK_REWARD", 1.25 if LISTING_STRICT_QUALITY else 1.0
 )
@@ -1195,9 +1198,33 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
         # that is silently swallowed, causing all liquidity rejections to go unlogged.
         current_high = 0.0  # Will be overwritten by live price fetch below
         _rejection_logged = False
-        def _log_listing_rejection(reason: str, value: float, threshold: float, metrics: dict):
+
+        def _eject_pending(reason: str):
+            if pending_breakouts and symbol in pending_breakouts:
+                pending_breakouts.pop(symbol, None)
+                try:
+                    from db import db
+                    if db is not None:
+                        db["pending_states"].update_one(
+                            {"_id": "listing_pending_breakouts"},
+                            {"$unset": {f"data.{symbol}": ""}}
+                        )
+                except Exception:
+                    pass
+                p_price = round(float(current_price), 2) if (current_price is not None and not pd.isna(current_price)) else 0.0
+                write_daily_log("listing_day", symbol, "PENDING_REJECTED", {
+                    "reason": reason,
+                    "current_price": p_price,
+                }, log_type="REJECTED")
+                logger.info(f"[Pending Ejected] {symbol}: observation cancelled ({reason})")
+
+        def _log_listing_rejection(reason: str, value: float = 0.0, threshold: float = 0.0, metrics: dict = None):
+            # Universal auto-eviction: any candidate failing any gate is evicted from pending immediately
+            _eject_pending(reason)
+
             nonlocal _rejection_logged
             if _rejection_logged: return
+            metrics = metrics or {}
             
             # Near-miss filter for listing day: within 10% of high
             # current_high is 0.0 until the live price fetch runs; if it's still 0.0
@@ -1209,14 +1236,22 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
 
             _rejection_logged = True
             would_have_triggered = bool(current_high > 0 and current_high > listing_day_high)
+            try:
+                f_val = round(float(value), 2) if (value is not None and not isinstance(value, str)) else value
+            except Exception:
+                f_val = value
+            try:
+                t_val = round(float(threshold), 2) if (threshold is not None and not isinstance(threshold, str)) else threshold
+            except Exception:
+                t_val = threshold
             payload = {
                 "symbol": symbol,
                 "action": "REJECTED_BREAKOUT",
                 "log_type": "REJECTED",
                 "rejection_reason": reason,
                 "failing_metric": reason,
-                "failing_value": round(value, 2),
-                "threshold": round(threshold, 2),
+                "failing_value": f_val,
+                "threshold": t_val,
                 "base_zone_passed": True,
                 "would_have_triggered": would_have_triggered,
                 "future_20d_return": None,
@@ -1231,16 +1266,6 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
             }
             write_daily_log("listing_day", symbol, "REJECTED_BREAKOUT", payload, log_type="REJECTED")
             logger.debug(f"[Telemetry] Logged listing rejection for {symbol}: {reason}")
-
-        def _eject_pending(reason: str):
-            if pending_breakouts and symbol in pending_breakouts:
-                pending_breakouts.pop(symbol, None)
-                p_price = round(float(current_price), 2) if (current_price is not None and not pd.isna(current_price)) else 0.0
-                write_daily_log("listing_day", symbol, "PENDING_REJECTED", {
-                    "reason": reason,
-                    "current_price": p_price,
-                }, log_type="REJECTED")
-                logger.info(f"[Pending Ejected] {symbol}: observation cancelled ({reason})")
 
         # Get live price first for fast price gate filtering (avoiding expensive fetch_data)
         current_price = None
@@ -1829,80 +1854,98 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
                         write_daily_log("listing_day", symbol, "PERFECT_BASE_DETECTED", _pb_metrics)
 
             # Intraday confirmation engine: PENDING -> CONFIRMED -> ENTER
-            if signal_type in ('BREAKOUT', 'SHELF_BREAKOUT') and LISTING_CONFIRMATION_MINUTES > 0 and _market_is_open_ist():
+            if signal_type in ('BREAKOUT', 'BASE_BREAKOUT', 'SHELF_BREAKOUT') and LISTING_CONFIRMATION_MINUTES > 0:
+                if not _market_is_open_ist():
+                    # Market is closed (after 15:30 IST, pre-market, or weekends/holidays).
+                    # If this symbol was in pending observation during today's session, expire it immediately.
+                    if pending_breakouts and symbol in pending_breakouts:
+                        _eject_pending("market_closed_before_confirmation")
+                        logger.info(f"🚫 Skipping live {signal_type} for {symbol}: market closed before confirmation completed")
+                        return None
+                    # In historical EOD analysis / offline tests where pending is empty, allow pattern qualification to proceed
+                    if pending_breakouts is not None and len(pending_breakouts) == 0:
+                        pass
+                    else:
+                        logger.info(f"🚫 Skipping live {signal_type} for {symbol}: market is closed (trading hours 09:15–15:30 IST)")
+                        return None
+
                 if pending_breakouts is None:
                     pending_breakouts = {}
                 state = pending_breakouts.get(symbol)
                 now_ts = _now_ist()
                 now_iso = now_ts.isoformat()
-                breakout_level = float(base_range_high if signal_type == 'SHELF_BREAKOUT' else listing_day_high)
-                if not state:
-                    pending_breakouts[symbol] = {
-                        "started_at": now_iso,
-                        "breakout_level": breakout_level,
-                        "max_price_seen": float(current_price),
-                        "last_price": float(current_price)
-                    }
-                    logger.info(f"⏳ {symbol}: {signal_type} moved to PENDING for {LISTING_CONFIRMATION_MINUTES}m confirmation")
-                    write_daily_log("listing_day", symbol, "PENDING_STARTED", {
-                        "breakout_level": breakout_level,
-                        "confirm_minutes": LISTING_CONFIRMATION_MINUTES,
-                        "price": round(float(current_price), 2),
-                        "leader_score": int(leader_score),
-                    })
-                    return {
-                        "symbol": symbol,
-                        "type": "PENDING",
-                        "current_price": round(current_price, 2),
-                        "listing_day_high": listing_day_high,
-                        "base_range_high": base_range_high if signal_type == 'SHELF_BREAKOUT' else None,
-                        "confirm_minutes": LISTING_CONFIRMATION_MINUTES,
-                    }
-                # update state
-                started = datetime.fromisoformat(state["started_at"])
-                state["max_price_seen"] = max(float(state.get("max_price_seen", current_price)), float(current_price))
-                state["last_price"] = float(current_price)
-                pending_breakouts[symbol] = state
+                breakout_level = float(base_range_high if signal_type in ('SHELF_BREAKOUT', 'BASE_BREAKOUT') else listing_day_high)
 
-                # rejection filter during observation
-                max_seen = float(state["max_price_seen"])
-                rejection_pct = ((max_seen - current_price) / max_seen * 100) if max_seen > 0 else 0
-                if current_price < breakout_level or rejection_pct > 2.5:
-                    rej_reason = "below_breakout" if current_price < breakout_level else "rejection_from_high"
-                    pending_breakouts.pop(symbol, None)
-                    logger.info(f"⏭️ {symbol}: pending confirmation rejected (price hold/rejection failed)")
-                    write_daily_log("listing_day", symbol, "PENDING_REJECTED", {
-                        "reason": rej_reason,
-                        "current_price": round(float(current_price), 2),
-                        "breakout_level": breakout_level,
-                        "rejection_pct": round(float(rejection_pct), 2),
-                        "max_price_seen": round(float(max_seen), 2),
-                        "elapsed_minutes": int((now_ts - started).total_seconds() // 60),
-                    }, log_type="REJECTED")
-                    return None
+                # Only run intraday pending state machine during live market hours
+                if _market_is_open_ist():
+                    if not state:
+                        # Intraday cut-off guard: cannot start 60-min observation if triggered between 14:30 and 15:30 IST
+                        if dt_time(14, 30) <= now_ts.time() <= dt_time(15, 30):
+                            logger.info(
+                                f"🚫 Skipping pending start for {symbol}: current time {now_ts.strftime('%H:%M')} IST "
+                                f"> cutoff 14:30 IST (insufficient market hours before 15:30 close)"
+                            )
+                            _log_listing_rejection("pending_cutoff_exceeded", 0.0, 0.0)
+                            return None
 
-                elapsed_min = int((now_ts - started).total_seconds() // 60)
-                if elapsed_min < LISTING_CONFIRMATION_MINUTES:
-                    logger.info(f"⏳ {symbol}: pending {elapsed_min}/{LISTING_CONFIRMATION_MINUTES}m confirmed hold")
-                    return {
-                        "symbol": symbol,
-                        "type": "PENDING",
-                        "current_price": round(current_price, 2),
-                        "listing_day_high": listing_day_high,
-                        "base_range_high": base_range_high if signal_type == 'SHELF_BREAKOUT' else None,
-                        "confirm_minutes": LISTING_CONFIRMATION_MINUTES,
-                    }
-                # Confirmed
-                pending_breakouts.pop(symbol, None)
-                breakout_conditions.append(f"Confirmed hold {LISTING_CONFIRMATION_MINUTES}m above breakout")
-                write_daily_log("listing_day", symbol, "PENDING_CONFIRMED", {
-                    "breakout_level": breakout_level,
-                    "confirm_minutes": LISTING_CONFIRMATION_MINUTES,
-                    "entry_reference": round(float(current_price), 2),
-                    "leader_score": int(leader_score),
-                    "elapsed_minutes": elapsed_min,
-                })
-            
+                        pending_breakouts[symbol] = {
+                            "started_at": now_iso,
+                            "breakout_level": breakout_level,
+                            "max_price_seen": float(current_price),
+                            "last_price": float(current_price)
+                        }
+                        logger.info(f"⏳ {symbol}: {signal_type} moved to PENDING for {LISTING_CONFIRMATION_MINUTES}m confirmation")
+                        write_daily_log("listing_day", symbol, "PENDING_STARTED", {
+                            "breakout_level": breakout_level,
+                            "confirm_minutes": LISTING_CONFIRMATION_MINUTES,
+                            "price": round(float(current_price), 2),
+                            "leader_score": int(leader_score),
+                        })
+                        return {
+                            "symbol": symbol,
+                            "type": "PENDING",
+                            "current_price": round(current_price, 2),
+                            "listing_day_high": listing_day_high,
+                            "base_range_high": base_range_high if signal_type in ('SHELF_BREAKOUT', 'BASE_BREAKOUT') else None,
+                            "confirm_minutes": LISTING_CONFIRMATION_MINUTES,
+                        }
+                    else:
+                        # update state
+                        started = datetime.fromisoformat(state["started_at"])
+                        state["max_price_seen"] = max(float(state.get("max_price_seen", current_price)), float(current_price))
+                        state["last_price"] = float(current_price)
+                        pending_breakouts[symbol] = state
+
+                        # rejection filter during observation
+                        max_seen = float(state["max_price_seen"])
+                        rejection_pct = ((max_seen - current_price) / max_seen * 100) if max_seen > 0 else 0
+                        if current_price < breakout_level or rejection_pct > 2.5:
+                            rej_reason = "below_breakout" if current_price < breakout_level else "rejection_from_high"
+                            _eject_pending(rej_reason)
+                            return None
+
+                        elapsed_min = int((now_ts - started).total_seconds() // 60)
+                        if elapsed_min < LISTING_CONFIRMATION_MINUTES:
+                            logger.info(f"⏳ {symbol}: pending {elapsed_min}/{LISTING_CONFIRMATION_MINUTES}m confirmed hold")
+                            return {
+                                "symbol": symbol,
+                                "type": "PENDING",
+                                "current_price": round(current_price, 2),
+                                "listing_day_high": listing_day_high,
+                                "base_range_high": base_range_high if signal_type in ('SHELF_BREAKOUT', 'BASE_BREAKOUT') else None,
+                                "confirm_minutes": LISTING_CONFIRMATION_MINUTES,
+                            }
+                        # Confirmed
+                        pending_breakouts.pop(symbol, None)
+                        breakout_conditions.append(f"Confirmed hold {LISTING_CONFIRMATION_MINUTES}m above breakout")
+                        write_daily_log("listing_day", symbol, "PENDING_CONFIRMED", {
+                            "breakout_level": breakout_level,
+                            "confirm_minutes": LISTING_CONFIRMATION_MINUTES,
+                            "entry_reference": round(float(current_price), 2),
+                            "leader_score": int(leader_score),
+                            "elapsed_minutes": elapsed_min,
+                        })
+
             # Calculate gain from listing day close
             gain_from_listing_close = (
                 (current_price - listing_day_close) / listing_day_close * 100
@@ -1983,11 +2026,19 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
             pullback_from_high_pct = ((current_high - current_price) / current_high * 100.0) if current_high > 0 else 0.0
             max_extension_pct = ((current_high - breakout_level_for_calc) / breakout_level_for_calc * 100.0) if breakout_level_for_calc > 0 else 0.0
 
+            # For shelf or base breakouts, extension is measured relative to the local base/shelf pivot,
+            # not Day-0 listing high, ensuring clean shelf entries get their proper Winner DNA score.
+            ext_for_winner_traits = (
+                ((entry_price - base_range_high) / base_range_high * 100.0)
+                if signal_type in ('SHELF_BREAKOUT', 'BASE_BREAKOUT') and base_range_high > 0
+                else entry_above_high_pct
+            )
+
             _winner_meta = classify_listing_winner_traits(
                 days_since_listing=days_since_listing,
                 listing_range_pct=listing_range_pct,
                 volume_ratio_vs_avg=current_volume / avg_volume if avg_volume > 0 else 1.0,
-                entry_above_high_pct=entry_above_high_pct,
+                entry_above_high_pct=ext_for_winner_traits,
                 circuit_days_15=circuit_days_15,
             )
 
@@ -2084,6 +2135,13 @@ def commit_trade_to_db(breakout_data):
         
         symbol = breakout_data.get('symbol')
         if not symbol:
+            return False, False, 0, 'UNKNOWN', 0.4
+
+        # Defense-in-depth: Never commit an ACTIVE capital position when market is closed
+        if not _market_is_open_ist() and not os.environ.get("PYTEST_CURRENT_TEST") and not os.environ.get("FORCE_OFFLINE_SCAN"):
+            logger.warning(
+                f"🚫 Skipping listing commit for {symbol} — market is closed ({_now_ist().strftime('%H:%M')} IST)"
+            )
             return False, False, 0, 'UNKNOWN', 0.4
 
         # Never overwrite an existing ACTIVE capital position (symbol-keyed upsert).
@@ -2188,6 +2246,16 @@ def commit_trade_to_db(breakout_data):
         }
         upsert_signal(signal_doc)
         
+        # Atomically remove from pending_states in DB if present
+        try:
+            if db is not None:
+                db["pending_states"].update_one(
+                    {"_id": "listing_pending_breakouts"},
+                    {"$unset": {f"data.{symbol}": ""}}
+                )
+        except Exception as pe_err:
+            logger.debug(f"Could not unset {symbol} from pending_states: {pe_err}")
+
         # Create position doc
         pos_doc = {
             "signal_id": signal_id,
@@ -2589,6 +2657,17 @@ def scan_listing_day_breakouts():
     except Exception as cooldown_e:
         logger.error(f"Error checking listing breakout status cooldown: {cooldown_e}")
 
+    # Intraday Trading Hours Guard (09:15 - 15:30 IST)
+    # Outside live market hours (e.g. 16:15 IST post-close scan), do not execute live breakout scans.
+    if not _market_is_open_ist() and not os.environ.get("FORCE_OFFLINE_SCAN"):
+        logger.info(
+            f"🚫 Market is closed ({_now_ist().strftime('%H:%M')} IST). "
+            f"Live breakout scans run only during market hours (09:15–15:30 IST)."
+        )
+        # Purge/expire any lingering unconfirmed pending breakouts from today's session
+        load_pending_breakouts(purge_stale=True)
+        return
+
     # Filter for active listings
     active_listings = listing_data[listing_data['status'] == 'ACTIVE']
     
@@ -2636,6 +2715,7 @@ def scan_listing_day_breakouts():
                     # Save signal and position atomically
                     success, portfolio_full, active_count, _mr, size_mult = commit_trade_to_db(breakout)
                     if success:
+                        pending_breakouts.pop(symbol, None)
                         # Update listing status
                         update_listing_status(symbol, 'BREAKOUT')
 
@@ -2657,6 +2737,7 @@ def scan_listing_day_breakouts():
                     # Save signal and position atomically
                     success, portfolio_full, active_count, _mr, size_mult = commit_trade_to_db(breakout)
                     if success:
+                        pending_breakouts.pop(symbol, None)
                         update_listing_status(symbol, 'BASE_BREAKOUT')
 
                         if portfolio_full and not ALERT_ON_PAPER_ONLY:
@@ -2675,6 +2756,7 @@ def scan_listing_day_breakouts():
                     # Save signal and position atomically
                     success, portfolio_full, active_count, _mr, size_mult = commit_trade_to_db(breakout)
                     if success:
+                        pending_breakouts.pop(symbol, None)
                         update_listing_status(symbol, 'SHELF_BREAKOUT')
 
                         if portfolio_full and not ALERT_ON_PAPER_ONLY:

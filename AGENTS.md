@@ -57,6 +57,25 @@ This file defines the core engineering standards, domain knowledge, and operatio
   - `signals_legacy_archive` (MongoDB)
 * Active collections `positions` and `signals` must remain 100% clean-cohort data only.
 
+### Synchronized System Versioning & Analytics Cleanliness Invariant
+Whenever the system version is updated, it **MUST be updated everywhere simultaneously in one synchronized atomic commit** to prevent telemetry drift and broken analytics queries.
+
+* **The 6 Mandatory Touchpoints That Must Always Match Exactly:**
+  1. `master_audit.py`: `EXPECTED_VERSION = "X.Y.Z"`
+  2. `streamlined_ipo_scanner.py`: `SCANNER_VERSION = "X.Y.Z"`
+  3. `listing_day_breakout_scanner.py`: `SCANNER_VERSION = "X.Y.Z"`
+  4. `hourly_breakout_scanner.py`: `SCANNER_VERSION = "X.Y.Z"`
+  5. `db.py`: `SCANNER_VERSION = "X.Y.Z"`
+  6. `README.md`: Version badge (`badge/version-X.Y.Z-orange`)
+
+* **Why Isolated Version Bumps Are Strictly Forbidden:**
+  - `master_audit.py` Section 3 enforces automated static checks on version drift. If `README.md` or any scanner differs from `EXPECTED_VERSION`, the audit immediately emits `[FAIL]`.
+  - MongoDB queries aggregate telemetry and position performance by cohort (e.g. `db.logs.find({"version": EXPECTED_VERSION})` and `db.positions.find({"position_version": EXPECTED_VERSION})`). Bumping a single file fragments cohort data and pollutes forward performance statistics.
+
+* **Two-Tier Versioning Protocol:**
+  - **Milestone System Version (`SCANNER_VERSION`):** The single source of truth across code, DB records, and `master_audit.py`. Only bumped when a synchronized strategy release occurs.
+  - **Patch Notes (`CHANGELOG.md`):** Documents chronological hotfixes, refactors, and guardrails (`[v3.5.1]`, `[v3.5.2]`, `[v3.5.3]`) without fracturing MongoDB cohort tags.
+
 ---
 
 ## 💾 3. Database Schema & Conventions (MongoDB)
@@ -141,3 +160,4 @@ Before delivering code or modifying the repository:
 3. **Preserve Immature Hypotheses:** Do not enable experimental gates on small sample sizes (see `EXPERIMENT_CHANGELOG.md`).
 4. **Validate Against Clean Cohort:** Test queries against `positions` and `strategy_evidence` using `2026-07-05` cutoff.
 5. **Never Destructively Overwrite DB Collections:** Always use upsert or archival tables.
+6. **Synchronized Versioning Rule:** If bumping system versions, update all 6 touchpoints atomically (master_audit.py, all 3 scanners, db.py, README.md badge) and verify with python master_audit.py --section 3 to guarantee zero analytics fragmentation.
