@@ -147,7 +147,7 @@ MIN_VOLUME_VS_LISTING_DAY = _env_float(
 )  # kept for backward compat — not used in filtering logic
 # Reject listing-high breakouts when IPO is too old (strategy is "listing day" edge)
 MAX_DAYS_SINCE_LISTING_FOR_BREAKOUT = _env_int(
-    "LISTING_MAX_DAYS_SINCE_LISTING", 730
+    "LISTING_MAX_DAYS_SINCE_LISTING", 60
 )
 # If listing-day volume in CSV is 0 / missing, require this multiple of recent avg volume
 MIN_VOL_MULT_WHEN_NO_LISTING_VOL = _env_float(
@@ -252,20 +252,23 @@ LISTING_WATCHLIST_MAX_SIGN_FLIPS = _env_int(
 # ---------------------------------------------------------------------------
 # Tier A+: perfect base + listing high breakout + volume + fresh IPO → 100% size
 LISTING_TIER_APLUS_MIN_VOLUME_MULT  = _env_float("LISTING_TIER_APLUS_MIN_VOLUME_MULT", 1.8)
-LISTING_TIER_APLUS_MAX_AGE_DAYS     = _env_int("LISTING_TIER_APLUS_MAX_AGE_DAYS", 730)
+LISTING_TIER_APLUS_MAX_AGE_DAYS     = _env_int("LISTING_TIER_APLUS_MAX_AGE_DAYS", 60)
 
 # Tier A: pure momentum — strong volume, no base required, NOT perfect base → 60% size
 LISTING_TIER_A_MIN_VOLUME_MULT = _env_float("LISTING_TIER_A_MIN_VOLUME_MULT", 2.0)
-LISTING_TIER_A_MAX_AGE_DAYS    = _env_int("LISTING_TIER_A_MAX_AGE_DAYS", 730)
+LISTING_TIER_A_MAX_AGE_DAYS    = _env_int("LISTING_TIER_A_MAX_AGE_DAYS", 60)
 
 # Tier A — controlled fallback: outside A windows but still valid → 50% size
-LISTING_TIER_A_FALLBACK_MAX_AGE_DAYS       = _env_int("LISTING_TIER_A_FALLBACK_MAX_AGE_DAYS", 730)
+LISTING_TIER_A_FALLBACK_MAX_AGE_DAYS       = _env_int("LISTING_TIER_A_FALLBACK_MAX_AGE_DAYS", 60)
 LISTING_TIER_A_FALLBACK_POSITION_SIZE_PCT  = _env_int("LISTING_TIER_A_FALLBACK_POSITION_SIZE_PCT", 50)
 
 # Tier B: base breakout below listing high (accumulation-driven) → 40% size
 LISTING_TIER_B_ENABLED                    = _env_bool("LISTING_TIER_B_ENABLED", True)
 LISTING_TIER_B_MAX_DISTANCE_FROM_HIGH_PCT = _env_float("LISTING_TIER_B_MAX_DISTANCE_FROM_HIGH_PCT", 20.0)
-LISTING_TIER_B_MAX_AGE_DAYS               = _env_int("LISTING_TIER_B_MAX_AGE_DAYS", 730)
+LISTING_TIER_B_MAX_AGE_DAYS               = _env_int("LISTING_TIER_B_MAX_AGE_DAYS", 60)
+
+# Minimum listing day range cushion (5.0%) to prevent trading compressed/flat listing days
+LISTING_MIN_RANGE_CUSHION_PCT = _env_float("LISTING_MIN_RANGE_CUSHION_PCT", 5.0)
 LISTING_TIER_B_POSITION_SIZE_PCT          = _env_int("LISTING_TIER_B_POSITION_SIZE_PCT", 40)
 
 # Post-confirm move: minimum % above breakout reference after confirmation (kills dead trades)
@@ -564,6 +567,7 @@ def _assign_breakout_tier(
     volume_ratio: float,
     days_since_listing: int,
     post_confirm_move_pct: float = 0.0,
+    listing_range_pct: float = 0.0,
 ) -> tuple:
     """
     Assign quality tier + position size to a confirmed breakout signal.
@@ -591,6 +595,13 @@ def _assign_breakout_tier(
         )
 
     if signal_type == "BREAKOUT":
+        # Volatility cushion guard: reject compressed/flat listing days (< 5.0% range)
+        if listing_range_pct > 0 and listing_range_pct < LISTING_MIN_RANGE_CUSHION_PCT:
+            return (
+                None, None,
+                f"Listing day range {listing_range_pct:.1f}% < {LISTING_MIN_RANGE_CUSHION_PCT:.1f}% (lacks volatility cushion)"
+            )
+
         # ── A+: perfect structure + listing-high breakout + volume + fresh ────────
         if (
             perfect_base
@@ -1983,6 +1994,7 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
                 volume_ratio=vol_ratio_for_tier,
                 days_since_listing=days_since_listing,
                 post_confirm_move_pct=post_confirm_move_pct,
+                listing_range_pct=listing_range_pct,
             )
             if tier is None and signal_type != 'WATCHLIST':
                 logger.info(f"⏭️ {symbol}: No tier assigned — {tier_rationale}")
@@ -2395,7 +2407,7 @@ def format_listing_breakout_alert(breakout_data):
     entry = breakout_data['entry_price']
     stop = breakout_data['stop_loss']
     target = breakout_data['target_price']
-    listing_high = breakout_data['listing_day_high']
+    listing_high = breakout_data.get('listing_day_high', breakout_data.get('base_range_high', breakout_data.get('entry_price', 0.0)))
     vol_spike = breakout_data.get('volume_spike', 0)
     rr = breakout_data.get('risk_reward', 0)
     days_since_listing = breakout_data.get('days_since_listing', 0)
@@ -2433,7 +2445,7 @@ def format_shelf_breakout_alert(breakout_data):
     entry = breakout_data['entry_price']
     stop = breakout_data['stop_loss']
     target = breakout_data['target_price']
-    listing_high = breakout_data['listing_day_high']
+    listing_high = breakout_data.get('listing_day_high', breakout_data.get('base_range_high', breakout_data.get('entry_price', 0.0)))
     base_high = breakout_data.get('base_range_high') or listing_high
     vol_spike = breakout_data.get('volume_spike', 0)
     rr = breakout_data.get('risk_reward', 0)
