@@ -71,7 +71,7 @@ jobs:
           LISTING_MAX_ENTRY_ABOVE_HIGH_PCT: ${{ vars.LISTING_MAX_ENTRY_ABOVE_HIGH_PCT || '3.5' }}
           LISTING_MIN_RISK_REWARD: ${{ vars.LISTING_MIN_RISK_REWARD || '1.25' }}
           LISTING_STOP_LOSS_PCT: ${{ vars.LISTING_STOP_LOSS_PCT || '8.0' }}
-          LISTING_MAX_DAYS_SINCE_LISTING: ${{ vars.LISTING_MAX_DAYS_SINCE_LISTING || '730' }}
+          LISTING_MAX_DAYS_SINCE_LISTING: ${{ vars.LISTING_MAX_DAYS_SINCE_LISTING || '60' }}
           MONGO_URI: ${{ secrets.MONGO_URI }}
         run: |
           echo "Environment variables configured"
@@ -107,7 +107,7 @@ jobs:
           LISTING_MAX_ENTRY_ABOVE_HIGH_PCT: ${{ vars.LISTING_MAX_ENTRY_ABOVE_HIGH_PCT || '3.5' }}
           LISTING_MIN_RISK_REWARD: ${{ vars.LISTING_MIN_RISK_REWARD || '1.25' }}
           LISTING_STOP_LOSS_PCT: ${{ vars.LISTING_STOP_LOSS_PCT || '8.0' }}
-          LISTING_MAX_DAYS_SINCE_LISTING: ${{ vars.LISTING_MAX_DAYS_SINCE_LISTING || '730' }}
+          LISTING_MAX_DAYS_SINCE_LISTING: ${{ vars.LISTING_MAX_DAYS_SINCE_LISTING || '60' }}
           MONGO_URI: ${{ secrets.MONGO_URI }}
         run: |
           echo "🔄 Fetching recent IPO symbols to MongoDB..."
