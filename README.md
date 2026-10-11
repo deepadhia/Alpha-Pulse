@@ -27,7 +27,7 @@ Targets newly listed IPOs during their primary institutional discovery window (*
 
 **Flow & Key Rules:**
 1. **Age Constraint (v3.5.4):** Enforces a disciplined **60-calendar-day lifecycle boundary** (`MAX_DAYS_SINCE_LISTING_FOR_BREAKOUT = 60`, `LISTING_TIER_A_MAX_AGE_DAYS = 60`). Focuses capital strictly on early institutional sponsorship and float scarcity, eliminating 150+ stale, multi-month zombie IPOs (100–700 days old).
-2. **Listing Day Volatility Cushion (v3.5.4):** Requires a listing day high-to-low range $\ge 5.0\%$ (`LISTING_MIN_RANGE_CUSHION_PCT = 5.0`). Rejects flat, compressed listings that lack initial price discovery and institutional participation.
+2. **Listing Day Volatility Cushion (v3.5.4):** Requires a listing day high-to-low range >= 5.0% (`LISTING_MIN_RANGE_CUSHION_PCT = 5.0`). Rejects flat, compressed listings that lack initial price discovery and institutional participation.
 3. **Breakout Volume Floor (v3.3.0):** IPOs whose breakout-day traded volume was `< 150,000 shares` are rejected. This removes illiquid listings that pass price filters but lack the institutional participation needed to sustain momentum. Day 0 (the actual listing day) is exempt since volume may not be fully settled in the DB yet.
 4. **Base Duration Floor (v3.3.0):** Standard breakouts require at least **3 trading days** of post-listing history before the scanner qualifies a signal. Prevents false breakout reads from single-day listing spikes.
 5. **Stop Loss (15-Day Local Swing Low, 12% Risk Cap):** Dynamically calculates the stop loss based on the 15-day local swing low (buffered by 3%), capped at a tight maximum risk of **12%** to shield against large drawdowns.
@@ -105,7 +105,7 @@ Market regimes (`BULL`, `WEAK_BULL`, `CORRECTION`, `RANGE`) are used purely as *
 
 Research across the 2024–2026 Mainboard IPO universe confirmed that patience is required for breakouts, but dead money should be recycled efficiently:
 
-* **14-Day / 10-Session Velocity Speed Gate (v3.5.0 Industry Standard):** If held for **≥ 14 calendar days** OR **≥ 10 NSE trading sessions** (dynamically accounting for NSE holidays and weekends via `count_trading_days`) and current PnL is non-positive ($PnL \le 0.0\%$), the position is immediately closed with exit reason `"Time Stop - Dead Money (14-Day Velocity Gate, PnL {pnl}%, Peak +{max_runup}%)"`.
+* **14-Day / 10-Session Velocity Speed Gate (v3.5.0 Industry Standard):** If held for **≥ 14 calendar days** OR **≥ 10 NSE trading sessions** (dynamically accounting for NSE holidays and weekends via `count_trading_days`) and current PnL is non-positive (PnL <= 0.0%), the position is immediately closed with exit reason `"Time Stop - Dead Money (14-Day Velocity Gate, PnL {pnl}%, Peak +{max_runup}%)"`.
   * **Empirical Edge:** Quantitative study of 104 trades demonstrated that 0 out of 46 positions underwater after 10 sessions / 14 days ever yielded a profit; 100% drifted into full stop losses. Eliminates dead-money bleed without overfitting.
   * **Loophole Closed:** The previous `new_max_runup < 3.5%` condition was eliminated so that false-start trades with an early minor spike (e.g. +4%) that fail and roll over are not trapped until full stop-loss.
 * **IPO Discovery Breakouts (`grade == "LISTING_BREAKOUT"`):** If held for **≥ 20 trading days** and peak runup has never reached **≥ 4%**, it is closed at the market with exit reason `"Time Stop - IPO Dead Money"`.
@@ -120,12 +120,12 @@ To maximize asymmetric returns, AlphaPulse employs a **2-Stage Dynamic Trailing 
 
 * **Single-Writer Ownership:** All position exits and trailing stop adjustments are centrally and authoritatively executed by `stop_loss_update_scan()` in `streamlined_ipo_scanner.py`. Both `listing_day_breakout_scanner.py` and `streamlined_ipo_scanner.py` qualify and emit new trades into MongoDB (`positions`), ensuring zero race conditions.
 * **Stage 1: Capital Protection & Breakeven (`max_runup < 15.0%`):**
-  * Initial hard stop-loss is capped at $\le 8\%$ (Consolidation) or dynamically buffered $\le 12\%$ (Listing Day).
+  * Initial hard stop-loss is capped at <= 8% (Consolidation) or dynamically buffered <= 12% (Listing Day).
   * Trailing starts at **+3.0% PnL** for `LISTING_BREAKOUT` and **+4.0% PnL** for `CONSOLIDATION`.
   * Moves stop loss to **Breakeven (Entry Price)** once early runup reaches $+8.0\%$, eliminating downside capital risk.
   * All dead-money speed gates (14-day velocity gate, patience stops, volume exhaustion) remain strictly active.
 * **Stage 2: Super-Winner Expansion & 20% Peak Cushion (`max_runup >= 15.0%`):**
-  * **Super-Winner Immunity:** Once a stock achieves $\ge 15\%$ runup, it is classified as a confirmed **Winner Archetype** and becomes permanently exempt from time-based dead-money stops, preventing healthy base-building pullbacks from choking multi-month winners.
+  * **Super-Winner Immunity:** Once a stock achieves >= 15% runup, it is classified as a confirmed **Winner Archetype** and becomes permanently exempt from time-based dead-money stops, preventing healthy base-building pullbacks from choking multi-month winners.
   * **Asymmetric 20% Peak Cushion:** Trailing stop is widened to a dynamic 20% cushion below the highest peak price achieved during the trade:
     $$\text{Trailing Stop} = \max(\text{Entry Price} \times 1.05, \text{Peak Price} \times 0.80)$$
   * This allows explosive IPO runners (e.g. `OMNI`, `EMMVEE`, `BUILDPRO`) breathing room to absorb normal 12–18% consolidations while locking in massive compounding gains.
@@ -613,9 +613,9 @@ The repository includes a reusable, production-grade **Trade Forensics & Strateg
 * **Granular Setup DNA Extraction:** Pairs pre-breakout DNA (volume surge multiplier, 10-day base PRNG tightness %, upper wick rejection %, daily turnover in Cr, days since listing) directly with empirical trade outcomes (PnL %, max runup %, holding period, exit reasons).
 * **Automated Qualitative Archetype Tagging:** Every trade is dynamically tagged with its behavioral archetype (`WINNER_MULTI_WEEK_RUNNER`, `MOMENTUM_RUNNER`, `EARLY_EXIT_SCRATCH`, `LOOSE_BASE_CHURN`, `UPPER_WICK_SUPPLY_TRAP`, `RUNUP_REVERSAL_EXHAUSTION`, `PROLONGED_DEAD_MONEY_BLEED`).
 * **Listing Day Breakout Statistical Edge:** Dynamic Section 3 in system diagnostics (`diagnose_trade.py --system`) validates structural edges across clean cohort data:
-  * **Base Tightness (PRNG $\le 15\%$):** 75.0% Win Rate (Avg PnL +8.0%) vs 40.0% Win Rate on loose bases.
+  * **Base Tightness (PRNG <= 15%):** 75.0% Win Rate (Avg PnL +8.0%) vs 40.0% Win Rate on loose bases.
   * **Upper Wick Rejection ($< 35\%$):** 70.0% Win Rate (Avg PnL +11.2%) vs 33.3% Win Rate on long wicks (Avg PnL -5.1%).
-  * **Volume Surge Multiplier ($\ge 3.0x$):** Institutional ignition driving top multi-week runners (`MILKYMIST` +58.4%, `MVELECTRO` +31.2%, `SHUKRAPHAR` +22.2%).
+  * **Volume Surge Multiplier (>= 3.0x):** Institutional ignition driving top multi-week runners (`MILKYMIST` +58.4%, `MVELECTRO` +31.2%, `SHUKRAPHAR` +22.2%).
 
 ### 2. Available Forensic CLI Commands
 

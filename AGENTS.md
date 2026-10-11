@@ -10,7 +10,8 @@ This file defines the core engineering standards, domain knowledge, and operatio
 
 ### Core Engines & Scanners
 1. **Listing Day Breakout Engine (`listing_day_breakout_scanner.py`):**
-   - Targets IPOs from listing day up to 730 calendar days (2 years).
+   - Targets newly listed IPOs up to 60 calendar days post-listing (<= 60d), eliminating stale secondary-market lag.
+   - Enforces a mandatory listing-day volatility cushion (Listing Day Range >= 5.0%) to ensure institutional price discovery.
    - Validates initial breaks of Day-1 listing high or tight local bases.
    - Enforces 60-minute holding observation (`PENDING` state) to reject intraday wick traps.
    - Hard 12% risk stop-loss cap dynamically buffered by 3% below the 15-day swing low.
@@ -24,7 +25,7 @@ This file defines the core engineering standards, domain knowledge, and operatio
 4. **Trade Diagnostics & Strategy Evidence Engine (`diagnose_trade.py` & `core/strategy_evidence.py`):**
    - Self-diagnosing intelligence layer that evaluates trade DNA (volume surges, base PRNG %, upper wick exhaustion) against real trade outcomes to continuously uncover proven strengths and eliminate strategy leaks.
 5. **IPO High Shelf Breakout Engine (`SHELF_BREAKOUT` - Inculcated in Main Listing Logic):**
-   - Eliminates the historical coverage dead zone on Days 3–30 between the standard listing breakout (≤3.5% extension cap) and consolidation scanner (≥10-day history requirement).
+   - Eliminates the historical coverage dead zone on Days 3–30 (<= 30d post-listing) between the standard listing breakout (<= 3.5% extension cap) and consolidation scanner (>= 10-day history requirement).
    - Automatically detects 3–8 bar consolidation shelves formed above/near listing high (`PRNG ≤ 18%`).
    - Breakouts within ≤5% of shelf pivot qualify as `SHELF_BREAKOUT` with stops anchored at the shelf floor (12% hard cap) and Upper 50% Body Gate protection.
    - Reuses single-writer exit ownership, 2-stage trailing stop, and 14-day velocity speed gate. Backtested across 2024–2026 IPO universe: **62.8% win rate, +18.04% avg peak runup** (N=145).
@@ -149,6 +150,10 @@ python manage_db.py diagnose --symbols KUSUMGAR CMRGREEN --vs-winners
 9. **Backtest & Quant Integrity:**
    - Never alter trading rules or backtesting logic silently.
    - Backtest integrity and statistical rigor take precedence over code aesthetics.
+10. **Lifecycle Age Horizon & Volatility Cushion (v3.5.4 Standards):**
+    - Listing Breakouts and Tier B Base Breakouts: Capped at <= 60 calendar days post-listing (eliminates stale zombie IPO drag).
+    - High Shelf Breakouts (Wave 2): Days 3 to 30 post-listing (<= 30d, aligning with institutional anchor lockup).
+    - Listing Day Volatility Cushion: Listing day high-to-low range must be >= 5.0% to ensure institutional liquidity and market-maker participation.
 
 ---
 
@@ -161,3 +166,6 @@ Before delivering code or modifying the repository:
 4. **Validate Against Clean Cohort:** Test queries against `positions` and `strategy_evidence` using `2026-07-05` cutoff.
 5. **Never Destructively Overwrite DB Collections:** Always use upsert or archival tables.
 6. **Synchronized Versioning Rule:** If bumping system versions, update all 6 touchpoints atomically (master_audit.py, all 3 scanners, db.py, README.md badge) and verify with python master_audit.py --section 3 to guarantee zero analytics fragmentation.
+7. **Readable Formatting Standard (No LaTeX Math Syntax):**
+   - Never output LaTeX math syntax (e.g. $\le$, $\ge$, $\pm$, $\times$) in user responses, console logs, git commits, or documentation.
+   - Always print clean, standard ASCII symbols (<=, >=, +/-, x) or plain English text ("less than or equal to", "greater than or equal to") for immediate readability across all terminals, markdown previews, and chat interfaces.
