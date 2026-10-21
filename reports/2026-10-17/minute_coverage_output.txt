@@ -1,0 +1,74 @@
+manifest status counts by stage:
+status  error   ok
+stage             
+1           2  226
+2          16  620
+
+Coverage of daily sessions by minute data (symbols with daily candles):
+       symbols     rows  sessions  covered     full  vol_ratio_median  bad_vol_days  covered_pct  full_pct
+stage                                                                                                     
+1          226  3400814    9166.0   9165.0   9006.0          0.998469         173.0        100.0      98.3
+2          607  8415721   24386.0  24386.0  20852.0          0.999638        1127.0        100.0      85.5
+
+By listing year (all stages):
+      symbols  sessions  covered     full  bad_vol_days  vol_ratio_median  covered_pct  full_pct
+year                                                                                            
+2022       64    2704.0   2704.0   1813.0         219.0          0.994741        100.0      67.0
+2023      128    5331.0   5330.0   4009.0         574.0          0.974333        100.0      75.2
+2024      139    5734.0   5734.0   5229.0         227.0          0.995148        100.0      91.2
+2025      171    7033.0   7033.0   6964.0         124.0          0.999591        100.0      99.0
+2026      331   12750.0  12750.0  11843.0         156.0          1.000000        100.0      92.9
+
+Problem symbols (covered < 95% of daily sessions or > 2 days with volume ratio outside 0.9-1.1): 113
+    symbol  stage  year  daily_sessions  covered_sessions  vol_ratio_bad  vol_ratio_median
+MAXESTATES      1  2023            43.0              42.0            7.0          0.949822
+       RSL      1  2026            38.0              38.0            5.0          0.998760
+   AARTECH      1  2023            44.0              44.0            6.0          0.968979
+EMSLIMITED      1  2023            41.0              41.0            3.0          0.968595
+   PYRAMID      1  2023            41.0              41.0            4.0          0.961623
+     SAMHI      1  2023            41.0              41.0            3.0          0.970747
+     BAJEL      1  2023            42.0              42.0           10.0          0.982564
+     GSLSU      1  2023            38.0              38.0            4.0          0.991456
+      TREL      1  2023            40.0              40.0            5.0          0.950539
+   HMAAGRO      1  2023            43.0              43.0            4.0          0.969331
+       TRU      1  2023            42.0              42.0            5.0          0.959413
+     WEWIN      2  2022            42.0              42.0            4.0          0.994205
+KSHITIJPOL      2  2022            40.0              40.0            3.0          1.061918
+   GVPTECH      2  2022            41.0              41.0           24.0          0.795455
+ TIPSFILMS      2  2022            41.0              41.0            6.0          0.982795
+       DCI      2  2022            41.0              41.0           15.0          0.969153
+ PPLPHARMA      2  2022            41.0              41.0            3.0          0.991953
+  BOHRAIND      2  2022            42.0              42.0           12.0          0.980045
+      HPIL      2  2022            44.0              44.0            3.0          0.990533
+  SUKHJITS      2  2022            44.0              44.0           44.0          1.991564
+ RUSTOMJEE      2  2022            43.0              43.0            3.0          0.994629
+     VINNY      2  2022            44.0              44.0           42.0          1.383751
+      DJML      2  2022            44.0              44.0            3.0          0.994826
+ HYBRIDFIN      2  2022            43.0              43.0           18.0          0.930909
+   AERONEU      2  2023            41.0              41.0            4.0          0.995849
+
+Symbols not fetched: 18
+ stage     symbol status        http                                                                                                                                                                                      error
+     1 BANSALWIRE  error 400|400|400 [{'errorCode': 'UDAPI100011', 'message': 'Invalid Instrument key', 'propertyPath': None, 'invalidValue': None, 'error_code': 'UDAPI100011', 'property_path': None, 'invalid_value': None}]
+     1       BLSE  error 400|400|400 [{'errorCode': 'UDAPI100011', 'message': 'Invalid Instrument key', 'propertyPath': None, 'invalidValue': None, 'error_code': 'UDAPI100011', 'property_path': None, 'invalid_value': None}]
+     2    NARMADA  error 400|400|400 [{'errorCode': 'UDAPI100011', 'message': 'Invalid Instrument key', 'propertyPath': None, 'invalidValue': None, 'error_code': 'UDAPI100011', 'property_path': None, 'invalid_value': None}]
+     2       POCL  error 400|400|400 [{'errorCode': 'UDAPI100011', 'message': 'Invalid Instrument key', 'propertyPath': None, 'invalidValue': None, 'error_code': 'UDAPI100011', 'property_path': None, 'invalid_value': None}]
+     2    KIRLPNU  error 400|400|400 [{'errorCode': 'UDAPI100011', 'message': 'Invalid Instrument key', 'propertyPath': None, 'invalidValue': None, 'error_code': 'UDAPI100011', 'property_path': None, 'invalid_value': None}]
+     2       JLHL  error 400|400|400 [{'errorCode': 'UDAPI100011', 'message': 'Invalid Instrument key', 'propertyPath': None, 'invalidValue': None, 'error_code': 'UDAPI100011', 'property_path': None, 'invalid_value': None}]
+     2      DBEIL  error 400|400|400 [{'errorCode': 'UDAPI100011', 'message': 'Invalid Instrument key', 'propertyPath': None, 'invalidValue': None, 'error_code': 'UDAPI100011', 'property_path': None, 'invalid_value': None}]
+     2    ABINFRA  error 400|400|400 [{'errorCode': 'UDAPI100011', 'message': 'Invalid Instrument key', 'propertyPath': None, 'invalidValue': None, 'error_code': 'UDAPI100011', 'property_path': None, 'invalid_value': None}]
+     2       KMEW  error 400|400|400 [{'errorCode': 'UDAPI100011', 'message': 'Invalid Instrument key', 'propertyPath': None, 'invalidValue': None, 'error_code': 'UDAPI100011', 'property_path': None, 'invalid_value': None}]
+     2  PASHUPATI  error 400|400|400 [{'errorCode': 'UDAPI100011', 'message': 'Invalid Instrument key', 'propertyPath': None, 'invalidValue': None, 'error_code': 'UDAPI100011', 'property_path': None, 'invalid_value': None}]
+     2       AHCL  error 400|400|400 [{'errorCode': 'UDAPI100011', 'message': 'Invalid Instrument key', 'propertyPath': None, 'invalidValue': None, 'error_code': 'UDAPI100011', 'property_path': None, 'invalid_value': None}]
+     2  RNBDENIMS  error 400|400|400 [{'errorCode': 'UDAPI100011', 'message': 'Invalid Instrument key', 'propertyPath': None, 'invalidValue': None, 'error_code': 'UDAPI100011', 'property_path': None, 'invalid_value': None}]
+     2        MWL  error 400|400|400 [{'errorCode': 'UDAPI100011', 'message': 'Invalid Instrument key', 'propertyPath': None, 'invalidValue': None, 'error_code': 'UDAPI100011', 'property_path': None, 'invalid_value': None}]
+     2   LEMERITE  error 400|400|400 [{'errorCode': 'UDAPI100011', 'message': 'Invalid Instrument key', 'propertyPath': None, 'invalidValue': None, 'error_code': 'UDAPI100011', 'property_path': None, 'invalid_value': None}]
+     2   BUILDPRO  error 400|400|400 [{'errorCode': 'UDAPI100011', 'message': 'Invalid Instrument key', 'propertyPath': None, 'invalidValue': None, 'error_code': 'UDAPI100011', 'property_path': None, 'invalid_value': None}]
+     2        TCC  error 400|400|400 [{'errorCode': 'UDAPI100011', 'message': 'Invalid Instrument key', 'propertyPath': None, 'invalidValue': None, 'error_code': 'UDAPI100011', 'property_path': None, 'invalid_value': None}]
+     2   TAALTECH  error 400|400|400 [{'errorCode': 'UDAPI100011', 'message': 'Invalid Instrument key', 'propertyPath': None, 'invalidValue': None, 'error_code': 'UDAPI100011', 'property_path': None, 'invalid_value': None}]
+     2   CORDELIA  error 400|400|400 [{'errorCode': 'UDAPI100011', 'message': 'Invalid Instrument key', 'propertyPath': None, 'invalidValue': None, 'error_code': 'UDAPI100011', 'property_path': None, 'invalid_value': None}]
+
+Symbols fetched OK but with zero rows: 0 []
+
+Policy-P trades with minute bars on the entry day: 226 of 228
+missing: [('BANSALWIRE', '2024-08-01', 'no file'), ('BLSE', '2024-02-16', 'no file')]

@@ -1,0 +1,66 @@
+research_anchor_unlock_audit.py  (POST-HOC robustness audit, not part of the pre-registered bar)
+
+A. AGE-PROFILE NULL: D(K) = event window centred at listing+K vs the stock's own windows at K+14, K+22, K+30, K+38 (mean abnormal return difference, pp)
+      K    N       D  CI90 low CI90 high   note
+     14  283   -0.44     -1.82     +0.94   
+     16  451   -0.38     -1.38     +0.60   
+     18  465   -1.20     -2.15     -0.20   <-- nominal unlock window
+     20  467   -1.66     -2.59     -0.76   <-- nominal unlock window
+     22  466   -2.08     -2.97     -1.20   <-- nominal unlock window
+     24  466   -2.05     -2.93     -1.11   <-- nominal unlock window
+     26  476   -2.36     -3.27     -1.49   <-- nominal unlock window
+     28  475   -1.74     -2.62     -0.89   <-- nominal unlock window (exact nominal date)
+     30  472   -0.97     -1.93     -0.04   <-- nominal unlock window
+     32  472   -0.47     -1.43     +0.40   <-- nominal unlock window
+     34  467   -0.09     -0.99     +0.83   <-- nominal unlock window
+     36  463   +0.60     -0.32     +1.57   <-- nominal unlock window
+     38  460   +0.92     +0.00     +1.86   <-- nominal unlock window
+     40  459   +1.07     +0.12     +2.06   
+     42  458   +1.18     +0.21     +2.13   
+     44  452   +1.60     +0.67     +2.56   
+     46  458   +1.58     +0.70     +2.54   
+     48  456   +1.25     +0.29     +2.21   
+     50  452   +1.24     +0.24     +2.19   
+     52  453   +1.23     +0.25     +2.16   
+     54  448   +1.31     +0.39     +2.13   
+     62  431   +0.99     +0.23     +1.76   
+     70  431   +0.68     -0.27     +1.64   
+     72  430   +0.52     -0.41     +1.51   
+     74  429   +0.13     -0.74     +1.12   
+     76  428   +0.43     -0.57     +1.41   
+     78  438   -0.58     -1.46     +0.32   <-- nominal unlock window
+     80  439   -1.04     -1.96     -0.18   <-- nominal unlock window
+     82  441   -1.46     -2.30     -0.57   <-- nominal unlock window
+     84  439   -1.57     -2.43     -0.65   <-- nominal unlock window
+     86  452   -1.29     -2.20     -0.43   <-- nominal unlock window
+     88  446   -1.26     -2.08     -0.35   <-- nominal unlock window (exact nominal date)
+     90  445   -1.26     -2.10     -0.40   <-- nominal unlock window
+     92  447   -0.53     -1.41     +0.33   <-- nominal unlock window
+     94  441   -0.10     -1.00     +0.82   <-- nominal unlock window
+     96  441   +0.13     -0.70     +1.00   <-- nominal unlock window
+     98  439   -0.17     -1.11     +0.74   <-- nominal unlock window
+    100  439   +0.20     -0.71     +1.19   
+    102  440   -0.00     -0.92     +0.84   
+    104  438   +0.07     -0.85     +0.94   
+    106  437   -0.58     -1.49     +0.40   
+    108  433   +0.21     -0.72     +1.14   
+    110  431   +0.14     -0.81     +1.14   
+    112  434   +0.51     -0.37     +1.44   
+    114  436   +0.11     -0.72     +0.95   
+    116  435   +0.34     -0.48     +1.17   
+    118  436   +0.14     -0.68     +1.00   
+    120  437   +0.70     -0.19     +1.59   
+    122  436   +0.59     -0.31     +1.48   
+    124  433   +0.65     -0.22     +1.50   
+    126  432   +0.64     -0.22     +1.58   
+    128  432   +0.75     -0.10     +1.65   
+    130  432   +0.32     -0.57     +1.21   
+   D(28) = -1.74pp; share of 31 non-unlock ages with D at least that negative: 0%   (non-unlock mean +0.55, min -0.58, max +1.60)
+   D(88) = -1.26pp; share of 31 non-unlock ages with D at least that negative: 0%   (non-unlock mean +0.55, min -0.58, max +1.60)
+
+B. TWO-SIDED PLACEBO for U90 (placebo windows BEFORE the event: centres 50, 58, 66, 74)
+   N=447  D = -2.77pp  CI90 [-3.55, -1.93]   by listing year: 2022: -0.94 (N=34)  2023: -2.69 (N=89)  2024: -3.50 (N=115)  2025: -2.72 (N=143)  2026: -2.67 (N=66)
+
+C. ROBUSTNESS of the pre-registered D (from reports/2026-10-21/anchor_unlock_U30.csv and _U90.csv)
+   U30: N=475 mean -1.74 median -2.16 5%-trimmed mean -1.89 mean without the 5 most negative -1.33 without the 5 most positive -2.19
+   U90: N=446 mean -1.26 median -2.06 5%-trimmed mean -1.76 mean without the 5 most negative -0.88 without the 5 most positive -1.87

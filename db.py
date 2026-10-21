@@ -37,7 +37,7 @@ db_metrics = {
 }
 
 # Versioning and Safeguards
-SCANNER_VERSION = "3.5.0"  # v3.5.0: Upper 50% Candle Body Gate, 14-Day Velocity Gate, Anti-Chasing Extension Guard
+SCANNER_VERSION = "3.6.0"  # v3.6.0: Hardened execution release (10 x 10% slots, close-based stop alerts, atomic commit lock, shelf/hourly PAPER_ONLY); v3.5.0 entry rules unchanged
 MAX_DAILY_REJECTIONS = 500
 _rejection_guard_warned = False
 

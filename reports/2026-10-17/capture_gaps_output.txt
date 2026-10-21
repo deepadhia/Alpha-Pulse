@@ -1,0 +1,25 @@
+episodes (+20% within 10 sessions): 396; held by policy P: 138 (34.8%)
+
+By close vs listing-high on the episode day (held = policy P was in a position):
+                           episodes  held  median_gain  held_pct
+bucket                                                          
+<-20% below LH                   89     0    23.750000       0.0
+-20..-10                         81    32    23.201682      39.5
+-10..-5                          61    38    24.635689      62.3
+-5..0 (just under LH)            40    27    26.231648      67.5
+0..+2.5 (at trigger zone)        19     9    23.830257      47.4
++2.5..+8 (above fill cap)        27     9    23.303835      33.3
+>+8 (extended)                   79    23    25.520732      29.1
+
+Missed episodes: price < Rs 25: 34 | inside 42-day cooldown after a policy-P exit: 39 | age 5-9: 62 | age 10-30: 69 | age 31-60: 127
+Missed episodes by year: {2022: (15, 20), 2023: (53, 81), 2024: (62, 96), 2025: (61, 87), 2026: (67, 112)}
+
+====================================================================================================
+Candidate widenings (engine unchanged, causal resting model, slip 0.3%, cap 2.5%)
+====================================================================================================
+V0 policy P                                                N=228 win=42.5% net=+5.22% CI90=[ +2.5, +8.1] med=-1.46% PF=2.43 exTop3=+3.36% open=19
+S shelf breakout (paper-only today)                        N=213 win=34.3% net=+3.18% CI90=[ +0.6, +6.0] med=-2.33% PF=1.77 exTop3=+1.27% open=8
+capture of +20% episodes: V0 138  shelf alone 109  V0+shelf 169  of 396
+  shelf trades by year (n, mean, PF): {2022: (9, -1.5, 0.53), 2023: (35, 13.0, 5.33), 2024: (44, 2.8, 1.68), 2025: (74, -1.9, 0.58), 2026: (51, 5.0, 2.12)}
+  V0: PF incl open 2.43 | closed 1.71 | ex-top3 1.91
+  shelf: PF incl open 1.77 | closed 1.59 | ex-top3 1.30

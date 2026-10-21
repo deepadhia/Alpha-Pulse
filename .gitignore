@@ -269,3 +269,20 @@ scratch_ohlc_cache.pkl
 
 # Local scratch directory (ad-hoc inspection scripts)
 scratch/
+
+# minute-bar research data (local only)
+data_minute/
+
+# logged-only shadow model (regenerate with train_shadow_model.py)
+models/
+
+# scraped IPO metadata (local research data)
+data_ipo_meta/
+
+# Regenerable research trade tables (re-run the script named in each reports/<date>/README.md).
+# CSVs that other scripts read as INPUT (gate_replay_V*.csv, event_model_events.csv, ipo_meta_matched.csv,
+# data_base_trades_causal_resting_eod.csv) stay tracked so those studies reproduce from a fresh clone.
+reports/2026-10-21/*.csv
+reports/2026-10-12/data_*.csv
+reports/2026-10-14/data_base_trades.csv
+reports/2026-10-14/data_base_trades_causal_resting.csv

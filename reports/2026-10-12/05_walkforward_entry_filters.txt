@@ -1,0 +1,68 @@
+events used: 752  (LISTING_BREAKOUT, turnover20 >= 0.75 Cr)   by year: {2022: 53, 2023: 160, 2024: 174, 2025: 201, 2026: 164}
+====================================================================================================
+PART A - walk-forward single-feature rules (threshold chosen on earlier years only)
+====================================================================================================
+
+low volatility (atr10_pct <= t)
+   test 2024: t=   4.655  kept   54/ 174  kept mean  +0.81  dropped  -1.48  all  -0.77
+   test 2025: t=   4.600  kept   81/ 201  kept mean  -1.66  dropped  -4.21  all  -3.18
+   test 2026: t=   4.295  kept   37/ 164  kept mean  -4.47  dropped  +1.03  all  -0.21
+
+narrow day range (day_range_pct <= t)
+   test 2024: t=   4.899  kept   40/ 174  kept mean  -1.50  dropped  -0.55  all  -0.77
+   test 2025: t=   6.001  kept   98/ 201  kept mean  -1.94  dropped  -4.36  all  -3.18
+   test 2026: t=   5.869  kept   67/ 164  kept mean  -0.25  dropped  -0.18  all  -0.21
+
+low IPO supply (mkt_supply30 <= t)
+   test 2024: t=  10.000  kept   48/ 174  kept mean  +5.67  dropped  -3.23  all  -0.77
+   test 2025: t=  10.000  kept   21/ 201  kept mean  -4.13  dropped  -3.07  all  -3.18
+   test 2026: t=  12.000  kept   47/ 164  kept mean  -0.16  dropped  -0.23  all  -0.21
+
+cool cohort momentum (mkt_med_ret20_5d <= t)
+   test 2024: t=   2.256  kept  118/ 174  kept mean  -0.76  dropped  -0.80  all  -0.77
+   test 2025: t=   3.723  kept  171/ 201  kept mean  -2.71  dropped  -5.88  all  -3.18
+   test 2026: t=   3.703  kept  116/ 164  kept mean  -0.02  dropped  -0.67  all  -0.21
+
+higher liquidity (turnover20_cr >= t)
+   test 2024: t=  24.211  kept  111/ 174  kept mean  -1.81  dropped  +1.06  all  -0.77
+   test 2025: t=   8.083  kept  173/ 201  kept mean  -3.36  dropped  -2.07  all  -3.18
+   test 2026: t=  11.340  kept   94/ 164  kept mean  -0.07  dropped  -0.39  all  -0.21
+
+tight extension (ext_pct <= t)
+   test 2024: t=   5.270  kept  142/ 174  kept mean  -0.49  dropped  -2.00  all  -0.77
+   test 2025: t=   5.203  kept  149/ 201  kept mean  -3.41  dropped  -2.54  all  -3.18
+   test 2026: t=   2.845  kept  102/ 164  kept mean  -0.84  dropped  +0.83  all  -0.21
+
+volume spike (vol_ratio >= t)
+   test 2024: t=   2.054  kept   68/ 174  kept mean  +1.30  dropped  -2.10  all  -0.77
+   test 2025: t=   2.161  kept   70/ 201  kept mean  -4.52  dropped  -2.47  all  -3.18
+   test 2026: t=   2.158  kept   57/ 164  kept mean  -0.21  dropped  -0.21  all  -0.21
+
+strong close (close_loc >= t)
+   test 2024: t=   0.601  kept   59/ 174  kept mean  -2.28  dropped  +0.00  all  -0.77
+   test 2025: t=   0.298  kept  147/ 201  kept mean  -3.13  dropped  -3.33  all  -3.18
+   test 2026: t=   0.324  kept  105/ 164  kept mean  +0.60  dropped  -1.66  all  -0.21
+
+Pooled out-of-sample summary (kept = events the rule would have traded):
+                                        rule  oos_n  kept  kept_mean  kept_PF  rest_mean  all_mean   diff     lo    hi     p yrs_better
+          low IPO supply (mkt_supply30 <= t)    539   116      1.534    1.421     -2.332      -1.5  3.866 -0.106 9.128 0.030        2/3
+cool cohort momentum (mkt_med_ret20_5d <= t)    539   405     -1.371    0.669     -1.890      -1.5  0.519 -4.500 4.452 0.378        3/3
+               volume spike (vol_ratio >= t)    539   195     -1.233    0.729     -1.651      -1.5  0.418 -1.601 2.730 0.350        1/3
+       narrow day range (day_range_pct <= t)    539   205     -1.303    0.671     -1.621      -1.5  0.318 -1.785 2.467 0.382        1/3
+             low volatility (atr10_pct <= t)    539   172     -1.491    0.643     -1.504      -1.5  0.013 -2.482 2.779 0.498        2/3
+               strong close (close_loc >= t)    539   311     -1.706    0.613     -1.219      -1.5 -0.487 -3.454 2.235 0.617        2/3
+              tight extension (ext_pct <= t)    539   393     -1.688    0.641     -0.993      -1.5 -0.695 -3.559 1.841 0.685        1/3
+       higher liquidity (turnover20_cr >= t)    539   378     -2.090    0.544     -0.115      -1.5 -1.975 -6.258 1.555 0.835        1/3
+
+====================================================================================================
+PART B - walk-forward ridge model (features standardised on the training years)
+====================================================================================================
+test 2024: n= 174  OOS rank-IC=+0.115  top-half mean  +0.58  bottom-half  -2.12  all  -0.77
+     coefficients (std units): atr10_pct=-1.05, mkt_med_ret20_5d=-0.61, ret10=-0.33, mkt_supply30=-0.26, mkt_frac_above_ld_5d=-0.11, close_loc=-0.05, ext_pct=-0.03, vol_ratio=+0.18, log_turnover20=+0.63, age=+0.65
+test 2025: n= 201  OOS rank-IC=-0.044  top-half mean  -3.66  bottom-half  -2.70  all  -3.18
+     coefficients (std units): atr10_pct=-1.04, mkt_supply30=-0.77, mkt_med_ret20_5d=-0.58, ext_pct=+0.01, ret10=+0.09, close_loc=+0.11, mkt_frac_above_ld_5d=+0.17, vol_ratio=+0.32, log_turnover20=+0.46, age=+0.72
+test 2026: n= 164  OOS rank-IC=+0.167  top-half mean  -0.74  bottom-half  +0.32  all  -0.21
+     coefficients (std units): atr10_pct=-0.80, mkt_med_ret20_5d=-0.50, mkt_supply30=-0.29, close_loc=-0.13, ret10=+0.02, ext_pct=+0.07, log_turnover20=+0.10, vol_ratio=+0.22, age=+0.30, mkt_frac_above_ld_5d=+0.48
+
+pooled OOS: top-half mean -1.41  PF 0.66  bottom-half -1.59  diff +0.19  CI95 [-2.23,+2.58]  P(diff<=0)=0.425
+pooled OOS rank-IC: +0.054

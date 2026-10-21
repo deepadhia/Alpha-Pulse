@@ -1,0 +1,70 @@
+POLICY P (cap 2.5%): N=228 net +5.22%  PF incl-open 2.43 | closed 1.71 | ex-top3 1.91  outliers>=25%: 23  >=75%: 7
+   +50% IPOs with a position: 46/84   +100%: 12/26
+
+======================================================================================================================
+SLIP on every fill 0.3% (gap-up fills at the open plus slip)
+======================================================================================================================
+
+cap 5%   whole book: N=239 net +4.72%  PF incl-open 2.29 | closed 1.71 | ex-top3 1.79  outliers>=25%: 23  >=75%: 6
+         +50% IPOs with a position 51/84, +100% 13/26
+         ADDED trades: N=22 mean net -0.44% (CI -4.3..+4.1) win 27% median -3.0% mean without best -2.50% | PF 0.89 | outliers>=25%: 1 | negative years (5+ trades): 3
+         added by year (n, mean): {2023: (2, 20.7), 2024: (9, -1.3), 2025: (5, -4.9), 2026: (6, -2.4)}
+         best added: [('GENSOL', '2023-07-26', 43.0), ('SAGILITY', '2024-11-27', 24.0), ('KRISHNADEF', '2026-01-06', 6.0), ('TARACHAND', '2024-05-03', 3.0), ('AIIL', '2024-06-07', 3.0)] | worst: [('SAURASHCEM', -13.0), ('COMSYN', -12.0), ('ELLEN', -10.0)]
+
+cap 8%   whole book: N=245 net +3.86%  PF incl-open 2.00 | closed 1.47 | ex-top3 1.54  outliers>=25%: 22  >=75%: 5
+         +50% IPOs with a position 52/84, +100% 13/26
+         ADDED trades: N=36 mean net -2.51% (CI -5.0..+0.5) win 22% median -3.7% mean without best -3.80% | PF 0.49 | outliers>=25%: 1 | negative years (5+ trades): 3
+         added by year (n, mean): {2023: (7, 2.7), 2024: (11, -2.2), 2025: (9, -5.8), 2026: (9, -3.6)}
+         best added: [('GENSOL', '2023-07-26', 43.0), ('SAGILITY', '2024-11-27', 24.0), ('KRISHNADEF', '2026-01-06', 6.0), ('LANDMARK', '2023-01-04', 4.0), ('TARACHAND', '2024-05-03', 3.0)] | worst: [('SOLEX', -14.0), ('HTEL', -13.0), ('SAURASHCEM', -13.0)]
+
+cap 12%  whole book: N=252 net +3.61%  PF incl-open 1.92 | closed 1.42 | ex-top3 1.48  outliers>=25%: 22  >=75%: 5
+         +50% IPOs with a position 53/84, +100% 13/26
+         ADDED trades: N=45 mean net -2.83% (CI -5.1..-0.0) win 27% median -4.6% mean without best -3.87% | PF 0.45 | outliers>=25%: 1 | negative years (5+ trades): 4
+         added by year (n, mean): {2023: (11, -0.4), 2024: (12, -0.8), 2025: (12, -5.6), 2026: (10, -4.6)}
+         best added: [('GENSOL', '2023-07-26', 43.0), ('SAGILITY', '2024-11-27', 24.0), ('EIEL', '2024-12-04', 15.0), ('KRISHNADEF', '2026-01-06', 6.0), ('CPEDU', '2025-09-23', 4.0)] | worst: [('LAXMIINDIA', -16.0), ('SOLEX', -14.0), ('SUNSHINE', -14.0)]
+
+cap 20%  whole book: N=270 net +3.87%  PF incl-open 1.95 | closed 1.41 | ex-top3 1.55  outliers>=25%: 27  >=75%: 6
+         +50% IPOs with a position 58/84, +100% 16/26
+         ADDED trades: N=64 mean net +0.08% (CI -3.2..+3.9) win 33% median -3.9% mean without best -1.11% | PF 1.02 | outliers>=25%: 6 | negative years (5+ trades): 4
+         added by year (n, mean): {2022: (5, -1.4), 2023: (14, -0.2), 2024: (14, -2.0), 2025: (16, -4.5), 2026: (15, 7.6)}
+         best added: [('XTRANET', '2026-08-13', 75.0), ('KPL', '2026-05-20', 56.0), ('MILKYMIST', '2026-08-28', 43.0), ('GENSOL', '2023-07-26', 43.0), ('PLAZACABLE', '2023-10-17', 30.0)] | worst: [('DYCL', -16.0), ('LAXMIINDIA', -16.0), ('CAPILLARY', -15.0)]
+
+no cap   whole book: N=286 net +4.11%  PF incl-open 1.99 | closed 1.49 | ex-top3 1.63  outliers>=25%: 30  >=75%: 7
+         +50% IPOs with a position 66/84, +100% 20/26
+         ADDED trades: N=81 mean net +1.57% (CI -2.1..+5.4) win 32% median -3.7% mean without best +0.26% | PF 1.29 | outliers>=25%: 9 | negative years (5+ trades): 3
+         added by year (n, mean): {2022: (5, -1.4), 2023: (19, 8.3), 2024: (19, -1.9), 2025: (17, -4.8), 2026: (21, 4.5)}
+         best added: [('IREDA', '2023-12-11', 107.0), ('XTRANET', '2026-08-13', 75.0), ('KPL', '2026-05-20', 56.0), ('JSWINFRA', '2023-11-07', 44.0), ('MILKYMIST', '2026-08-28', 43.0)] | worst: [('DYCL', -16.0), ('LAXMIINDIA', -16.0), ('CAPILLARY', -15.0)]
+
+======================================================================================================================
+SLIP on every fill 1.0% (gap-up fills at the open plus slip)
+======================================================================================================================
+
+cap 5%   whole book: N=238 net +4.01%  PF incl-open 1.98 | closed 1.48 | ex-top3 1.54  outliers>=25%: 23  >=75%: 6
+         +50% IPOs with a position 51/84, +100% 13/26
+         ADDED trades: N=22 mean net -1.21% (CI -5.0..+3.3) win 27% median -4.0% mean without best -3.26% | PF 0.74 | outliers>=25%: 1 | negative years (5+ trades): 3
+         added by year (n, mean): {2023: (2, 19.8), 2024: (8, -1.8), 2025: (6, -5.5), 2026: (6, -3.1)}
+         best added: [('GENSOL', '2023-07-26', 42.0), ('SAGILITY', '2024-11-27', 23.0), ('KRISHNADEF', '2026-01-06', 5.0), ('TARACHAND', '2024-05-03', 2.0), ('AIIL', '2024-06-07', 2.0)] | worst: [('COMSYN', -13.0), ('SAURASHCEM', -12.0), ('ELLEN', -11.0)]
+
+cap 8%   whole book: N=244 net +3.14%  PF incl-open 1.74 | closed 1.27 | ex-top3 1.32  outliers>=25%: 22  >=75%: 5
+         +50% IPOs with a position 52/84, +100% 13/26
+         ADDED trades: N=36 mean net -3.21% (CI -5.7..-0.3) win 19% median -4.8% mean without best -4.49% | PF 0.41 | outliers>=25%: 1 | negative years (5+ trades): 3
+         added by year (n, mean): {2023: (7, 2.1), 2024: (10, -2.8), 2025: (10, -6.6), 2026: (9, -4.0)}
+         best added: [('GENSOL', '2023-07-26', 42.0), ('SAGILITY', '2024-11-27', 23.0), ('KRISHNADEF', '2026-01-06', 5.0), ('LANDMARK', '2023-01-04', 4.0), ('TARACHAND', '2024-05-03', 2.0)] | worst: [('SOLEX', -15.0), ('URBANCO', -13.0), ('COMSYN', -13.0)]
+
+cap 12%  whole book: N=250 net +2.91%  PF incl-open 1.67 | closed 1.23 | ex-top3 1.27  outliers>=25%: 22  >=75%: 5
+         +50% IPOs with a position 53/84, +100% 13/26
+         ADDED trades: N=44 mean net -3.53% (CI -5.9..-0.9) win 20% median -5.2% mean without best -4.58% | PF 0.38 | outliers>=25%: 1 | negative years (5+ trades): 4
+         added by year (n, mean): {2023: (11, -1.0), 2024: (11, -1.3), 2025: (12, -6.6), 2026: (10, -5.1)}
+         best added: [('GENSOL', '2023-07-26', 42.0), ('SAGILITY', '2024-11-27', 23.0), ('EIEL', '2024-12-04', 14.0), ('KRISHNADEF', '2026-01-06', 5.0), ('LANDMARK', '2023-01-04', 4.0)] | worst: [('LAXMIINDIA', -16.0), ('SOLEX', -15.0), ('SUNSHINE', -15.0)]
+
+cap 20%  whole book: N=269 net +3.19%  PF incl-open 1.72 | closed 1.24 | ex-top3 1.36  outliers>=25%: 27  >=75%: 5
+         +50% IPOs with a position 58/84, +100% 16/26
+         ADDED trades: N=65 mean net -0.46% (CI -3.7..+3.3) win 28% median -4.4% mean without best -1.62% | PF 0.92 | outliers>=25%: 6 | negative years (5+ trades): 4
+         added by year (n, mean): {2022: (5, -2.3), 2023: (14, -0.3), 2024: (15, -2.6), 2025: (16, -5.3), 2026: (15, 7.3)}
+         best added: [('XTRANET', '2026-08-13', 74.0), ('KPL', '2026-05-20', 55.0), ('MILKYMIST', '2026-08-28', 42.0), ('GENSOL', '2023-07-26', 42.0), ('PLAZACABLE', '2023-10-17', 29.0)] | worst: [('ORIENTTECH', -17.0), ('DYCL', -16.0), ('LAXMIINDIA', -16.0)]
+
+no cap   whole book: N=285 net +3.29%  PF incl-open 1.73 | closed 1.28 | ex-top3 1.40  outliers>=25%: 29  >=75%: 6
+         +50% IPOs with a position 66/84, +100% 20/26
+         ADDED trades: N=82 mean net +0.49% (CI -3.0..+4.2) win 29% median -4.4% mean without best -0.80% | PF 1.09 | outliers>=25%: 8 | negative years (5+ trades): 3
+         added by year (n, mean): {2022: (5, -2.3), 2023: (19, 5.5), 2024: (20, -2.4), 2025: (17, -5.3), 2026: (21, 4.0)}
+         best added: [('IREDA', '2023-12-11', 105.0), ('XTRANET', '2026-08-13', 74.0), ('KPL', '2026-05-20', 55.0), ('MILKYMIST', '2026-08-28', 42.0), ('GENSOL', '2023-07-26', 42.0)] | worst: [('ORIENTTECH', -17.0), ('DYCL', -16.0), ('LAXMIINDIA', -16.0)]

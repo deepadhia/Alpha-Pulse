@@ -1,0 +1,21 @@
+trades 228  GOOD 54  BAD 86  baseline mean net +5.22%  PF incl open 2.43
+     rule  cut  good_cut  bad_cut  saved_on_cuts  gain_pp  ci_lo  ci_hi  gain_ex_top  worse_years  pf_incl_open  pf_closed  pf_ex_top3
+R(2d,-4%)   58         4       46          -3.38    -0.86  -2.29   0.22        -0.17            3          2.26       1.51        1.73
+R(2d,-6%)   34         1       28           0.07     0.01  -0.22   0.24         0.07            2          2.44       1.73        1.92
+R(2d,-8%)   18         0       16           0.83     0.07  -0.10   0.22         0.12            1          2.48       1.76        1.95
+R(3d,-4%)   68         4       53          -2.64    -0.79  -2.21   0.29        -0.09            2          2.31       1.55        1.77
+R(3d,-6%)   41         1       35           0.33     0.06  -0.18   0.30         0.12            2          2.48       1.75        1.94
+R(3d,-8%)   24         0       20           0.54     0.06  -0.12   0.22         0.11            1          2.47       1.76        1.94
+R(5d,-4%)   85         5       66          -2.35    -0.88  -2.31   0.23        -0.18            2          2.28       1.52        1.74
+R(5d,-6%)   56         1       49           0.48     0.12  -0.16   0.40         0.18            2          2.53       1.82        1.98
+R(5d,-8%)   32         0       27           0.40     0.06  -0.16   0.28         0.12            2          2.48       1.79        1.94
+
+Variants passing the adoption bar: NONE
+
+Best by mean gain: R(5d,-6%)  by year (paired gain pp): {2022: -0.07, 2023: 0.32, 2024: 0.1, 2025: 0.46, 2026: -0.29}
+GOOD trades it would have cut: [('FABTECH', '2025-10-13', 2.0)]
+
+Why: path of GOOD vs BAD trades in the first 5 sessions (share whose close was ever <= -x% of entry):
+  close <= -4%: {'GOOD': 9.3, 'BAD': 76.7, 'ALL': 37.3}
+  close <= -6%: {'GOOD': 1.9, 'BAD': 57.0, 'ALL': 24.6}
+  close <= -8%: {'GOOD': 0.0, 'BAD': 31.4, 'ALL': 14.0}

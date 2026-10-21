@@ -47,9 +47,10 @@ _scanner_file = os.path.join(_cur_dir, "streamlined_ipo_scanner.py")
 spec = importlib.util.spec_from_file_location("scanner", _scanner_file)
 scanner_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(scanner_module)
+from core.portfolio_caps import DEFAULT_MAX_ACTIVE_POSITIONS, DEFAULT_HARD_ACTIVE_POSITIONS
 
 # Import version and logging utilities from main scanner
-SCANNER_VERSION = "3.5.0"  # v3.5.0: Upper 50% Candle Body Gate, 14-Day Velocity Gate, Anti-Chasing Extension Guard
+SCANNER_VERSION = "3.6.0"  # v3.6.0: Hardened execution release (10 x 10% slots, close-based stop alerts, atomic commit lock, shelf/hourly PAPER_ONLY); v3.5.0 entry rules unchanged
 write_daily_log = getattr(scanner_module, 'write_daily_log', lambda *a, **k: None)
 
 fetch_data = scanner_module.fetch_data
@@ -129,6 +130,7 @@ LISTING_SHELF_MIN_AGE_DAYS = _env_int("LISTING_SHELF_MIN_AGE_DAYS", 3)
 LISTING_SHELF_MAX_PRNG = _env_float("LISTING_SHELF_MAX_PRNG", 18.0)
 LISTING_SHELF_MAX_ENTRY_ABOVE_PIVOT_PCT = _env_float("LISTING_SHELF_MAX_ENTRY_ABOVE_PIVOT_PCT", 5.0)
 LISTING_SHELF_MIN_TURNOVER_CR = _env_float("LISTING_SHELF_MIN_TURNOVER_CR", 10.0)
+LISTING_SHELF_LIVE_CAPITAL_ENABLED = _env_bool("LISTING_SHELF_LIVE_CAPITAL_ENABLED", False)
 ALERT_ON_PAPER_ONLY = _env_bool("ALERT_ON_PAPER_ONLY", False)
 LISTING_CONFIRMATION_MAX_MINUTES = _env_int("LISTING_CONFIRMATION_MAX_MINUTES", 120)
 LISTING_PENDING_CUTOFF_HOUR = _env_int("LISTING_PENDING_CUTOFF_HOUR", 14)
@@ -2138,6 +2140,24 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
 
 def commit_trade_to_db(breakout_data):
     """
+    Commit a breakout under the portfolio commit lock so that "count ACTIVE -> apply cap ->
+    insert" is atomic across overlapping scanner processes.  If the lock cannot be acquired the
+    trade is stored as PAPER_ONLY (never as uncapped ACTIVE capital).
+    Returns: (success, portfolio_full, active_count, market_regime, size_multiplier)
+    """
+    try:
+        from db import db as _db
+        from core.locks import portfolio_commit_lock
+    except Exception:
+        return _commit_trade_to_db_unlocked(breakout_data, force_paper=True)
+    with portfolio_commit_lock(_db) as held:
+        if not held:
+            logger.warning("Portfolio commit lock not acquired: opening as PAPER_ONLY to stay inside the slot cap")
+        return _commit_trade_to_db_unlocked(breakout_data, force_paper=not held)
+
+
+def _commit_trade_to_db_unlocked(breakout_data, force_paper=False):
+    """
     Atomically commit the breakout signal and corresponding position to MongoDB
     subject to portfolio cap rules.
     Returns: (success, portfolio_full, active_count, market_regime, size_multiplier)
@@ -2177,8 +2197,8 @@ def commit_trade_to_db(breakout_data):
         size_mult = regime_multipliers.get(mr, 0.4)
         
         # Soft / hard cap parity with consolidation scanner
-        soft_cap = getattr(scanner_module, 'MAX_ACTIVE_POSITIONS', 5)
-        hard_cap = getattr(scanner_module, 'HARD_ACTIVE_POSITIONS', soft_cap + 2)
+        soft_cap = getattr(scanner_module, 'MAX_ACTIVE_POSITIONS', DEFAULT_MAX_ACTIVE_POSITIONS)
+        hard_cap = getattr(scanner_module, 'HARD_ACTIVE_POSITIONS', DEFAULT_HARD_ACTIVE_POSITIONS)
         winner_score = breakout_data.get('winner_score', 0) or 0
         if active_count < soft_cap:
             portfolio_full = False
@@ -2204,6 +2224,18 @@ def commit_trade_to_db(breakout_data):
                     f"({active_count}/{soft_cap} soft, hard {hard_cap})"
                 )
         
+        if force_paper:
+            portfolio_full = True
+
+        # SHELF_BREAKOUT is paper-only until it earns live capital. Under live-faithful rules it lost
+        # money in every analysis (avg -1.4% per trade, below the any-day baseline); the legacy backtest's
+        # PF 2.17 came from an off-by-one in the shelf detector and an OR volume gate. Reversible with
+        # LISTING_SHELF_LIVE_CAPITAL_ENABLED=1.
+        if breakout_data.get('type') == 'SHELF_BREAKOUT' and not LISTING_SHELF_LIVE_CAPITAL_ENABLED:
+            if not portfolio_full:
+                logger.info(f"📋 SHELF_BREAKOUT {symbol} saved as PAPER_ONLY (LISTING_SHELF_LIVE_CAPITAL_ENABLED=0)")
+            portfolio_full = True
+
         # Generate signal_id (deterministic format)
         today_str = datetime.now().strftime("%Y%m%d")
         sig_prefix = "SHELF" if breakout_data.get('type') == 'SHELF_BREAKOUT' else "BREAKOUT"

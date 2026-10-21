@@ -10,6 +10,8 @@ import os
 import pandas as pd
 from datetime import datetime
 
+from core.versioning import NATIVE_FORWARD_VERSIONS
+
 # Force stdout/stderr to use UTF-8 on Windows to prevent UnicodeEncodeError for emojis
 if sys.stdout.encoding != 'utf-8':
     try:
@@ -106,7 +108,7 @@ def main():
 
     # Cohort definitions
     # 1. Native Live v3.5.0: generated natively by v3.5.0 scanner (not backfilled)
-    native_v35 = df_pos[(df_pos["version"] == "3.5.0") & (~df_pos["_backfilled"])]
+    native_v35 = df_pos[(df_pos["version"].isin(NATIVE_FORWARD_VERSIONS)) & (~df_pos["_backfilled"])]  # 3.5.0 and 3.6.0 tags (core/versioning.py)
     
     # 2. Backfilled Legacy Cohort: historical/backfilled tracking
     backfilled = df_pos[df_pos["_backfilled"]]

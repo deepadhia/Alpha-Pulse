@@ -1,0 +1,33 @@
+=== A. each switch ALONE from legacy ===
+only shelf_offbyone=False                                          N=206 win= 42.7% PF= 2.13 avg=+4.46% tot= +918.7% worst= -12.00% top3=  49%  [L=55 S=151 B=0]
+only age_basis=calendar                                            N=141 win= 41.1% PF= 1.92 avg=+3.57% tot= +503.3% worst= -12.00% top3=  66%  [L=43 S=98 B=0]
+only entry_path=live                                               N=136 win= 44.9% PF= 1.80 avg=+3.32% tot= +451.8% worst= -12.00% top3=  81%  [L=53 S=83 B=0]
+only shelf_turnover=and                                            N=115 win= 40.0% PF= 1.73 avg=+2.82% tot= +324.0% worst= -12.00% top3= 115%  [L=62 S=53 B=0]
+only runup_basis=close                                             N=194 win= 39.7% PF= 1.85 avg=+3.08% tot= +597.8% worst= -12.00% top3=  68%  [L=55 S=139 B=0]
+only trail_basis=grade_10pct                                       N=196 win= 45.9% PF= 2.30 avg=+4.45% tot= +872.4% worst= -12.00% top3=  51%  [L=56 S=140 B=0]
+only gate_clock=live                                               N=199 win= 42.7% PF= 2.04 avg=+3.41% tot= +679.3% worst= -12.00% top3=  66%  [L=56 S=143 B=0]
+only entry_fill=next_open                                          N=184 win= 43.5% PF= 2.14 avg=+4.23% tot= +778.3% worst= -13.99% top3=  57%  [L=51 S=133 B=0]
+only exit_fill=gap_aware                                           N=196 win= 44.9% PF= 2.23 avg=+4.41% tot= +864.5% worst= -14.26% top3=  52%  [L=56 S=140 B=0]
+only lock_model=True                                               N=196 win= 45.4% PF= 2.27 avg=+4.48% tot= +878.4% worst= -12.00% top3=  51%  [L=56 S=140 B=0]
+
+=== B. live-faithful with ONE switch reverted to legacy ===
+live-faithful (all on)                                             N= 79 win= 46.8% PF= 1.24 avg=+0.79% tot=  +62.2% worst= -13.35% top3= 230%  [L=36 S=43 B=0]
+live-faithful but shelf_offbyone=True                              N= 79 win= 46.8% PF= 1.24 avg=+0.79% tot=  +62.2% worst= -13.35% top3= 230%  [L=36 S=43 B=0]
+live-faithful but age_basis=bars                                   N=116 win= 45.7% PF= 1.52 avg=+2.02% tot= +234.0% worst= -13.62% top3= 138%  [L=45 S=71 B=0]
+live-faithful but entry_path=legacy                                N= 71 win= 39.4% PF= 1.16 avg=+0.63% tot=  +45.1% worst= -13.99% top3= 395%  [L=41 S=30 B=0]
+live-faithful but shelf_turnover=or                                N= 86 win= 44.2% PF= 1.12 avg=+0.43% tot=  +37.3% worst= -14.41% top3= 383%  [L=36 S=50 B=0]
+live-faithful but runup_basis=intraday_high                        N= 79 win= 46.8% PF= 1.40 avg=+1.34% tot= +105.9% worst= -13.35% top3= 154%  [L=36 S=43 B=0]
+live-faithful but trail_basis=initial_risk                         N= 79 win= 46.8% PF= 1.63 avg=+2.12% tot= +167.1% worst= -13.35% top3= 110%  [L=36 S=43 B=0]
+live-faithful but gate_clock=bars                                  N= 79 win= 50.6% PF= 1.19 avg=+0.69% tot=  +54.7% worst= -15.84% top3= 262%  [L=36 S=43 B=0]
+live-faithful but entry_fill=close                                 N= 85 win= 43.5% PF= 1.22 avg=+0.72% tot=  +61.3% worst= -12.00% top3= 241%  [L=41 S=44 B=0]
+live-faithful but exit_fill=stop_price                             N= 79 win= 46.8% PF= 1.27 avg=+0.89% tot=  +70.4% worst= -13.35% top3= 210%  [L=36 S=43 B=0]
+live-faithful but lock_model=False                                 N= 79 win= 46.8% PF= 1.24 avg=+0.79% tot=  +62.2% worst= -13.35% top3= 230%  [L=36 S=43 B=0]
+
+=== C. entry_path=live sub-gate ablation (on top of LIVE_FAITHFUL) ===
+no post-confirm >=1.5% rule                                        N=109 win= 43.1% PF= 1.00 avg=-0.01% tot=   -0.8% worst= -13.99% top3= nan%  [L=73 S=36 B=0]
+no leader-score gate                                               N= 79 win= 46.8% PF= 1.24 avg=+0.79% tot=  +62.2% worst= -13.35% top3= 230%  [L=36 S=43 B=0]
+no price floor                                                     N= 83 win= 48.2% PF= 1.29 avg=+0.93% tot=  +76.8% worst= -13.35% top3= 186%  [L=38 S=45 B=0]
+no turnover floor                                                  N= 79 win= 46.8% PF= 1.24 avg=+0.79% tot=  +62.2% worst= -13.35% top3= 230%  [L=36 S=43 B=0]
+no circuit-day gate                                                N= 81 win= 48.1% PF= 1.57 avg=+1.85% tot= +150.0% worst= -13.35% top3= 105%  [L=36 S=45 B=0]
+no Tier B (base) entries                                           N= 79 win= 46.8% PF= 1.24 avg=+0.79% tot=  +62.2% worst= -13.35% top3= 230%  [L=36 S=43 B=0]
+ALL live entry sub-gates off                                       N=123 win= 43.1% PF= 1.11 avg=+0.41% tot=  +49.9% worst= -13.99% top3= 357%  [L=83 S=40 B=0]

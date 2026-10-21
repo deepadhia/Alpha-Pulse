@@ -1,0 +1,123 @@
+================================================================================================================
+1. DEAD-MONEY ANATOMY (policy P)
+================================================================================================================
+                          n  cap_days    mean    total  share_trades  share_capital_days
+cat                                                                                     
+open                     22      1545  29.735  654.168         0.097               0.167
+stop/trail              124      6434   7.407  918.480         0.546               0.694
+time-stop (dead money)   81      1288  -4.601 -372.655         0.357               0.139
+dead-money trades: median 14 days held, mean peak run-up 2.2%, mean net -4.60%, 14% still positive at exit; their total -373pp vs all trades +1200pp
+share of trades ending as dead money by entry year: {2022: 0.43, 2023: 0.32, 2024: 0.38, 2025: 0.41, 2026: 0.28}
+
+-- by first_cross
+               n  dead  runner  mean   med   total
+first_cross                                       
+False        123  0.37    0.18  5.38 -1.48  661.86
+True         104  0.34    0.21  5.17 -1.40  538.14
+
+-- by near10
+                               n  dead  runner  mean   med   total
+near10                                                            
+0-1 closes pressing the high  89  0.29    0.19  2.78 -1.34  247.38
+2-3                           83  0.40    0.20  7.28 -1.44  604.40
+4-6                           40  0.38    0.20  8.40 -1.99  336.06
+7-10                          15  0.47    0.13  0.81 -1.95   12.14
+
+-- by pct_above
+                           n  dead  runner   mean   med   total
+pct_above                                                      
+never above LH           134  0.33    0.20   4.88 -1.47  653.82
+up to 30% of days above   21  0.38    0.29  11.42 -2.78  239.88
+30-70%                    35  0.43    0.20   7.49  1.20  262.05
+70%+                      37  0.38    0.11   1.20 -2.03   44.24
+
+-- by age
+         n  dead  runner  mean   med   total
+age                                         
+5-10d   88  0.39    0.19  4.56 -1.50  401.27
+11-20d  63  0.41    0.13  2.25 -2.91  141.56
+21-40d  39  0.21    0.23  7.73  1.64  301.58
+41-60d  37  0.35    0.27  9.61 -1.31  355.58
+
+-- by dryup
+                          n  dead  runner   mean   med   total
+dryup                                                         
+volume drying up (<0.6)  45  0.44    0.18   0.70 -2.22   31.53
+0.6-1.0                  31  0.16    0.13   3.74 -0.16  115.92
+1.0-1.5                  19  0.32    0.21   3.86 -2.41   73.42
+rising (>1.5)            27  0.44    0.26  12.69 -1.35  342.51
+
+-- by day0_loc
+                         n  dead  runner  mean   med   total
+day0_loc                                                    
+listing day closed low  99  0.37    0.18  6.44 -1.48  638.04
+middle                  54  0.33    0.26  5.01 -1.60  270.36
+closed high             74  0.35    0.16  3.94 -0.70  291.59
+
+Reading: dead-money rates sit between about 30% and 45% in almost every bucket and the buckets that look best have n of 20-45;
+no pattern separates dead money from the outliers that follow it.
+
+================================================================================================================
+2. PATTERN COMPARISON: SHELF_BREAKOUT vs LISTING_BREAKOUT (causal, resting entry, live close-based stops, age >= 5)
+================================================================================================================
+LISTING (policy P)                         N=227 mean +5.29% CI90[ +2.6, +8.2] med -1.44 PF incl-open 2.45 closed 1.67 | dead-money  36% (capital-days  14%) runners  19% outliers 10.6% | {2022: (14, -2.5), 2023: (37, 9.8), 2024: (53, 5.1), 2025: (63, 0.6), 2026: (60, 9.4)}
+SHELF, resting cap pivot+2.5%              N=208 mean +3.19% CI90[ +0.5, +6.2] med -2.40 PF incl-open 1.75 closed 1.57 | dead-money  44% (capital-days  18%) runners  17% outliers 8.7% | {2022: (9, -2.1), 2023: (35, 13.0), 2024: (44, 2.5), 2025: (71, -1.9), 2026: (49, 5.2)}
+SHELF, resting cap pivot+5.0% (live chase) N=210 mean +3.36% CI90[ +0.8, +6.3] med -2.40 PF incl-open 1.78 closed 1.60 | dead-money  44% (capital-days  18%) runners  18% outliers 9.0% | {2022: (10, -3.3), 2023: (35, 13.3), 2024: (45, 3.3), 2025: (71, -1.8), 2026: (49, 5.2)}
+SHELF, cap +5.0%, fill +1.0%               N=210 mean +1.72% CI90[ -0.6, +4.3] med -2.70 PF incl-open 1.38 closed 1.21 | dead-money  47% (capital-days  23%) runners  15% outliers 7.6% | {2022: (10, -4.0), 2023: (35, 7.6), 2024: (45, 1.5), 2025: (71, -2.3), 2026: (49, 4.8)}
+reference with the live end-of-day gates (1.8x spike, Rs 10 Cr day turnover; look-ahead vs a resting order):
+LISTING, EOD gates                         N=164 mean +5.49% CI90[ +2.3, +8.9] med -1.22 PF incl-open 2.47 closed 1.90 | dead-money  30% (capital-days  11%) runners  23% outliers 11.0% | {2022: (9, -1.3), 2023: (29, 12.8), 2024: (39, 4.0), 2025: (42, -1.5), 2026: (45, 9.9)}
+SHELF, EOD gates, cap +5.0%                N=152 mean +4.75% CI90[ +1.4, +8.5] med -2.42 PF incl-open 2.14 closed 1.68 | dead-money  39% (capital-days  16%) runners  19% outliers 11.2% | {2022: (3, 3.7), 2023: (27, 9.8), 2024: (32, 1.0), 2025: (47, -1.6), 2026: (43, 11.4)}
+
+shelf by shelf tightness (cap +5.0%):
+                     n  dead  runner  mean   med
+prng_b                                          
+shelf range <= 8%  121  0.51    0.17  3.14 -2.95
+8-12%               57  0.39    0.11  2.96 -2.33
+12-18%              32  0.25    0.34  4.90 -0.18
+
+account level (Rs 1 lakh, 10 slots of 10%, costs on):
+  LISTING only                               signals 227 taken 175 ret  +126.0% CAGR +20.6% maxDD  -25.4% Calmar 0.81 PF 2.35
+  SHELF only                                 signals 210 taken 176 ret   +65.3% CAGR +12.3% maxDD  -26.5% Calmar 0.46 PF 1.61
+  LISTING + SHELF (listing wins overlaps)    signals 334 taken 214 ret  +111.6% CAGR +18.8% maxDD  -26.3% Calmar 0.72 PF 1.87
+
+================================================================================================================
+3. IS CAPITAL THE CONSTRAINT? (policy P)
+================================================================================================================
+business days 1134: average open positions 6.0; days with >= 10 open 22.8%; >= 7 43.2%
+average dead-money positions open at a time 0.9; days at the 10-slot cap that would not be without dead money: 6.5%
+cap  7, Rs    1 lakh: signals 227 taken 143 skipped {'cap': 23, 'too_expensive': 42, 'cash': 19} | missed N=84 mean net +5.68% sum +477pp, missed outliers (>=25%): 12 ['ARSSBL', 'BLACKBUCK', 'EPACKPEB', 'CMPDI', 'KISSHT', 'JSFB']
+cap  7, Rs   10 lakh: signals 227 taken 143 skipped {'cap': 23, 'too_expensive': 41, 'cash': 20} | missed N=84 mean net +5.68% sum +477pp, missed outliers (>=25%): 12 ['ARSSBL', 'BLACKBUCK', 'EPACKPEB', 'CMPDI', 'KISSHT', 'JSFB']
+cap 10, Rs    1 lakh: signals 227 taken 175 skipped {'cap': 7, 'too_expensive': 21, 'cash': 24} | missed N=52 mean net +3.70% sum +192pp, missed outliers (>=25%): 6 ['ARSSBL', 'KISSHT', 'JSFB', 'HEXAGON', 'MVELECTRO', 'MOLBIO']
+cap 10, Rs   10 lakh: signals 227 taken 173 skipped {'cap': 1, 'too_expensive': 36, 'cash': 17} | missed N=54 mean net +4.07% sum +220pp, missed outliers (>=25%): 7 ['ARSSBL', 'EPACKPEB', 'KISSHT', 'JSFB', 'HEXAGON', 'MVELECTRO']
+
+================================================================================================================
+4. R1/R2 ROTATION OF DEAD-MONEY POSITIONS (account level, 10 slots)
+================================================================================================================
+
+== resting 0.3%/cap2.5, Rs 1 lakh
+  no rotation (today)        taken 175 ret  +126.0% CAGR +20.6% maxDD  -25.4% Calmar 0.81 PF 2.35
+  rotate after 7 days        taken 186 ret   +92.6% CAGR +16.3% maxDD  -25.5% Calmar 0.64 PF 2.05
+      rotated 14: sold at avg -2.5% vs would have ended at avg +12.8% (gross); would-have-been outliers: [('SIGNATURE', 138), ('EPACKPEB', 30), ('SHUKRAPHAR', 51)]
+  rotate after 10 days       taken 181 ret  +112.7% CAGR +19.0% maxDD  -25.8% Calmar 0.74 PF 2.23
+      rotated 8: sold at avg -3.3% vs would have ended at avg +1.8% (gross); would-have-been outliers: [('SHUKRAPHAR', 51)]
+
+== resting 0.3%/cap2.5, Rs 10 lakh
+  no rotation (today)        taken 173 ret  +144.3% CAGR +22.8% maxDD  -24.1% Calmar 0.94 PF 2.55
+  rotate after 7 days        taken 185 ret  +110.9% CAGR +18.7% maxDD  -24.5% Calmar 0.77 PF 2.28
+      rotated 14: sold at avg -2.5% vs would have ended at avg +12.8% (gross); would-have-been outliers: [('SIGNATURE', 138), ('EPACKPEB', 30), ('SHUKRAPHAR', 51)]
+  rotate after 10 days       taken 178 ret  +127.3% CAGR +20.8% maxDD  -24.9% Calmar 0.83 PF 2.41
+      rotated 8: sold at avg -3.3% vs would have ended at avg +1.8% (gross); would-have-been outliers: [('SHUKRAPHAR', 51)]
+
+== moderate 1.0%/cap3.0, Rs 1 lakh
+  no rotation (today)        taken 183 ret   +87.6% CAGR +15.6% maxDD  -26.7% Calmar 0.58 PF 1.87
+  rotate after 7 days        taken 192 ret   +64.3% CAGR +12.1% maxDD  -27.9% Calmar 0.43 PF 1.73
+      rotated 14: sold at avg -2.2% vs would have ended at avg +13.1% (gross); would-have-been outliers: [('SIGNATURE', 137), ('EPACKPEB', 29), ('SHUKRAPHAR', 50)]
+  rotate after 10 days       taken 184 ret   +92.6% CAGR +16.3% maxDD  -26.7% Calmar 0.61 PF 1.97
+      rotated 5: sold at avg -2.9% vs would have ended at avg +6.0% (gross); would-have-been outliers: [('SHUKRAPHAR', 50)]
+
+== moderate 1.0%/cap3.0, Rs 10 lakh
+  no rotation (today)        taken 181 ret  +103.1% CAGR +17.7% maxDD  -25.8% Calmar 0.69 PF 2.03
+  rotate after 7 days        taken 192 ret   +82.2% CAGR +14.8% maxDD  -26.0% Calmar 0.57 PF 1.96
+      rotated 14: sold at avg -2.2% vs would have ended at avg +13.1% (gross); would-have-been outliers: [('SIGNATURE', 137), ('EPACKPEB', 29), ('SHUKRAPHAR', 50)]
+  rotate after 10 days       taken 182 ret  +109.2% CAGR +18.5% maxDD  -25.8% Calmar 0.72 PF 2.16
+      rotated 5: sold at avg -2.9% vs would have ended at avg +6.0% (gross); would-have-been outliers: [('SHUKRAPHAR', 50)]

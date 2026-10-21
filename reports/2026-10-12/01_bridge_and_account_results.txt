@@ -1,0 +1,49 @@
+universe: 849 symbols with candles, 870 listing records
+
+== ATTRIBUTION BRIDGE: legacy -> live-faithful (cumulative, one switch at a time) ==
+0. Legacy backtest (as run today)                                  N=196 win= 45.4% PF= 2.27 avg=+4.48% tot= +878.4% worst= -12.00% top3=  51%
+1. Shelf detector off-by-one fixed (use yesterday's bar)           N=206 win= 42.7% PF= 2.13 avg=+4.46% tot= +918.7% worst= -12.00% top3=  49%
+2. IPO age measured in calendar days (live) not bar index          N=157 win= 40.1% PF= 2.02 avg=+4.19% tot= +657.8% worst= -12.00% top3=  51%
+3. Live gate stack: fresh-cross not required, leader score, +1.5%  N= 92 win= 46.7% PF= 1.74 avg=+2.70% tot= +248.7% worst= -12.00% top3=  86%
+4. Shelf needs volume spike AND >= Rs10 Cr (live)                  N= 85 win= 49.4% PF= 1.95 avg=+3.12% tot= +265.1% worst= -12.00% top3=  81%
+5. Peak run-up / winner status from closes (live), not intraday hi N= 85 win= 44.7% PF= 1.57 avg=+1.91% tot= +162.6% worst= -12.00% top3= 118%
+6. Stage-1 trail = 10% below price (live), not entry risk %        N= 85 win= 44.7% PF= 1.31 avg=+1.03% tot=  +87.3% worst= -12.00% top3= 175%
+7. Dead-money gates on 14 calendar days / 10 sessions (live)       N= 85 win= 43.5% PF= 1.24 avg=+0.81% tot=  +68.7% worst= -12.00% top3= 222%
+8. Entry fills at next open under the live limit-buy ceiling       N= 79 win= 46.8% PF= 1.27 avg=+0.89% tot=  +70.4% worst= -13.35% top3= 210%
+9. Stop exits fill at min(open, stop), not at the stop             N= 79 win= 46.8% PF= 1.24 avg=+0.79% tot=  +62.2% worst= -13.35% top3= 230%
+10. Lower/upper circuit lock delays exits and blocks entries       N= 79 win= 46.8% PF= 1.24 avg=+0.79% tot=  +62.2% worst= -13.35% top3= 230%
+
+== ACCOUNT-LEVEL RESULTS (capital Rs 100,000) ==
+
+-- costs: zero cost
+legacy trades | as_coded 5/7                               taken=161/196 ret= +137.0% cagr= +22.5% maxDD= -53.1% PF=1.75 worst= -12.0% top3=  77% skip={'cap': 18, 'too_expensive': 10, 'cash': 7}
+legacy trades | documented 5/7                             taken=141/196 ret= +152.8% cagr= +24.4% maxDD= -43.8% PF=1.93 worst= -12.0% top3=  73% skip={'cap': 51, 'too_expensive': 4, 'cash': 0}
+legacy trades | flat 5/5                                   taken=134/196 ret= +237.8% cagr= +33.1% maxDD= -56.7% PF=1.81 worst= -12.0% top3=  77% skip={'cap': 37, 'too_expensive': 25, 'cash': 0}
+legacy trades | flat 10/10                                 taken=180/196 ret= +103.7% cagr= +18.2% maxDD= -41.9% PF=1.89 worst= -12.0% top3=  62% skip={'cap': 7, 'too_expensive': 6, 'cash': 3}
+live-faithful trades | as_coded 5/7                        taken= 75/ 79 ret=   +9.6% cagr=  +2.2% maxDD= -16.5% PF=1.25 worst= -13.3% top3= 215% skip={'cap': 4, 'too_expensive': 0, 'cash': 0}
+live-faithful trades | documented 5/7                      taken= 71/ 79 ret=   +9.5% cagr=  +2.1% maxDD= -16.0% PF=1.26 worst= -13.3% top3= 219% skip={'cap': 8, 'too_expensive': 0, 'cash': 0}
+live-faithful trades | flat 5/5                            taken= 70/ 79 ret=  +13.7% cagr=  +3.1% maxDD= -20.0% PF=1.27 worst= -13.3% top3= 218% skip={'cap': 9, 'too_expensive': 0, 'cash': 0}
+live-faithful trades | flat 10/10                          taken= 78/ 79 ret=   +6.7% cagr=  +1.5% maxDD= -13.3% PF=1.25 worst= -13.3% top3= 214% skip={'cap': 0, 'too_expensive': 1, 'cash': 0}
+
+-- costs: default Indian delivery costs + 0.3%/side slippage
+legacy trades | as_coded 5/7                               taken=161/196 ret=  +86.6% cagr= +15.8% maxDD= -55.9% PF=1.47 worst= -13.2% top3= 110% skip={'cap': 18, 'too_expensive': 2, 'cash': 15}
+legacy trades | documented 5/7                             taken=141/196 ret= +104.9% cagr= +18.4% maxDD= -46.7% PF=1.63 worst= -13.2% top3=  97% skip={'cap': 51, 'too_expensive': 4, 'cash': 0}
+legacy trades | flat 5/5                                   taken=134/196 ret= +165.2% cagr= +25.8% maxDD= -59.7% PF=1.58 worst= -13.0% top3= 101% skip={'cap': 37, 'too_expensive': 25, 'cash': 0}
+legacy trades | flat 10/10                                 taken=180/196 ret=  +65.2% cagr= +12.5% maxDD= -45.3% PF=1.53 worst= -13.4% top3=  91% skip={'cap': 7, 'too_expensive': 2, 'cash': 7}
+live-faithful trades | as_coded 5/7                        taken= 74/ 79 ret=   -3.0% cagr=  -0.7% maxDD= -20.9% PF=0.93 worst= -14.5% top3= nan% skip={'cap': 1, 'too_expensive': 4, 'cash': 0}
+live-faithful trades | documented 5/7                      taken= 71/ 79 ret=   -3.6% cagr=  -0.8% maxDD= -21.8% PF=0.92 worst= -14.5% top3= nan% skip={'cap': 8, 'too_expensive': 0, 'cash': 0}
+live-faithful trades | flat 5/5                            taken= 70/ 79 ret=   -2.6% cagr=  -0.6% maxDD= -27.4% PF=0.95 worst= -14.3% top3= nan% skip={'cap': 9, 'too_expensive': 0, 'cash': 0}
+live-faithful trades | flat 10/10                          taken= 78/ 79 ret=   -4.2% cagr=  -1.0% maxDD= -18.3% PF=0.86 worst= -14.7% top3= nan% skip={'cap': 0, 'too_expensive': 1, 'cash': 0}
+
+-- costs: stress: 0.75%/side slippage
+legacy trades | as_coded 5/7                               taken=161/196 ret=  +51.5% cagr= +10.3% maxDD= -58.6% PF=1.28 worst= -13.9% top3= 176% skip={'cap': 18, 'too_expensive': 3, 'cash': 14}
+legacy trades | documented 5/7                             taken=141/196 ret=  +70.3% cagr= +13.3% maxDD= -49.2% PF=1.42 worst= -13.9% top3= 134% skip={'cap': 51, 'too_expensive': 4, 'cash': 0}
+legacy trades | flat 5/5                                   taken=134/196 ret= +110.2% cagr= +19.1% maxDD= -62.3% PF=1.40 worst= -13.8% top3= 138% skip={'cap': 37, 'too_expensive': 25, 'cash': 0}
+legacy trades | flat 10/10                                 taken=180/196 ret=  +41.0% cagr=  +8.4% maxDD= -48.1% PF=1.33 worst= -14.1% top3= 139% skip={'cap': 7, 'too_expensive': 6, 'cash': 3}
+live-faithful trades | as_coded 5/7                        taken= 75/ 79 ret=  -12.6% cagr=  -3.1% maxDD= -27.2% PF=0.73 worst= -15.3% top3= nan% skip={'cap': 4, 'too_expensive': 0, 'cash': 0}
+live-faithful trades | documented 5/7                      taken= 71/ 79 ret=  -12.0% cagr=  -3.0% maxDD= -27.1% PF=0.74 worst= -15.2% top3= nan% skip={'cap': 8, 'too_expensive': 0, 'cash': 0}
+live-faithful trades | flat 5/5                            taken= 70/ 79 ret=  -14.0% cagr=  -3.5% maxDD= -34.1% PF=0.77 worst= -15.1% top3= nan% skip={'cap': 9, 'too_expensive': 0, 'cash': 0}
+live-faithful trades | flat 10/10                          taken= 78/ 79 ret=  -10.9% cagr=  -2.7% maxDD= -22.6% PF=0.68 worst= -15.4% top3= nan% skip={'cap': 0, 'too_expensive': 1, 'cash': 0}
+
+-- slot-priority sensitivity (live-faithful, default costs, as_coded 5/7): 20 random orderings
+   total return across orderings: min=-3.4% median=-3.2% max=-3.0%

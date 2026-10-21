@@ -16,6 +16,8 @@ import pandas as pd
 import numpy as np
 from pymongo import MongoClient
 
+from core.versioning import is_native_forward
+
 # Terminal Colors
 class Colors:
     GREEN = '\033[92m'
@@ -243,7 +245,8 @@ def build_trade_evidence_doc(trade: dict, db=None, fetch_data_fn=None) -> dict:
     elif not is_win and is_concluded:
         cohorts.append("STOPPED_OUT_LOSER")
 
-    is_native_v350 = bool(trade.get("version") == "3.5.0" and not trade.get("_backfilled", False) and entry_date_str >= "2026-09-29")
+    # field name kept for stored-document compatibility; it now means "native forward cohort" (versions 3.5.0 and 3.6.0, see core/versioning.py)
+    is_native_v350 = is_native_forward(trade.get("version"), trade.get("_backfilled", False), entry_date_str)
     is_backfilled = bool(trade.get("_backfilled", False))
     if is_native_v350:
         cohorts.append("NATIVE_V350_FORWARD")

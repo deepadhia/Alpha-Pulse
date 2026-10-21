@@ -12,7 +12,7 @@ Optimized IPO breakout scanner:
 - Dry-run and heartbeat modes
 """
 
-SCANNER_VERSION = "3.5.0"  # v3.5.0: Upper 50% Candle Body Gate, 14-Day Velocity Gate, Anti-Chasing Extension Guard
+SCANNER_VERSION = "3.6.0"  # v3.6.0: Hardened execution release (10 x 10% slots, close-based stop alerts, atomic commit lock, shelf/hourly PAPER_ONLY); v3.5.0 entry rules unchanged
 LOG_SCHEMA_VERSION = "2026-04-23.v1"
 
 import os
@@ -598,6 +598,13 @@ from utils import (
     send_holiday_notification_once,
     count_trading_days
 )
+from core.guards import (
+    assess_price_drop,
+    NORMAL as DROP_NORMAL,
+    LIKELY_CORPORATE_ACTION,
+)
+from core.exit_rules import ExitParams, evaluate_position
+from core.portfolio_caps import DEFAULT_MAX_ACTIVE_POSITIONS, DEFAULT_HARD_ACTIVE_POSITIONS
 
 class DynamicNSEHolidays(set):
     """Set proxy that dynamically includes current and adjacent year NSE holidays."""
@@ -851,8 +858,9 @@ MIN_DAYS_BETWEEN_SIGNALS = get_env_int("MIN_DAYS_BETWEEN_SIGNALS", 10)
 MIN_LIVE_GRADE = os.getenv("MIN_LIVE_GRADE", "B") # 2026-07-05: raised from C → B; Grade C avg -2.64%, median -5.55% across 64-trade history
 
 # --- Capital Allocation, Velocity Gates, and Sizing Configurations (Phase 2.6) ---
-MAX_ACTIVE_POSITIONS = get_env_int("MAX_ACTIVE_POSITIONS", 5)
-HARD_ACTIVE_POSITIONS = get_env_int("HARD_ACTIVE_POSITIONS", MAX_ACTIVE_POSITIONS + 2)
+# Defaults live in core/portfolio_caps.py (10 slots, flat; was soft 5 / hard 7 until 2026-10-14). Override both variables to roll back.
+MAX_ACTIVE_POSITIONS = get_env_int("MAX_ACTIVE_POSITIONS", DEFAULT_MAX_ACTIVE_POSITIONS)
+HARD_ACTIVE_POSITIONS = get_env_int("HARD_ACTIVE_POSITIONS", DEFAULT_HARD_ACTIVE_POSITIONS)
 
 # Dead-money speed gate thresholds by archetype (v3.5.0: Tightened to 14 days)
 DEAD_MONEY_DAYS_IPO = get_env_int("DEAD_MONEY_DAYS_IPO", 14)
@@ -863,6 +871,18 @@ DEAD_MONEY_RUNUP_CONSOL = get_env_float("DEAD_MONEY_RUNUP_CONSOL", 5.0)
 
 DEAD_MONEY_DAYS_OTHER = get_env_int("DEAD_MONEY_DAYS_OTHER", 30)
 DEAD_MONEY_RUNUP_OTHER = get_env_float("DEAD_MONEY_RUNUP_OTHER", 5.0)
+
+# Single source of truth for exit/trailing thresholds (core/exit_rules.py). Built from the
+# env-overridable constants above so production behaviour is unchanged.
+EXIT_PARAMS = ExitParams(
+    dead_money_days_ipo=DEAD_MONEY_DAYS_IPO,
+    dead_money_runup_ipo=DEAD_MONEY_RUNUP_IPO,
+    dead_money_days_consol=DEAD_MONEY_DAYS_CONSOL,
+    dead_money_runup_consol=DEAD_MONEY_RUNUP_CONSOL,
+    dead_money_days_other=DEAD_MONEY_DAYS_OTHER,
+    min_pnl_for_trail=MIN_PNL_FOR_TRAIL,
+    min_trail_move_pct=MIN_TRAIL_MOVE_PCT,
+)
 
 # Soft regime sizing weights
 REGIME_SIZE_MULT = {
@@ -1897,29 +1917,34 @@ def update_positions():
             else:
                 logger.warning(f"⚠️ Using yesterday's close for {sym}: ₹{current_price:.2f} (market may be closed)")
         
-        # Corporate Action Guard: Detect extreme single-day price drops (>25%)
-        # which are mathematically impossible under NSE/BSE circuit limits
-        # (indicating a stock split, bonus issue, or data feed error).
+        # Corporate Action Guard (fail-safe): only PAUSE when the drop matches a split/bonus
+        # ratio; any other large drop is treated as a real crash and processing continues.
         prev_price = pos.get("current_price") or pos.get("entry_price")
         if prev_price and prev_price > 0:
-            price_change_pct = (current_price - prev_price) / prev_price * 100.0
-            if price_change_pct <= -25.0:
-                logger.error(f"⚠️ Extreme price drop detected for {sym}: {prev_price} -> {current_price} ({price_change_pct:.2f}%). Potential stock split or data error.")
+            _drop = assess_price_drop(prev_price, current_price)
+            if _drop.kind != DROP_NORMAL:
+                price_change_pct = _drop.drop_pct
+                logger.error(f"⚠️ Extreme price drop for {sym}: {prev_price} -> {current_price} ({price_change_pct:.2f}%): {_drop.reason}")
                 from utils import escape_html_text
                 clean_sym = escape_html_text(sym)
-                split_alert = f"""⚠️ <b>AlphaPulse | CORPORATE ACTION / ANOMALY</b>
+                _paused = (_drop.kind == LIKELY_CORPORATE_ACTION)
+                _headline = "CORPORATE ACTION / ANOMALY" if _paused else "SEVERE DROP - EXIT LOGIC RUNNING"
+                _footer = ("DB updates paused. Manual corporate action check required." if _paused
+                           else "Not a split/bonus ratio: treated as a REAL crash. Stop-loss logic is NOT suspended.")
+                split_alert = f"""⚠️ <b>AlphaPulse | {_headline}</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📊 <b>{clean_sym}</b>
-📉 Price Drop: <code>{price_change_pct:.2f}%</code> (Extreme Volatility)
+📉 Price Drop: <code>{price_change_pct:.2f}%</code> ({escape_html_text(_drop.reason)})
 
 • <b>Prior Ref:</b> ₹{prev_price:,.2f}  •  <b>LTP:</b> ₹{current_price:,.2f}
-⚠️ <i>DB updates paused. Manual corporate action check required.</i>
+⚠️ <i>{_footer}</i>
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION} • {_now_ist().strftime('%d %b %Y, %H:%M IST')}</i>"""
                 send_telegram(split_alert)
-                continue
+                if _paused:
+                    continue
 
         pnl = (current_price - float(pos["entry_price"]))/float(pos["entry_price"])*100
         
@@ -4463,31 +4488,37 @@ def stop_loss_update_scan():
                 latest_date_str = latest_date.strftime('%Y-%m-%d')
                 price_source = f"Historical Close ({latest_date_str})"
                 
-            # Corporate Action Guard: Detect extreme single-day price drops (>25%)
-            # which are mathematically impossible under NSE/BSE circuit limits
-            # (indicating a stock split, bonus issue, or data feed error).
+            # Corporate Action Guard (fail-safe): only PAUSE when the drop matches a split/bonus
+            # ratio. Any other large drop is a real crash -> alert loudly and let the normal
+            # exit logic below run, so the stop-loss is never frozen when it matters most.
             prev_price = pos.get("current_price") or pos.get("entry_price")
             if prev_price and prev_price > 0:
-                price_change_pct = (current_price - prev_price) / prev_price * 100.0
-                if price_change_pct <= -25.0:
-                    logger.error(f"⚠️ Extreme price drop detected for {sym}: {prev_price} -> {current_price} ({price_change_pct:.2f}%). Potential stock split or data error.")
+                _drop = assess_price_drop(prev_price, current_price)
+                if _drop.kind != DROP_NORMAL:
+                    price_change_pct = _drop.drop_pct
+                    logger.error(f"⚠️ Extreme price drop for {sym}: {prev_price} -> {current_price} ({price_change_pct:.2f}%): {_drop.reason}")
                     old_trailing = pos.get("trailing_stop", pos.get("stop_loss", prev_price * 0.95))
                     from utils import escape_html_text
                     clean_sym = escape_html_text(sym)
-                    split_alert = f"""⚠️ <b>AlphaPulse | CORPORATE ACTION / ANOMALY</b>
+                    _paused = (_drop.kind == LIKELY_CORPORATE_ACTION)
+                    _headline = "CORPORATE ACTION / ANOMALY" if _paused else "SEVERE DROP - EXIT LOGIC RUNNING"
+                    _footer = ("DB updates paused. Manual corporate action check required." if _paused
+                               else "Not a split/bonus ratio: treated as a REAL crash. Stop-loss logic is NOT suspended.")
+                    split_alert = f"""⚠️ <b>AlphaPulse | {_headline}</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📊 <b>{clean_sym}</b>
-📉 Price Drop: <code>{price_change_pct:.2f}%</code> (Extreme Volatility)
+📉 Price Drop: <code>{price_change_pct:.2f}%</code> ({escape_html_text(_drop.reason)})
 
 • <b>Prior Ref:</b> ₹{prev_price:,.2f}  •  <b>LTP:</b> ₹{current_price:,.2f}
-⚠️ <i>DB updates paused. Manual corporate action check required.</i>
+⚠️ <i>{_footer}</i>
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse v{SCANNER_VERSION} • {_now_ist().strftime('%d %b %Y, %H:%M IST')}</i>"""
                     send_telegram(split_alert)
-                    failed_updates.append(sym)
-                    continue
+                    if _paused:
+                        failed_updates.append(sym)
+                        continue
 
             entry_price = pos["entry_price"]
             old_trailing = pos["trailing_stop"]
@@ -4512,101 +4543,45 @@ def stop_loss_update_scan():
                 current_price, pnl, days_held, new_max_runup, new_max_drawdown
             ]
             
-            # Check for exits - use current price for exit decisions
+            # Check for exits - use current price for exit decisions.
+            # The decision itself lives in core.exit_rules.evaluate_position: ONE definition shared
+            # with the backtest and the tests, so the rules cannot silently diverge again.
             exit_reason = None
             new_trailing = float(old_trailing)
             is_winner_archetype = (new_max_runup >= 15.0)
 
             # Manage trade if active or paper only
             if pos["status"] in ("ACTIVE", "PAPER_ONLY"):
-                if current_price <= old_trailing:  # Use OLD trailing stop for exit check
-                    exit_reason = "Stop Loss"
-                elif not is_winner_archetype:
-                    # Archetype-sensitive dead-money speed gate (velocity threshold)
-                    # ONLY applies to non-winner / Stage 1 positions (max_runup < 15%)
-                    grade = pos.get("grade", "N/A")
-                    is_ipo_discovery = (grade == "LISTING_BREAKOUT")
-                    
-                    if is_ipo_discovery:
-                        # IPO Discovery: Momentum is front-loaded. Cut faster!
-                        if days_held >= DEAD_MONEY_DAYS_IPO and new_max_runup < DEAD_MONEY_RUNUP_IPO:
-                            exit_reason = f"Time Stop - IPO Dead Money (No momentum after {DEAD_MONEY_DAYS_IPO} days)"
-                    else:
-                        # Consolidation: Slightly longer leash
-                        if days_held >= DEAD_MONEY_DAYS_CONSOL and new_max_runup < DEAD_MONEY_RUNUP_CONSOL:
-                            exit_reason = f"Time Stop - Consolidation Dead Money (No momentum after {DEAD_MONEY_DAYS_CONSOL} days)"
-                    
-                    # Standard legacy time stops for minor losers (fallbacks)
-                    if not exit_reason:
-                        if days_held > DEAD_MONEY_DAYS_OTHER and current_price < entry_price * 0.95:
-                            exit_reason = f"Time Stop -5% (Underperforming after {DEAD_MONEY_DAYS_OTHER} days)"
-                        elif days_held > 60 and current_price < entry_price * 0.92:
-                            exit_reason = "Time Stop -8% (Underperforming after 60 days)"
-                
-                    # 14-Day Portfolio Velocity Speed Gate (v3.5.0 Standard):
-                    # Cut true dead-money positions held >= 14 days that never achieved momentum (peak runup < 3.5% and flat/negative PnL).
-                    # Protects healthy base-builders (max_runup >= 3.5%) while eliminating non-performers.
-                    # 14-Day / 10-Session Portfolio Velocity Speed Gate (Industry-Standard Momentum Rule):
-                    # Cut true dead-money positions held >= 14 calendar days (or >= 10 trading sessions) that remain flat or underwater (pnl <= 0.0%).
-                    # Confirmed winners (new_max_runup >= 15%) are protected by is_winner_archetype above.
-                    if not exit_reason and (days_held >= 14 or trading_sessions >= 10) and pnl <= 0.0:
-                        exit_reason = f"Time Stop - Dead Money (14-Day Velocity Gate, PnL {pnl:+.1f}%, Peak +{new_max_runup:.1f}%)"
-
-                    # Secondary Stagnant Position Guard (applies to flat / non-winner positions)
-                    # v3.5.0 Tightened: Only cut positions that NEVER moved (peak runup < 8%) AND are
-                    # currently underwater. Positions with prior meaningful runup (>= 8%) that are
-                    # consolidating gains are protected by the trailing stop engine instead.
-                    if not exit_reason and days_held >= 40:
-                        if pnl <= 0.0 and new_max_runup < 8.0:
-                            exit_reason = f"Time Stop - Stagnant Position (40d, no momentum: peak +{new_max_runup:.1f}%, PnL {pnl:+.1f}%)"
-
-                # --- VOLUME EXHAUSTION EARLY EXIT ---
-                # Exits stagnant flat positions BEFORE day 40 when volume is collapsing relative
-                # to the post-entry baseline, signalling the breakout has exhausted buyer interest.
-                # Only applies to flat/never-moved positions. Skips winners (max_runup >= 8%),
-                # positions already marked for exit, and positions held < minimum days.
-                _VOL_MIN_DAYS_IPO    = 15     # LISTING_BREAKOUT: post-listing excitement settles ~2 weeks
-                _VOL_MIN_DAYS_CONSOL = 10     # Consolidation breakout: signal visible earlier
-                _VOL_FLAT_PNL_LOW    = -3.0   # Don't apply if significantly underwater (let SL handle it)
-                _VOL_FLAT_PNL_HIGH   =  5.0   # Don't apply to working trades (trailing stop protects them)
-                _VOL_MAX_RUNUP       =  8.0   # Skip if position had meaningful momentum at any point
-                _VOL_RATIO_THRESHOLD =  0.45  # Exit if recent 5d vol < 45% of post-entry 11d baseline
-                _VOL_ABS_FLOOR       = 50_000 # Min baseline vol (shares/day) — below this, signal is noise
-
-                _vol_grade = pos.get("grade", "N/A")  # Re-read grade safely (may be out of scope if winner)
-                _vol_min_days = _VOL_MIN_DAYS_IPO if _vol_grade == "LISTING_BREAKOUT" else _VOL_MIN_DAYS_CONSOL
-
-                if (
-                    not exit_reason
-                    and not is_winner_archetype
-                    and days_held >= _vol_min_days
-                    and _VOL_FLAT_PNL_LOW <= pnl < _VOL_FLAT_PNL_HIGH
-                    and new_max_runup < _VOL_MAX_RUNUP
-                ):
+                def _post_entry_volumes():
+                    """Daily volumes after the entry day (oldest first); fetched lazily, only if needed."""
                     try:
                         _vol_df = current_data if current_data is not None else fetch_data(sym, fetch_start_date)
-
-                        if _vol_df is not None and "VOLUME" in _vol_df.columns and len(_vol_df) > 0:
-                            _entry_ts = pd.Timestamp(fetch_start_date)
-                            _entry_rows = _vol_df[_vol_df["DATE"] >= _entry_ts].copy().reset_index(drop=True)
-
-                            if len(_entry_rows) > 1:
-                                _entry_rows = _entry_rows.iloc[1:].reset_index(drop=True)
-
-                            if len(_entry_rows) >= 16:
-                                _baseline_vol = _entry_rows.iloc[:11]["VOLUME"].mean()
-                                _recent_vol   = _entry_rows.iloc[-5:]["VOLUME"].mean()
-
-                                if _baseline_vol >= _VOL_ABS_FLOOR and _baseline_vol > 0:
-                                    _vol_ratio = _recent_vol / _baseline_vol
-                                    if _vol_ratio < _VOL_RATIO_THRESHOLD:
-                                        exit_reason = (
-                                            f"Volume Exhaustion - Dead volume "
-                                            f"(ratio: {_vol_ratio:.2f}, "
-                                            f"pnl: {pnl:+.1f}%, days: {days_held})"
-                                        )
+                        if _vol_df is None or "VOLUME" not in _vol_df.columns or len(_vol_df) == 0:
+                            return None
+                        _entry_ts = pd.Timestamp(fetch_start_date)
+                        _rows = _vol_df[_vol_df["DATE"] >= _entry_ts].copy().reset_index(drop=True)
+                        if len(_rows) > 1:
+                            _rows = _rows.iloc[1:].reset_index(drop=True)
+                        return _rows["VOLUME"].tolist()
                     except Exception as _ve:
                         logger.warning(f"[VolumeCheck] Could not evaluate volume for {sym}: {_ve}")
+                        return None
+
+                _decision = evaluate_position(
+                    entry_price=entry_price,
+                    old_trailing=old_trailing,
+                    current_price=current_price,
+                    days_held=days_held,
+                    trading_sessions=trading_sessions,
+                    prev_max_runup=current_max_runup,
+                    prev_max_drawdown=current_max_drawdown,
+                    grade_exit=pos.get("grade", "N/A"),
+                    grade_trail=pos.get("grade", "C"),
+                    volume_provider=_post_entry_volumes,
+                    params=EXIT_PARAMS,
+                )
+                exit_reason = _decision.exit_reason
+                _decided_trailing = _decision.new_trailing
 
                 if exit_reason:
                     # Outcome Classification
@@ -4685,31 +4660,13 @@ def stop_loss_update_scan():
                         logger.error(f"Failed to persist position exit for {sym}: {db_e}")
                 else:
                     # ── 2-Stage Dynamic Trailing Stop Engine ────────────────────────
-                    # Stage 2 (Super-Winner Immunity: max_runup >= 15.0%):
-                    # Give proven winners a 20% trailing cushion from peak to ride multi-month price discovery
-                    # Stage 1 (Initial Sniping & Capital Protection: max_runup < 15.0%):
-                    # Standard grade-based trailing / breakeven protection
-                    grade = pos.get("grade", "C")
-                    
-                    if is_winner_archetype:
-                        # Stage 2: 20% Trailing cushion from highest achieved peak price
-                        peak_price = entry_price * (1.0 + new_max_runup / 100.0)
-                        candidate_trailing = max(entry_price * 1.05, peak_price * 0.80)
-                        min_trail_move_abs = entry_price * (MIN_TRAIL_MOVE_PCT / 100.0)
-
-                        if candidate_trailing > new_trailing and (candidate_trailing - new_trailing) >= min_trail_move_abs:
-                            new_trailing = candidate_trailing
-                            logger.info(f"🏆 [Stage 2 Winner Trailing] {sym}: Trailing Stop updated to ₹{new_trailing:.2f} (20% cushion from peak ₹{peak_price:.2f})")
-                    else:
-                        # Stage 1: Grade-based trailing (starts at +3% for LISTING_BREAKOUT, +4% for Consolidation)
-                        trail_threshold = 3.0 if grade == "LISTING_BREAKOUT" else MIN_PNL_FOR_TRAIL
-                        if pnl >= trail_threshold:
-                            _, stop_pct = calculate_grade_based_stop_loss(entry_price, entry_price, grade)
-                            candidate_trailing = current_price * (1 - stop_pct)
-                            min_trail_move_abs = entry_price * (MIN_TRAIL_MOVE_PCT / 100.0)
-
-                            if candidate_trailing > new_trailing and (candidate_trailing - new_trailing) >= min_trail_move_abs:
-                                new_trailing = candidate_trailing
+                    # Computed by core.exit_rules.next_trailing (called inside evaluate_position):
+                    #   Stage 2 (Super-Winner: max_runup >= 15%): 20% cushion from the peak, min entry*1.05
+                    #   Stage 1: grade-based trail below price once PnL clears the start threshold
+                    if _decided_trailing > new_trailing:
+                        if is_winner_archetype:
+                            logger.info(f"🏆 [Stage 2 Winner Trailing] {sym}: Trailing Stop updated to ₹{_decided_trailing:.2f} (20% cushion from peak)")
+                        new_trailing = _decided_trailing
 
                     # Persist updated position
                     df_positions.loc[idx, ["current_price", "trailing_stop", "pnl_pct", "days_held", "max_runup_pct", "max_drawdown_pct"]] = [

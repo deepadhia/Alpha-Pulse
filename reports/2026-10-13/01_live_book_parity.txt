@@ -1,0 +1,145 @@
+positions: 29   by (status, backfilled): {('PAPER_CLOSED', True): 11, ('CLOSED', True): 5, ('PAPER_ONLY', True): 2, ('PAPER_ONLY', False): 4, ('ACTIVE', True): 1, ('ACTIVE', False): 6}
+
+A. PER-POSITION PARITY (age = calendar days from listing to the STORED entry date; negative = entry before the stock listed, i.e. the stored date cannot be a real fill)
+LOTUSDEV     PAPER_CLOSED bf=1 entry=2026-07-08 px=150.1 pnl=53.7 list=2025-08-06 age@entry=336 engine_signals=[] engine_trades=[]
+SUDEEPPHRM   PAPER_CLOSED bf=1 entry=2026-07-14 px=862.75 pnl=1.0 list=2025-11-28 age@entry=228 engine_signals=[] engine_trades=[]
+SAATVIKGL    PAPER_CLOSED bf=1 entry=2026-07-14 px=473.05 pnl=-9.9 list=2025-09-26 age@entry=291 engine_signals=[] engine_trades=[]
+PNGSREVA     CLOSED       bf=1 entry=2026-07-25 px=442.0 pnl=25.0 list=2026-03-04 age@entry=143 engine_signals=[] engine_trades=[]
+STYL         PAPER_CLOSED bf=1 entry=2026-08-02 px=408.05 pnl=-5.1 list=2025-09-30 age@entry=306 engine_signals=[] engine_trades=[]
+MILKYMIST    PAPER_ONLY   bf=1 entry=2026-08-12 px=184.89 pnl=69.3 list=2026-08-18 age@entry=-6 engine_signals=[] engine_trades=[]
+TURTLEMINT   PAPER_CLOSED bf=1 entry=2026-08-13 px=149.48 pnl=-12.3 list=2026-06-29 age@entry=45 engine_signals=[] engine_trades=[]
+ORIRAIL      PAPER_CLOSED bf=1 entry=2026-08-16 px=114.78 pnl=1.4 list=2026-08-17 age@entry=-1 engine_signals=[] engine_trades=[]
+JNPR         PAPER_CLOSED bf=1 entry=2026-08-17 px=273.76 pnl=-4.8 list=2026-08-06 age@entry=11 engine_signals=['2026-08-20'] engine_trades=[('2026-08-21', -3.2)]
+MANBRO       PAPER_CLOSED bf=1 entry=2026-08-19 px=60.1 pnl=-12.2  NO CANDLES in cache (fewer than 10 candles or missing)
+SHUKRAPHAR   PAPER_ONLY   bf=1 entry=2026-08-19 px=44.18 pnl=51.0 list=2026-08-14 age@entry=5 engine_signals=[] engine_trades=[]
+URBANCO      PAPER_CLOSED bf=1 entry=2026-08-24 px=169.74 pnl=-6.8 list=2025-09-17 age@entry=341 engine_signals=[] engine_trades=[]
+MVELECTRO    PAPER_CLOSED bf=1 entry=2026-08-24 px=641.35 pnl=21.2 list=2026-08-06 age@entry=18 engine_signals=[] engine_trades=[]
+RIR          CLOSED       bf=1 entry=2026-09-15 px=204.82 pnl=-10.2 list=2026-07-16 age@entry=61 engine_signals=[] engine_trades=[]
+BLUESTONE    CLOSED       bf=1 entry=2026-09-21 px=937.15 pnl=-8.7 list=2025-08-19 age@entry=398 engine_signals=['2025-09-05'] engine_trades=[('2025-09-08', -1.2)]
+ARCIL        CLOSED       bf=1 entry=2026-09-21 px=145.6 pnl=-2.3 list=2026-09-17 age@entry=4 engine_signals=['2026-10-07'] engine_trades=[]
+KUSUMGAR     CLOSED       bf=1 entry=2026-09-21 px=647.05 pnl=-7.0 list=2026-07-15 age@entry=68 engine_signals=[] engine_trades=[]
+JAINREC      PAPER_CLOSED bf=1 entry=2026-09-23 px=302.85 pnl=-2.8 list=2025-10-01 age@entry=357 engine_signals=['2025-10-24'] engine_trades=[('2025-10-27', 0.8)]
+AZAD         ACTIVE       bf=1 entry=2026-09-27 px=2914.2 pnl=2.5 list=2023-12-28 age@entry=1004 engine_signals=[] engine_trades=[]
+AUGMONT      ACTIVE       bf=0 entry=2026-09-28 px=1054.1 pnl=23.3 list=2026-08-31 age@entry=28 engine_signals=[] engine_trades=[]
+WEWORK       ACTIVE       bf=0 entry=2026-09-29 px=663.0 pnl=2.1  NO CANDLES in cache (fewer than 10 candles or missing)
+AEROPLANE    PAPER_ONLY   bf=0 entry=2026-10-03 px=211.24 pnl=3.5 list=2026-04-02 age@entry=184 engine_signals=[] engine_trades=[]
+ADVANCE      ACTIVE       bf=0 entry=2026-10-03 px=117.17 pnl=22.9 list=2025-10-08 age@entry=360 engine_signals=[] engine_trades=[]
+LGEINDIA     ACTIVE       bf=0 entry=2026-10-03 px=1800.6 pnl=-2.4  NO CANDLES in cache (fewer than 10 candles or missing)
+MANIKA       ACTIVE       bf=0 entry=2026-10-04 px=45.65 pnl=13.9  NO CANDLES in cache (fewer than 10 candles or missing)
+KNACK        PAPER_ONLY   bf=0 entry=2026-10-05 px=197.34 pnl=5.5 list=2026-07-08 age@entry=89 engine_signals=['2026-08-05'] engine_trades=[('2026-08-06', -2.6)]
+SEIL         PAPER_ONLY   bf=0 entry=2026-10-05 px=186.95 pnl=-4.3 list=2026-04-20 age@entry=168 engine_signals=['2026-05-08'] engine_trades=[('2026-05-11', -7.4)]
+STEAMHOUSE   ACTIVE       bf=0 entry=2026-10-08 px=131.61 pnl=-5.6  NO CANDLES in cache (fewer than 10 candles or missing)
+COMMIT_CLEAN_TEST PAPER_ONLY   bf=0 entry=2026-10-12 px=205.0 pnl=0.0  NO CANDLES in cache (fewer than 10 candles or missing)
+
+B. NATIVE (non-backfilled) FILLS vs LISTING HIGH (empirical fill extension)
+AEROPLANE    PAPER_ONLY   listing_high=200.0 entry=211.24 ext=+5.62%  current=218.68 updated=2026-10-13
+AUGMONT      ACTIVE       listing_high=1019.8 entry=1054.1 ext=+3.36%  current=1300.1 updated=2026-10-13
+WEWORK       ACTIVE       listing_high=650.15 entry=663.0 ext=+1.98%  current=677.0 updated=2026-10-13
+ADVANCE      ACTIVE       listing_high=114.5 entry=117.17 ext=+2.33%  current=143.97 updated=2026-10-13
+LGEINDIA     ACTIVE       listing_high=1749.0 entry=1800.6 ext=+2.95%  current=1758.0 updated=2026-10-13
+MANIKA       ACTIVE       listing_high=43.5 entry=45.65 ext=+4.94%  current=52.01 updated=2026-10-13
+KNACK        PAPER_ONLY   listing_high=192.0 entry=197.34 ext=+2.78%  current=208.12 updated=2026-10-13
+SEIL         PAPER_ONLY   listing_high=183.9 entry=186.95 ext=+1.66%  current=178.84 updated=2026-10-13
+STEAMHOUSE   ACTIVE       listing_high=103.95 entry=131.61 ext=+26.61%  current=124.26 updated=2026-10-13
+mean ext (excluding entries >10% above the stored listing high, likely shelf/bad record): 3.20%  n=8
+
+C. POSITIONS ENTERED IN THE LAST 30 DAYS (stored entry date >= 2026-09-13)
+all: N=15 mean=+2.03% median=-2.31% up=7 down=8
+closed: N=5 mean=-6.18%   open (unrealised): N=10 mean=+6.14%
+native only (not backfilled): N=9 mean=+6.55% median=+3.52%
+
+=== MILKYMIST list=2026-08-18 ld_high=181.5 ld_low=165.0 range%=9.1
+ 0 2026-08-18 age=  0 O  165.00 H  181.50 L  165.00 C  181.50 V 92269979
+ 1 2026-08-19 age=  1 O  190.00 H  199.65 L  190.00 C  199.65 V 29368751
+ 2 2026-08-20 age=  2 O  207.80 H  211.80 L  181.50 C  184.89 V 56542171
+ 3 2026-08-21 age=  3 O  190.00 H  194.70 L  183.51 C  189.22 V 32756478 vr= 0.6 turn20= 981.6Cr brk=Y ext=4.3 closeloc=0.51
+ 4 2026-08-24 age=  6 O  191.00 H  199.10 L  186.23 C  196.66 V 19647276 vr= 0.4 turn20= 862.5Cr brk=Y ext=8.4 closeloc=0.81
+ 5 2026-08-25 age=  7 O  198.00 H  205.70 L  197.00 C  201.92 V 15543026 vr= 0.4 turn20= 771.1Cr brk=Y ext=11.3 closeloc=0.57
+ 6 2026-08-26 age=  8 O  201.90 H  222.11 L  198.06 C  222.11 V 20878033 vr= 0.7 turn20= 727.2Cr brk=Y ext=22.4 closeloc=1.00
+ 7 2026-08-27 age=  9 O  227.39 H  233.80 L  212.66 C  217.31 V 59235093 vr= 2.0 turn20= 797.2Cr brk=Y ext=19.7 closeloc=0.22
+ 8 2026-08-28 age= 10 O  215.00 H  217.26 L  210.10 C  214.31 V 14621198 vr= 0.4 turn20= 743.4Cr brk=Y ext=18.1 closeloc=0.59
+ 9 2026-08-31 age= 13 O  218.75 H  222.00 L  206.40 C  210.94 V 13349862 vr= 0.4 turn20= 697.2Cr brk=Y ext=16.2 closeloc=0.29
+10 2026-09-01 age= 14 O  230.79 H  232.03 L  221.92 C  232.03 V 23925717 vr= 0.8 turn20= 684.3Cr brk=Y ext=27.8 closeloc=1.00
+11 2026-09-02 age= 15 O  234.00 H  255.23 L  228.36 C  252.04 V 56560370 vr= 2.0 turn20= 746.1Cr brk=Y ext=38.9 closeloc=0.88
+12 2026-09-03 age= 16 O  250.62 H  268.69 L  246.35 C  252.89 V 44203953 vr= 1.4 turn20= 774.7Cr brk=Y ext=39.3 closeloc=0.29
+13 2026-09-04 age= 17 O  255.00 H  260.59 L  249.50 C  252.43 V 14599282 vr= 0.5 turn20= 745.7Cr brk=Y ext=39.1 closeloc=0.26
+14 2026-09-07 age= 20 O  255.06 H  277.67 L  248.56 C  276.01 V 35261875 vr= 1.2 turn20= 760.9Cr brk=Y ext=52.1 closeloc=0.94
+15 2026-09-08 age= 21 O  278.00 H  288.45 L  270.65 C  275.97 V 15671478 vr= 0.5 turn20= 740.3Cr brk=Y ext=52.0 closeloc=0.30
+16 2026-09-09 age= 22 O  274.94 H  274.94 L  262.18 C  265.56 V  8108465 vr= 0.3 turn20= 709.4Cr brk=Y ext=46.3 closeloc=0.26
+17 2026-09-10 age= 23 O  267.00 H  278.83 L  265.32 C  278.83 V  8013334 vr= 0.3 turn20= 682.4Cr brk=Y ext=53.6 closeloc=1.00
+18 2026-09-11 age= 24 O  279.00 H  292.77 L  276.83 C  292.77 V  8807785 vr= 0.4 turn20= 660.1Cr brk=Y ext=61.3 closeloc=1.00
+19 2026-09-15 age= 28 O  290.00 H  304.70 L  278.14 C  278.14 V 10778708 vr= 0.5 turn20= 642.1Cr brk=Y ext=53.2 closeloc=0.00
+20 2026-09-16 age= 29 O  270.00 H  281.70 L  264.24 C  276.23 V 13428031 vr= 0.6 turn20= 576.9Cr brk=Y ext=52.2 closeloc=0.69
+21 2026-09-17 age= 30 O  276.01 H  282.70 L  270.06 C  274.76 V  3974674 vr= 0.2 turn20= 553.0Cr brk=Y ext=51.4 closeloc=0.37
+
+=== SHUKRAPHAR list=2026-08-14 ld_high=43.4 ld_low=40.06 range%=7.7
+ 0 2026-08-14 age=  0 O   42.04 H   43.40 L   40.06 C   41.42 V  1113804
+ 1 2026-08-17 age=  3 O   44.39 H   44.39 L   41.40 C   41.44 V  1136748
+ 2 2026-08-18 age=  4 O   42.48 H   42.78 L   41.51 C   41.55 V  1250990
+ 3 2026-08-19 age=  5 O   42.00 H   43.14 L   41.51 C   42.67 V   889499 vr= 0.7 turn20=   4.6Cr brk=n ext=None closeloc=0.71
+ 4 2026-08-20 age=  6 O   43.73 H   45.78 L   42.89 C   43.33 V   416182 vr= 0.4 turn20=   4.0Cr brk=Y ext=0.0 closeloc=0.15
+ 5 2026-08-21 age=  7 O   44.02 H   44.50 L   42.60 C   44.06 V  1048348 vr= 1.2 turn20=   4.1Cr brk=Y ext=1.5 closeloc=0.77
+ 6 2026-08-24 age= 10 O   45.25 H   45.25 L   44.04 C   44.07 V   694253 vr= 0.8 turn20=   4.0Cr brk=Y ext=1.5 closeloc=0.02
+ 7 2026-08-25 age= 11 O   44.07 H   44.94 L   44.07 C   44.08 V  1374828 vr= 1.6 turn20=   4.2Cr brk=Y ext=1.6 closeloc=0.01
+ 8 2026-08-26 age= 12 O   44.09 H   46.16 L   44.09 C   44.18 V  2435650 vr= 2.6 turn20=   5.0Cr brk=Y ext=1.8 closeloc=0.04
+ 9 2026-08-27 age= 13 O   44.90 H   45.34 L   44.20 C   44.22 V  1003469 vr= 0.9 turn20=   4.9Cr brk=Y ext=1.9 closeloc=0.02
+10 2026-08-28 age= 14 O   44.25 H   45.33 L   44.25 C   44.28 V   901483 vr= 0.8 turn20=   4.8Cr brk=Y ext=2.0 closeloc=0.03
+11 2026-08-31 age= 17 O   46.99 H   46.99 L   44.29 C   44.39 V  1624555 vr= 1.5 turn20=   5.0Cr brk=Y ext=2.3 closeloc=0.04
+12 2026-09-01 age= 18 O   44.54 H   46.40 L   44.34 C   44.43 V  1832377 vr= 1.6 turn20=   5.3Cr brk=Y ext=2.4 closeloc=0.04
+13 2026-09-02 age= 19 O   44.52 H   47.24 L   44.52 C   46.79 V  2933344 vr= 2.4 turn20=   5.9Cr brk=Y ext=7.8 closeloc=0.83
+14 2026-09-03 age= 20 O   47.37 H   54.90 L   47.10 C   51.93 V  8949935 vr= 6.3 turn20=   8.6Cr brk=Y ext=19.7 closeloc=0.62
+15 2026-09-04 age= 21 O   53.39 H   55.54 L   51.66 C   51.93 V  4036493 vr= 1.8 turn20=   9.3Cr brk=Y ext=19.7 closeloc=0.07
+16 2026-09-07 age= 24 O   51.93 H   53.59 L   51.93 C   53.07 V  1887833 vr= 0.7 turn20=   9.4Cr brk=Y ext=22.3 closeloc=0.69
+17 2026-09-08 age= 25 O   53.37 H   56.00 L   52.21 C   54.11 V  6791172 vr= 2.5 turn20=  10.9Cr brk=Y ext=24.7 closeloc=0.50
+18 2026-09-09 age= 26 O   54.98 H   57.44 L   54.17 C   56.10 V  2827806 vr= 0.9 turn20=  11.2Cr brk=Y ext=29.3 closeloc=0.59
+19 2026-09-10 age= 27 O   57.69 H   58.20 L   53.91 C   53.97 V  4087812 vr= 1.2 turn20=  11.7Cr brk=Y ext=24.4 closeloc=0.01
+20 2026-09-11 age= 28 O   54.05 H   55.60 L   53.75 C   53.94 V  1577298 vr= 0.4 turn20=  11.9Cr brk=Y ext=24.3 closeloc=0.10
+21 2026-09-15 age= 32 O   54.06 H   56.20 L   54.06 C   55.27 V  2366428 vr= 0.6 turn20=  12.3Cr brk=Y ext=27.4 closeloc=0.57
+
+=== MVELECTRO list=2026-08-06 ld_high=624.0 ld_low=520.0 range%=16.7
+ 0 2026-08-06 age=  0 O  520.00 H  624.00 L  520.00 C  624.00 V 17538016
+ 1 2026-08-07 age=  1 O  665.50 H  686.50 L  593.05 C  611.70 V 13751593
+ 2 2026-08-10 age=  4 O  600.00 H  644.80 L  595.50 C  614.80 V  5245199
+ 3 2026-08-11 age=  5 O  622.40 H  628.75 L  595.00 C  599.45 V  1408063 vr= 0.3 turn20= 585.6Cr brk=Y ext=0.0 closeloc=0.13
+ 4 2026-08-12 age=  6 O  600.90 H  607.70 L  571.20 C  582.85 V  1534434 vr= 0.5 turn20= 486.4Cr brk=n ext=None closeloc=0.32
+ 5 2026-08-13 age=  7 O  585.15 H  628.00 L  585.15 C  615.10 V  2823065 vr= 1.0 turn20= 434.3Cr brk=Y ext=0.0 closeloc=0.70
+ 6 2026-08-14 age=  8 O  618.80 H  632.00 L  585.00 C  588.65 V   980894 vr= 0.4 turn20= 380.5Cr brk=Y ext=0.0 closeloc=0.08
+ 7 2026-08-17 age= 11 O  588.00 H  595.00 L  566.50 C  570.10 V   678775 vr= 0.3 turn20= 337.7Cr brk=n ext=None closeloc=0.13
+ 8 2026-08-18 age= 12 O  574.00 H  583.85 L  556.15 C  574.10 V   777088 vr= 0.4 turn20= 305.2Cr brk=n ext=None closeloc=0.65
+ 9 2026-08-19 age= 13 O  577.75 H  583.55 L  560.15 C  570.20 V   620974 vr= 0.3 turn20= 278.2Cr brk=n ext=None closeloc=0.43
+10 2026-08-20 age= 14 O  570.95 H  578.80 L  564.40 C  568.30 V   471669 vr= 0.3 turn20= 255.3Cr brk=n ext=None closeloc=0.27
+11 2026-08-21 age= 15 O  569.90 H  594.10 L  567.50 C  591.15 V   903580 vr= 0.6 turn20= 238.5Cr brk=n ext=None closeloc=0.89
+12 2026-08-24 age= 18 O  592.95 H  601.90 L  574.25 C  578.95 V   650831 vr= 0.4 turn20= 223.1Cr brk=n ext=None closeloc=0.17
+13 2026-08-25 age= 19 O  579.00 H  582.70 L  559.00 C  564.15 V   367077 vr= 0.3 turn20= 208.6Cr brk=n ext=None closeloc=0.22
+14 2026-08-26 age= 20 O  525.00 H  566.45 L  516.55 C  560.15 V  1171438 vr= 1.2 turn20= 199.1Cr brk=n ext=None closeloc=0.87
+15 2026-08-27 age= 21 O  565.50 H  672.15 L  559.95 C  646.80 V 14689330 vr=15.6 turn20= 246.0Cr brk=Y ext=3.7 closeloc=0.77
+16 2026-08-28 age= 22 O  649.90 H  768.00 L  638.50 C  719.55 V 28262303 vr=13.3 turn20= 351.2Cr brk=Y ext=15.3 closeloc=0.63
+17 2026-08-31 age= 25 O  718.95 H  780.00 L  693.05 C  760.45 V 10367613 vr= 2.1 turn20= 375.5Cr brk=Y ext=21.9 closeloc=0.78
+18 2026-09-01 age= 26 O  757.65 H  757.70 L  696.30 C  713.70 V  3239338 vr= 0.6 turn20= 367.9Cr brk=Y ext=14.4 closeloc=0.28
+19 2026-09-02 age= 27 O  708.95 H  724.50 L  675.40 C  686.05 V  1444414 vr= 0.2 turn20= 354.4Cr brk=Y ext=9.9 closeloc=0.22
+20 2026-09-03 age= 28 O  685.00 H  744.80 L  661.65 C  730.65 V  8739539 vr= 1.4 turn20= 331.6Cr brk=Y ext=17.1 closeloc=0.83
+21 2026-09-04 age= 29 O  730.65 H  752.40 L  710.00 C  729.70 V  3173336 vr= 0.5 turn20= 301.2Cr brk=Y ext=16.9 closeloc=0.46
+
+=== AUGMONT list=2026-08-31 ld_high=1019.8 ld_low=900.0 range%=11.7
+ 0 2026-08-31 age=  0 O  961.00 H 1019.80 L  900.00 C  908.15 V 17691142
+ 1 2026-09-01 age=  1 O  899.45 H  899.95 L  851.00 C  866.25 V  3757111
+ 2 2026-09-02 age=  2 O  865.00 H  952.85 L  857.05 C  952.85 V  4700620
+ 3 2026-09-03 age=  3 O  975.00 H  979.95 L  912.00 C  922.70 V  3652464 vr= 0.8 turn20= 679.2Cr brk=n ext=None closeloc=0.16
+ 4 2026-09-04 age=  4 O  922.70 H  940.10 L  894.00 C  901.50 V   942895 vr= 0.2 turn20= 560.4Cr brk=n ext=None closeloc=0.16
+ 5 2026-09-07 age=  7 O  908.80 H  931.40 L  878.10 C  891.60 V  1669696 vr= 0.5 turn20= 491.8Cr brk=n ext=None closeloc=0.25
+ 6 2026-09-08 age=  8 O  899.00 H  909.95 L  882.80 C  893.40 V   693093 vr= 0.3 turn20= 430.4Cr brk=n ext=None closeloc=0.39
+ 7 2026-09-09 age=  9 O  885.50 H  926.20 L  885.50 C  895.30 V  1284516 vr= 0.6 turn20= 391.0Cr brk=n ext=None closeloc=0.24
+ 8 2026-09-10 age= 10 O  910.20 H  950.00 L  890.80 C  917.50 V  2403694 vr= 1.1 turn20= 372.0Cr brk=n ext=None closeloc=0.45
+ 9 2026-09-11 age= 11 O  915.00 H  915.00 L  873.70 C  886.15 V  1169259 vr= 0.5 turn20= 345.2Cr brk=n ext=None closeloc=0.30
+10 2026-09-15 age= 15 O  889.95 H  889.95 L  825.30 C  832.25 V   930427 vr= 0.5 turn20= 320.9Cr brk=n ext=None closeloc=0.11
+11 2026-09-16 age= 16 O  836.20 H  851.45 L  812.10 C  833.05 V   732796 vr= 0.4 turn20= 299.2Cr brk=n ext=None closeloc=0.53
+12 2026-09-17 age= 17 O  835.00 H  844.20 L  806.05 C  811.10 V   441991 vr= 0.2 turn20= 278.9Cr brk=n ext=None closeloc=0.13
+13 2026-09-18 age= 18 O  815.00 H  884.00 L  813.00 C  874.35 V   898791 vr= 0.6 turn20= 264.6Cr brk=n ext=None closeloc=0.86
+14 2026-09-21 age= 21 O  877.00 H  907.20 L  875.15 C  887.20 V   682991 vr= 0.6 turn20= 251.0Cr brk=n ext=None closeloc=0.38
+15 2026-09-22 age= 22 O  830.00 H  872.00 L  825.20 C  853.35 V  1115175 vr= 1.0 turn20= 241.3Cr brk=n ext=None closeloc=0.60
+16 2026-09-23 age= 23 O  853.00 H  893.70 L  846.65 C  886.30 V   631751 vr= 0.6 turn20= 230.4Cr brk=n ext=None closeloc=0.84
+17 2026-09-24 age= 24 O  879.95 H  895.00 L  858.60 C  864.10 V   448654 vr= 0.4 turn20= 219.7Cr brk=n ext=None closeloc=0.15
+18 2026-09-25 age= 25 O  865.00 H  892.40 L  860.00 C  877.90 V   352381 vr= 0.4 turn20= 209.8Cr brk=n ext=None closeloc=0.55
+19 2026-09-28 age= 28 O  899.00 H  965.65 L  896.00 C  965.65 V   979636 vr= 1.3 turn20= 204.0Cr brk=n ext=None closeloc=1.00
+20 2026-09-29 age= 29 O 1022.00 H 1062.20 L 1022.00 C 1062.20 V  1711349 vr= 2.4 turn20= 132.8Cr brk=Y ext=4.2 closeloc=1.00
+21 2026-09-30 age= 30 O 1074.00 H 1138.50 L 1014.30 C 1086.55 V  2989279 vr= 3.7 turn20= 132.8Cr brk=Y ext=6.5 closeloc=0.58
