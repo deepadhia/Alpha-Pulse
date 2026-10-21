@@ -1,6 +1,6 @@
 # IPO Breakout Qualification Engine — System Knowledge Map
 
-> **Version:** v3.5.0
+> **Version:** v3.6.0
 > **Last Updated:** 2026-07-21
 > **Purpose:** Permanent reference document. Attach this file to any AI conversation before asking questions or requesting changes to this codebase.
 
@@ -283,8 +283,8 @@ Stored on every signal/position document as `position_size_weight`.
 ## 7. Portfolio and Position Management
 
 ### 7.1 Portfolio Cap Guard
-- `MAX_ACTIVE_POSITIONS` (default: **5**) = soft cap — signals exceeding this are written with `status: "PAPER_ONLY"` (position row is still upserted)
-- `HARD_ACTIVE_POSITIONS` (default: `MAX_ACTIVE_POSITIONS + 2` = **7**) = hard cap
+- `MAX_ACTIVE_POSITIONS` (default: **10** since 2026-10-14, from `core/portfolio_caps.py`; was 5) = soft cap — signals exceeding this are written with `status: "PAPER_ONLY"` (position row is still upserted)
+- `HARD_ACTIVE_POSITIONS` (default: **10** since 2026-10-14, equal to the soft cap so there is no admission band; was `MAX_ACTIVE_POSITIONS + 2` = 7) = hard cap. Rollback: set `MAX_ACTIVE_POSITIONS=5` and `HARD_ACTIVE_POSITIONS=7`. Order-sheet weight per position is 1 / hard cap = 10%
 - Consolidation production path forces `PAPER_ONLY` (OOS forward test); listing/re-entry/hourly honor soft/hard caps
 - Hourly never overwrites an existing `ACTIVE`/`PAPER_ONLY` row for the same symbol
 - `PAPER_ONLY` signals are included in **strategy expectancy analytics** but excluded from **live capital P&L calculations**
@@ -342,7 +342,7 @@ Exits flat, stagnant positions before day 40 if volume collapses relative to the
 All thresholds configurable via `.env`:
 ```
 MIN_PNL_FOR_TRAIL=4.0
-DEAD_MONEY_DAYS_IPO=20
+DEAD_MONEY_DAYS_IPO=14
 DEAD_MONEY_RUNUP_IPO=4.0
 DEAD_MONEY_DAYS_CONSOL=21
 DEAD_MONEY_RUNUP_CONSOL=5.0
@@ -615,9 +615,9 @@ All constants use `get_env_int()` / `get_env_float()` helpers with hardcoded def
 | `MIN_TRAIL_MOVE_PCT` | 1.0 | Min % improvement to count as a trail update |
 | `MIN_DAYS_BETWEEN_SIGNALS` | 10 | Signal cooldown per symbol |
 | `MIN_LIVE_GRADE` | B | Minimum grade for live signal emission |
-| `MAX_ACTIVE_POSITIONS` | 5 | Soft portfolio cap |
-| `HARD_ACTIVE_POSITIONS` | 7 | Hard portfolio cap |
-| `DEAD_MONEY_DAYS_IPO` | 20 | Patience stop days for listing breakouts |
+| `MAX_ACTIVE_POSITIONS` | 10 | Soft portfolio cap (was 5 until 2026-10-14) |
+| `HARD_ACTIVE_POSITIONS` | 10 | Hard portfolio cap (was 7 until 2026-10-14) |
+| `DEAD_MONEY_DAYS_IPO` | 14 | Patience stop days for listing breakouts |
 | `DEAD_MONEY_RUNUP_IPO` | 4.0 | Min runup % to avoid patience stop (IPO) |
 | `DEAD_MONEY_DAYS_CONSOL` | 21 | Patience stop days for consolidation |
 | `DEAD_MONEY_RUNUP_CONSOL` | 5.0 | Min runup % to avoid patience stop (consolidation) |

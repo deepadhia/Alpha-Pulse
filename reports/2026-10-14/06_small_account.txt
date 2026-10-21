@@ -1,0 +1,89 @@
+================================================================================================================
+1. FRICTIONS: round-trip cost (charges + 0.3% exit slippage, excl. entry fill) as a % of the position
+================================================================================================================
+  position Rs  5,000: 1.78%   (the flat assumption used elsewhere is 1.0% in total)
+  position Rs 10,000: 1.15%   (the flat assumption used elsewhere is 1.0% in total)
+  position Rs 20,000: 0.84%   (the flat assumption used elsewhere is 1.0% in total)
+  position Rs 50,000: 0.65%   (the flat assumption used elsewhere is 1.0% in total)
+
+================================================================================================================
+2. REAL 12-MONTH WINDOWS (start on the 1st of each month; trades entering inside the window; NAV marked to market at the window end)
+================================================================================================================
+41 overlapping window starts, 2022-06-01 to 2025-10-01
+
+-- fills: resting (+0.3%)
+  Rs 50k 10 slots x 10% median ret   +5.6% | 5th pct  -14.5% | P(loss)  46% | median max DD  -12.0% | P(DD>=20%)  15% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 50k 7 slots x 14.3% median ret   +6.9% | 5th pct  -15.6% | P(loss)  41% | median max DD  -13.2% | P(DD>=20%)  22% P(DD>=30%)   7% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 50k 5 slots x 20% median ret  +11.0% | 5th pct  -22.6% | P(loss)  41% | median max DD  -15.1% | P(DD>=20%)  34% P(DD>=30%)  12% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 10 slots x 10% median ret   +7.7% | 5th pct  -11.4% | P(loss)  41% | median max DD  -11.0% | P(DD>=20%)  10% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 7 slots x 14.3% median ret  +10.2% | 5th pct  -12.5% | P(loss)  34% | median max DD  -11.9% | P(DD>=20%)  22% P(DD>=30%)   2% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 5 slots x 20% median ret  +13.3% | 5th pct  -20.7% | P(loss)  34% | median max DD  -14.2% | P(DD>=20%)  32% P(DD>=30%)  10% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+
+-- fills: moderate (+1.0%)
+  Rs 50k 10 slots x 10% median ret   +3.7% | 5th pct  -17.2% | P(loss)  46% | median max DD  -13.1% | P(DD>=20%)  15% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 50k 7 slots x 14.3% median ret   +3.0% | 5th pct  -20.4% | P(loss)  44% | median max DD  -16.4% | P(DD>=20%)  32% P(DD>=30%)  10% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 50k 5 slots x 20% median ret   +7.3% | 5th pct  -29.0% | P(loss)  46% | median max DD  -18.2% | P(DD>=20%)  49% P(DD>=30%)  15% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 10 slots x 10% median ret   +5.7% | 5th pct  -14.5% | P(loss)  44% | median max DD  -11.9% | P(DD>=20%)  10% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 7 slots x 14.3% median ret   +6.1% | 5th pct  -17.9% | P(loss)  44% | median max DD  -15.5% | P(DD>=20%)  27% P(DD>=30%)   5% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 5 slots x 20% median ret   +9.2% | 5th pct  -26.7% | P(loss)  44% | median max DD  -17.0% | P(DD>=20%)  37% P(DD>=30%)  12% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+
+-- fills: chase (+1.7%, today)
+  Rs 50k 10 slots x 10% median ret   +4.9% | 5th pct  -18.0% | P(loss)  49% | median max DD  -13.4% | P(DD>=20%)  22% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 50k 7 slots x 14.3% median ret   +6.4% | 5th pct  -21.3% | P(loss)  44% | median max DD  -16.3% | P(DD>=20%)  34% P(DD>=30%)  10% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 50k 5 slots x 20% median ret  +11.2% | 5th pct  -25.7% | P(loss)  46% | median max DD  -17.3% | P(DD>=20%)  39% P(DD>=30%)  12% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 10 slots x 10% median ret   +7.0% | 5th pct  -15.2% | P(loss)  44% | median max DD  -12.1% | P(DD>=20%)  15% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 7 slots x 14.3% median ret  +10.5% | 5th pct  -18.2% | P(loss)  44% | median max DD  -14.9% | P(DD>=20%)  32% P(DD>=30%)  10% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 5 slots x 20% median ret  +13.8% | 5th pct  -23.5% | P(loss)  46% | median max DD  -16.8% | P(DD>=20%)  37% P(DD>=30%)  12% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+
+================================================================================================================
+3. RESAMPLED HISTORIES (250 per cell; random 3-month blocks of real trades)
+================================================================================================================
+
+-- 12 months, fills: resting (+0.3%)
+  Rs 50k 10 slots x 10% median ret  +14.5% | 5th pct  -11.1% | P(loss)  24% | median max DD  -11.0% | P(DD>=20%)   3% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 50k 7 slots x 14.3% median ret  +18.6% | 5th pct  -13.6% | P(loss)  22% | median max DD  -12.9% | P(DD>=20%)  11% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 50k 5 slots x 20% median ret  +22.1% | 5th pct  -15.0% | P(loss)  22% | median max DD  -15.3% | P(DD>=20%)  20% P(DD>=30%)   2% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 50k 10 slots x 6% median ret   +6.0% | 5th pct   -8.2% | P(loss)  30% | median max DD   -7.7% | P(DD>=20%)   0% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 10 slots x 10% median ret  +17.8% | 5th pct   -8.6% | P(loss)  18% | median max DD  -10.3% | P(DD>=20%)   1% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 7 slots x 14.3% median ret  +21.6% | 5th pct  -11.7% | P(loss)  16% | median max DD  -12.7% | P(DD>=20%)   9% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 5 slots x 20% median ret  +24.1% | 5th pct  -13.7% | P(loss)  21% | median max DD  -14.9% | P(DD>=20%)  18% P(DD>=30%)   1% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 10 slots x 6% median ret   +9.4% | 5th pct   -5.8% | P(loss)  22% | median max DD   -6.9% | P(DD>=20%)   0% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+
+-- 12 months, fills: moderate (+1.0%)
+  Rs 50k 10 slots x 10% median ret   +8.0% | 5th pct  -13.1% | P(loss)  32% | median max DD  -12.1% | P(DD>=20%)   5% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 50k 7 slots x 14.3% median ret   +9.8% | 5th pct  -14.5% | P(loss)  32% | median max DD  -14.7% | P(DD>=20%)  20% P(DD>=30%)   1% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 50k 5 slots x 20% median ret  +13.0% | 5th pct  -20.1% | P(loss)  30% | median max DD  -17.3% | P(DD>=20%)  34% P(DD>=30%)   5% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 50k 10 slots x 6% median ret   +2.9% | 5th pct   -9.7% | P(loss)  40% | median max DD   -8.5% | P(DD>=20%)   0% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 10 slots x 10% median ret  +11.0% | 5th pct   -9.9% | P(loss)  23% | median max DD  -11.5% | P(DD>=20%)   3% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 7 slots x 14.3% median ret  +12.9% | 5th pct  -12.6% | P(loss)  23% | median max DD  -14.2% | P(DD>=20%)  16% P(DD>=30%)   1% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 5 slots x 20% median ret  +15.3% | 5th pct  -17.7% | P(loss)  27% | median max DD  -16.8% | P(DD>=20%)  30% P(DD>=30%)   4% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 10 slots x 6% median ret   +5.9% | 5th pct   -6.8% | P(loss)  28% | median max DD   -7.5% | P(DD>=20%)   0% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+
+-- 12 months, fills: chase (+1.7%, today)
+  Rs 50k 10 slots x 10% median ret  +10.4% | 5th pct  -14.0% | P(loss)  29% | median max DD  -12.8% | P(DD>=20%)   9% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 50k 7 slots x 14.3% median ret  +13.6% | 5th pct  -17.5% | P(loss)  28% | median max DD  -15.3% | P(DD>=20%)  25% P(DD>=30%)   2% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 50k 5 slots x 20% median ret  +16.9% | 5th pct  -20.8% | P(loss)  28% | median max DD  -17.6% | P(DD>=20%)  39% P(DD>=30%)   8% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 50k 10 slots x 6% median ret   +3.6% | 5th pct  -10.0% | P(loss)  37% | median max DD   -8.8% | P(DD>=20%)   0% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 10 slots x 10% median ret  +13.7% | 5th pct  -11.4% | P(loss)  21% | median max DD  -11.9% | P(DD>=20%)   7% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 7 slots x 14.3% median ret  +16.6% | 5th pct  -15.5% | P(loss)  24% | median max DD  -14.7% | P(DD>=20%)  22% P(DD>=30%)   1% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 5 slots x 20% median ret  +19.0% | 5th pct  -18.8% | P(loss)  24% | median max DD  -17.3% | P(DD>=20%)  35% P(DD>=30%)   7% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 10 slots x 6% median ret   +7.4% | 5th pct   -7.8% | P(loss)  25% | median max DD   -7.9% | P(DD>=20%)   0% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+
+-- 24 months, fills: moderate (+1.0%)
+  Rs 50k 10 slots x 10% median ret  +21.6% | 5th pct  -18.6% | P(loss)  19% | median max DD  -16.2% | P(DD>=20%)  25% P(DD>=30%)   3% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 50k 7 slots x 14.3% median ret  +24.6% | 5th pct  -23.1% | P(loss)  20% | median max DD  -19.7% | P(DD>=20%)  48% P(DD>=30%)   9% P(DD>=40%)   1% | BLOWUP (NAV<=50%) 0.0%
+  Rs 50k 5 slots x 20% median ret  +31.1% | 5th pct  -22.6% | P(loss)  20% | median max DD  -23.1% | P(DD>=20%)  65% P(DD>=30%)  20% P(DD>=40%)   5% | BLOWUP (NAV<=50%) 0.0%
+  Rs 50k 10 slots x 6% median ret   +7.1% | 5th pct  -14.7% | P(loss)  31% | median max DD  -11.7% | P(DD>=20%)   6% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 10 slots x 10% median ret  +29.2% | 5th pct  -13.3% | P(loss)  12% | median max DD  -15.1% | P(DD>=20%)  16% P(DD>=30%)   2% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 7 slots x 14.3% median ret  +30.8% | 5th pct  -17.1% | P(loss)  15% | median max DD  -18.6% | P(DD>=20%)  39% P(DD>=30%)   4% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 5 slots x 20% median ret  +38.0% | 5th pct  -17.9% | P(loss)  15% | median max DD  -21.8% | P(DD>=20%)  59% P(DD>=30%)  16% P(DD>=40%)   3% | BLOWUP (NAV<=50%) 0.0%
+  Rs 100k 10 slots x 6% median ret  +15.4% | 5th pct   -9.5% | P(loss)  16% | median max DD  -10.2% | P(DD>=20%)   3% P(DD>=30%)   0% P(DD>=40%)   0% | BLOWUP (NAV<=50%) 0.0%
+
+================================================================================================================
+4. STRUCTURAL LOSS BOUND PER TRADE (policy P: 12% stop cap, close-based exit; worst replayed loss)
+================================================================================================================
+worst closed trade -17.4%, 1st percentile -16.0%, share below -12%: 10.0%, below -15%: 1.9%
+  position weight  6.0%: worst replayed single-trade loss = -1.0% of the account; all positions at the worst case at once = -10.5%
+  position weight 10.0%: worst replayed single-trade loss = -1.7% of the account; all positions at the worst case at once = -17.4%
+  position weight 14.3%: worst replayed single-trade loss = -2.5% of the account; all positions at the worst case at once = -17.5%
+  position weight 20.0%: worst replayed single-trade loss = -3.5% of the account; all positions at the worst case at once = -17.4%

@@ -1,0 +1,73 @@
+universe: 849 symbols with candles / 870 listing records; candles 2022-05-27 -> 2026-10-09
+
+==============================================================================================================
+CURRENT RULES: listing breakout <= 60 days, shelf 3-30 days
+==============================================================================================================
+
+LISTING_BREAKOUT
+  full history   N= 36  win(net)= 47.2%  avg gross= +3.35%  avg net= +2.35%  PF(net)=2.09  best trade= +67.5%  best share of profit=  56%
+  2022           N=  4  win(net)= 75.0%  avg gross= +3.81%  avg net= +2.81%  PF(net)=4.92  best trade=  +7.1%  best share of profit=  47%
+  2023           N=  9  win(net)= 55.6%  avg gross=+11.02%  avg net=+10.02%  PF(net)=6.76  best trade= +67.5%  best share of profit=  68%
+  2024           N=  5  win(net)= 60.0%  avg gross= +0.90%  avg net= -0.10%  PF(net)=0.94  best trade=  +5.0%  best share of profit= 112%
+  2025           N= 13  win(net)= 23.1%  avg gross= -0.96%  avg net= -1.96%  PF(net)=0.34  best trade=  +6.1%  best share of profit= nan%
+  2026           N=  5  win(net)= 60.0%  avg gross= +2.85%  avg net= +1.85%  PF(net)=1.77  best trade= +16.1%  best share of profit= 113%
+  ex top-3       N= 33  win(net)= 42.4%  avg gross= +0.16%  avg net= -0.84%  PF(net)=0.65  best trade=  +7.1%  best share of profit= 131%
+
+SHELF_BREAKOUT
+  full history   N= 43  win(net)= 27.9%  avg gross= -1.36%  avg net= -2.36%  PF(net)=0.56  best trade= +39.3%  best share of profit= nan%
+  2022           N=  1  win(net)=  0.0%  avg gross=-12.15%  avg net=-13.15%  PF(net)=0.00  best trade= -12.2%  best share of profit= nan%
+  2023           N= 10  win(net)= 40.0%  avg gross= -1.19%  avg net= -2.19%  PF(net)=0.68  best trade= +36.3%  best share of profit= nan%
+  2024           N=  9  win(net)= 11.1%  avg gross= -5.30%  avg net= -6.30%  PF(net)=0.07  best trade=  +5.0%  best share of profit= nan%
+  2025           N= 11  win(net)= 36.4%  avg gross= +4.64%  avg net= +3.64%  PF(net)=2.36  best trade= +39.3%  best share of profit=  77%
+  2026           N= 12  win(net)= 25.0%  avg gross= -3.15%  avg net= -4.15%  PF(net)=0.15  best trade=  +5.0%  best share of profit= nan%
+  ex top-3       N= 40  win(net)= 22.5%  avg gross= -3.98%  avg net= -4.98%  PF(net)=0.14  best trade=  +5.0%  best share of profit= nan%
+
+ALL
+  full history   N= 79  win(net)= 36.7%  avg gross= +0.79%  avg net= -0.21%  PF(net)=0.95  best trade= +67.5%  best share of profit= 108%
+  2022           N=  5  win(net)= 60.0%  avg gross= +0.62%  avg net= -0.38%  PF(net)=0.88  best trade=  +7.1%  best share of profit= 230%
+  2023           N= 19  win(net)= 47.4%  avg gross= +4.59%  avg net= +3.59%  PF(net)=1.80  best trade= +67.5%  best share of profit=  77%
+  2024           N= 14  win(net)= 28.6%  avg gross= -3.09%  avg net= -4.09%  PF(net)=0.18  best trade=  +5.0%  best share of profit= nan%
+  2025           N= 24  win(net)= 29.2%  avg gross= +1.61%  avg net= +0.61%  PF(net)=1.21  best trade= +39.3%  best share of profit= 102%
+  2026           N= 17  win(net)= 35.3%  avg gross= -1.38%  avg net= -2.38%  PF(net)=0.43  best trade= +16.1%  best share of profit= nan%
+  ex top-3       N= 76  win(net)= 34.2%  avg gross= -1.06%  avg net= -2.06%  PF(net)=0.49  best trade= +31.7%  best share of profit= nan%
+
+Account level (Rs 100,000, 5/7 slots, Indian delivery costs + 0.3%/side slippage):
+  LISTING only   taken  36/ 36  return   +10.1%  CAGR   +2.3%  maxDD  -11.1%  PF 1.79  top-3 share 157%
+  SHELF only     taken  43/ 43  return   -14.9%  CAGR   -4.1%  maxDD  -17.5%  PF 0.52  top-3 share nan%
+  BOTH           taken  74/ 79  return    -3.0%  CAGR   -0.7%  maxDD  -20.9%  PF 0.93  top-3 share nan%
+
+==============================================================================================================
+OLD LIFECYCLE: listing breakout <= 730 days (rules in force until v3.5.4)
+==============================================================================================================
+
+LISTING_BREAKOUT
+  full history   N=147  win(net)= 30.6%  avg gross= +0.94%  avg net= -0.06%  PF(net)=0.99  best trade=+168.0%  best share of profit= 122%
+  2022           N=  4  win(net)= 75.0%  avg gross= +3.81%  avg net= +2.81%  PF(net)=4.92  best trade=  +7.1%  best share of profit=  47%
+  2023           N= 22  win(net)= 40.9%  avg gross=+13.15%  avg net=+12.15%  PF(net)=4.75  best trade=+168.0%  best share of profit=  58%
+  2024           N= 31  win(net)= 32.3%  avg gross= +0.40%  avg net= -0.60%  PF(net)=0.89  best trade= +78.4%  best share of profit= 626%
+  2025           N= 58  win(net)= 22.4%  avg gross= -2.63%  avg net= -3.63%  PF(net)=0.17  best trade= +13.4%  best share of profit= nan%
+  2026           N= 32  win(net)= 31.2%  avg gross= -0.83%  avg net= -1.83%  PF(net)=0.59  best trade= +49.1%  best share of profit= nan%
+  ex top-3       N=144  win(net)= 29.2%  avg gross= -1.22%  avg net= -2.22%  PF(net)=0.50  best trade= +61.1%  best share of profit= nan%
+
+SHELF_BREAKOUT
+  full history   N= 43  win(net)= 27.9%  avg gross= -1.36%  avg net= -2.36%  PF(net)=0.56  best trade= +39.3%  best share of profit= nan%
+  2022           N=  1  win(net)=  0.0%  avg gross=-12.15%  avg net=-13.15%  PF(net)=0.00  best trade= -12.2%  best share of profit= nan%
+  2023           N= 10  win(net)= 40.0%  avg gross= -1.19%  avg net= -2.19%  PF(net)=0.68  best trade= +36.3%  best share of profit= nan%
+  2024           N=  9  win(net)= 11.1%  avg gross= -5.30%  avg net= -6.30%  PF(net)=0.07  best trade=  +5.0%  best share of profit= nan%
+  2025           N= 11  win(net)= 36.4%  avg gross= +4.64%  avg net= +3.64%  PF(net)=2.36  best trade= +39.3%  best share of profit=  77%
+  2026           N= 12  win(net)= 25.0%  avg gross= -3.15%  avg net= -4.15%  PF(net)=0.15  best trade=  +5.0%  best share of profit= nan%
+  ex top-3       N= 40  win(net)= 22.5%  avg gross= -3.98%  avg net= -4.98%  PF(net)=0.14  best trade=  +5.0%  best share of profit= nan%
+
+ALL
+  full history   N=190  win(net)= 30.0%  avg gross= +0.42%  avg net= -0.58%  PF(net)=0.87  best trade=+168.0%  best share of profit= 212%
+  2022           N=  5  win(net)= 60.0%  avg gross= +0.62%  avg net= -0.38%  PF(net)=0.88  best trade=  +7.1%  best share of profit= 230%
+  2023           N= 32  win(net)= 40.6%  avg gross= +8.67%  avg net= +7.67%  PF(net)=2.75  best trade=+168.0%  best share of profit=  61%
+  2024           N= 40  win(net)= 27.5%  avg gross= -0.88%  avg net= -1.88%  PF(net)=0.68  best trade= +78.4%  best share of profit= nan%
+  2025           N= 69  win(net)= 24.6%  avg gross= -1.47%  avg net= -2.47%  PF(net)=0.40  best trade= +39.3%  best share of profit= nan%
+  2026           N= 44  win(net)= 29.5%  avg gross= -1.46%  avg net= -2.46%  PF(net)=0.46  best trade= +49.1%  best share of profit= nan%
+  ex top-3       N=187  win(net)= 28.9%  avg gross= -1.25%  avg net= -2.25%  PF(net)=0.52  best trade= +61.1%  best share of profit= nan%
+
+Account level (Rs 100,000, 5/7 slots, Indian delivery costs + 0.3%/side slippage):
+  LISTING only   taken 129/147  return    -0.5%  CAGR   -0.1%  maxDD  -38.4%  PF 0.99  top-3 share nan%
+  SHELF only     taken  43/ 43  return   -14.9%  CAGR   -4.1%  maxDD  -17.5%  PF 0.52  top-3 share nan%
+  BOTH           taken 153/190  return    -6.8%  CAGR   -1.7%  maxDD  -44.4%  PF 0.94  top-3 share nan%

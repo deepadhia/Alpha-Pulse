@@ -1,0 +1,30 @@
+D:\Personal Projects\Alpha-Pulse\research_quiet_day.py:88: RuntimeWarning: invalid value encountered in divide
+  rng = (h - l) / c
+IPO days 10397 across 492 symbols; NEAR days 3247; QUIET 1293 (12.4%), QUIET&NEAR 406; base hit20 11.6%, hit30 7.8%
+
+================================================================================================================
+(1) CASE-CONTROL: is a quiet day over-represented before +20% moves?
+================================================================================================================
+nr7     all days   days flagged  1756: hit20  11.4% (CI 9.7..13.2) vs not flagged  11.7%  lift 0.97x  by year (n, flagged%, rest%): {2022: (84, 6, 10), 2023: (323, 11, 14), 2024: (434, 15, 13), 2025: (575, 7, 7), 2026: (340, 16, 16)}
+nr7     NEAR days  days flagged   536: hit20  10.3% (CI 7.6..13.1) vs not flagged  10.4%  lift 0.99x  by year (n, flagged%, rest%): {2022: (19, 5, 1), 2023: (113, 14, 15), 2024: (129, 12, 14), 2025: (193, 6, 6), 2026: (82, 12, 12)}
+        share of +20% episodes-days that were nr7: 16.5%  vs 16.9% of non-hit days
+voldry  all days   days flagged  4557: hit20  10.9% (CI 9.3..12.5) vs not flagged  12.3%  lift 0.89x  by year (n, flagged%, rest%): {2022: (186, 4, 13), 2023: (785, 12, 14), 2024: (1110, 14, 13), 2025: (1634, 7, 7), 2026: (842, 14, 18)}
+voldry  NEAR days  days flagged  1464: hit20  10.2% (CI 7.9..12.7) vs not flagged  10.5%  lift 0.97x  by year (n, flagged%, rest%): {2022: (52, 0, 4), 2023: (285, 14, 15), 2024: (340, 14, 14), 2025: (568, 8, 4), 2026: (219, 9, 14)}
+        share of +20% episodes-days that were voldry: 40.9%  vs 44.2% of non-hit days
+quiet   all days   days flagged  1293: hit20  11.3% (CI 9.4..13.2) vs not flagged  11.7%  lift 0.97x  by year (n, flagged%, rest%): {2022: (52, 2, 10), 2023: (232, 13, 13), 2024: (330, 13, 13), 2025: (444, 7, 7), 2026: (235, 16, 16)}
+quiet   NEAR days  days flagged   406: hit20  11.1% (CI 8.0..14.6) vs not flagged  10.2%  lift 1.08x  by year (n, flagged%, rest%): {2023: (79, 19, 14), 2024: (105, 12, 14), 2025: (154, 8, 5), 2026: (56, 9, 12)}
+        share of +20% episodes-days that were quiet: 12.1%  vs 12.5% of non-hit days
+
+================================================================================================================
+(2) TRADABLE SETUP: buy stop above the quiet-day high (3 sessions), stop = quiet-day low, exit at target / stop / session 15
+================================================================================================================
+
+-- +20% target, 15 sessions --
+QUIET & NEAR               setups   85 filled   56  target  7.1%  stop 69.6%  time 23.2%  mean net -0.86% (CI -2.5..+0.9)  median -4.00%  PF 0.75
+NEAR, not quiet (control)  setups  696 filled  392  target 15.6%  stop 61.0%  time 23.5%  mean net +0.32% (CI -0.6..+1.3)  median -4.35%  PF 1.08
+   difference quiet minus control: -1.17pp (90% CI -3.00..+0.69); by year (n quiet, quiet net, control net): {2023: (10, -0.7, 3.0), 2024: (18, 0.6, -0.5), 2025: (21, -2.3, -0.9)}
+
+-- +30% target, 20 sessions --
+QUIET & NEAR               setups   85 filled   56  target  5.4%  stop 71.4%  time 23.2%  mean net -0.02% (CI -2.2..+2.3)  median -4.00%  PF 1.00
+NEAR, not quiet (control)  setups  696 filled  388  target  9.0%  stop 64.4%  time 26.5%  mean net +0.93% (CI -0.2..+2.1)  median -4.47%  PF 1.23
+   difference quiet minus control: -0.95pp (90% CI -3.46..+1.73); by year (n quiet, quiet net, control net): {2023: (10, -1.3, 3.6), 2024: (18, 2.9, 0.0), 2025: (21, -1.2, -0.8)}

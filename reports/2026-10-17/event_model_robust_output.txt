@@ -1,0 +1,25 @@
+real run: AUC 0.700, top-30% lift 1.60x on 199 out-of-sample events (27 positives)
+R1 permutation null (100 shuffles within year): mean AUC 0.475, 95th pct 0.585, max 0.626; p-value = 0.000
+
+R2 stability across seeds and depth:
+  depth 1: AUC median 0.711 (min 0.705, max 0.731); top-30% lift median 1.72x (min 1.47)
+  depth 2: AUC median 0.700 (min 0.689, max 0.728); top-30% lift median 1.72x (min 1.47)
+  depth 3: AUC median 0.706 (min 0.693, max 0.714); top-30% lift median 1.60x (min 1.60)
+
+R3 mean feature importance (3 walk-forward models) and univariate direction on all events:
+  gap       importance 0.237  spearman with 10-session max-high gain +0.10
+  ret5      importance 0.089  spearman with 10-session max-high gain -0.06
+  ld_range  importance 0.079  spearman with 10-session max-high gain +0.11
+  turn20    importance 0.077  spearman with 10-session max-high gain -0.09
+  supply30  importance 0.069  spearman with 10-session max-high gain -0.05
+  med_r10   importance 0.067  spearman with 10-session max-high gain -0.03
+  breadth   importance 0.067  spearman with 10-session max-high gain -0.04
+  vprev     importance 0.048  spearman with 10-session max-high gain +0.09
+
+R4 events matched to policy-P trades (2024-26, out of sample): 63 (top 30%: 19, rest: 44)
+  mean net top +9.85% vs rest +3.29%   PF top 3.44 vs rest 1.68   win rate top 53% vs rest 30%
+  difference top minus rest: +6.56pp, 90% symbol-cluster CI -5.48..+19.49
+  by year (mean net top / rest, n top): {2024: (19.9, 3.7, 4), 2025: (-6.1, 5.9, 3), 2026: (10.5, -2.0, 12)}
+  largest top-bucket winners: [('SEDEMAC', '2026-04-21', 93.0), ('MVELECTRO', '2026-08-27', 50.0), ('KRN', '2024-11-06', 41.0), ('JSFB', '2024-03-28', 36.0), ('PANORAMA', '2026-09-10', 21.0)]
+  top bucket net without its 3 best trades: +0.19%   (rest without its 3 best: -3.52%)
+  GOOD-type winners (net >= 20%) captured by the top bucket: 5 of 8

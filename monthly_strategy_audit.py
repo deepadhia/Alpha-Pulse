@@ -47,6 +47,7 @@ SCANNER_VERSION = scanner_module.SCANNER_VERSION
 fetch_data = scanner_module.fetch_data
 
 from core.strategy_evidence import sync_all_trade_evidence
+from core.versioning import NATIVE_FORWARD_CUTOFF, NATIVE_FORWARD_VERSIONS
 
 
 def run_monthly_audit(send_alert: bool = True) -> dict:
@@ -97,7 +98,7 @@ def run_monthly_audit(send_alert: bool = True) -> dict:
 
     # Version-Isolated Cohorts:
     # 1. Native Live v3.5.0 Forward-Test Cohort (entered natively under v3.5.0 rules on/after 2026-09-29)
-    v35_df = df[(df['version'] == '3.5.0') & (~df['_backfilled']) & (df['entry_date_str'] >= '2026-09-29')]
+    v35_df = df[(df['version'].isin(NATIVE_FORWARD_VERSIONS)) & (~df['_backfilled']) & (df['entry_date_str'] >= NATIVE_FORWARD_CUTOFF)]  # 3.5.0 and 3.6.0 tags
     v35_total = len(v35_df)
     v35_wins = len(v35_df[v35_df['is_win']])
     v35_losses = v35_total - v35_wins

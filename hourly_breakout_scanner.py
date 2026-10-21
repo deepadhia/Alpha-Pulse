@@ -52,6 +52,7 @@ _scanner_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stream
 spec = importlib.util.spec_from_file_location("scanner", _scanner_path)
 scanner_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(scanner_module)
+from core.portfolio_caps import DEFAULT_MAX_ACTIVE_POSITIONS, DEFAULT_HARD_ACTIVE_POSITIONS
 
 # Import shared utilities
 get_market_regime = scanner_module.get_market_regime
@@ -63,7 +64,7 @@ if send_holiday_notification_once is None:
     from utils import send_holiday_notification_once
 write_daily_log = scanner_module.write_daily_log  # Use shared writer — prevents version drift
 
-SCANNER_VERSION = "3.5.0"  # v3.5.0: Upper 50% Candle Body Gate, 14-Day Velocity Gate, Anti-Chasing Extension Guard
+SCANNER_VERSION = "3.6.0"  # v3.6.0: Hardened execution release (10 x 10% slots, close-based stop alerts, atomic commit lock, shelf/hourly PAPER_ONLY); v3.5.0 entry rules unchanged
 
 def _now_ist():
     return (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).replace(tzinfo=None)
@@ -634,10 +635,25 @@ def save_breakout_signal(breakout_data):
             logger.warning(f"Open-position guard failed for {symbol}: {e}")
 
         # Portfolio caps (same soft/hard as IPO scanners) — hourly must not ignore the book.
-        soft_cap = getattr(scanner_module, 'MAX_ACTIVE_POSITIONS', 5)
-        hard_cap = getattr(scanner_module, 'HARD_ACTIVE_POSITIONS', soft_cap + 2)
+        soft_cap = getattr(scanner_module, 'MAX_ACTIVE_POSITIONS', DEFAULT_MAX_ACTIVE_POSITIONS)
+        hard_cap = getattr(scanner_module, 'HARD_ACTIVE_POSITIONS', DEFAULT_HARD_ACTIVE_POSITIONS)
         active_count = 0
         portfolio_full = False
+        # Atomic "count ACTIVE -> cap -> insert": hold the portfolio commit lock until the write is done.
+        _lock_db = None
+        _lock_owner = None
+        try:
+            from db import db as _lock_db
+            from core.locks import acquire_blocking
+            _lock_owner = acquire_blocking(_lock_db)
+        except Exception as lock_e:
+            logger.warning(f"Hourly commit lock unavailable for {symbol}: {lock_e}")
+        if _lock_owner is None:
+            portfolio_full = True   # fail closed: never open uncapped ACTIVE capital without the lock
+        # INTRADAY-grade signals have no backtest evidence behind them. Until they do, they are paper-only
+        # unless explicitly enabled (HOURLY_LIVE_CAPITAL_ENABLED=1).
+        if os.getenv("HOURLY_LIVE_CAPITAL_ENABLED", "0") != "1":
+            portfolio_full = True
         try:
             from db import positions_col
             if positions_col is not None:
@@ -718,7 +734,17 @@ def save_breakout_signal(breakout_data):
                 db_metrics["failures"] = db_metrics.get("failures", 0) + 1
             except Exception:
                 pass
+            try:
+                from core.locks import release_owner
+                release_owner(_lock_db, _lock_owner)
+            except Exception:
+                pass
             return False
+        try:
+            from core.locks import release_owner
+            release_owner(_lock_db, _lock_owner)
+        except Exception:
+            pass
 
         logger.info(
             f"✅ Saved INTRADAY {position_status} for {symbol} "

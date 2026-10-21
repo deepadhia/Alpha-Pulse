@@ -1,0 +1,12 @@
+events 263 across 195 symbols; EXPLODE (>=+20% in 10 sessions) 14.4%; BIG (>=+40%) 4.6%; by year events: {2022: 10, 2023: 54, 2024: 61, 2025: 76, 2026: 62}  explode rate: {2022: 0.1, 2023: 0.185, 2024: 0.18, 2025: 0.053, 2026: 0.194}
+
+Out-of-sample events (2024-26): 199; base EXPLODE rate 13.6%, BIG 5.5%, mean 10-session max-high gain 11.2%
+M1 logistic L2   target y20: AUC 0.432 (90% CI 0.332..0.530)  top-30% rate 8.3% vs base 13.6% (lift 0.61x)  top gain 10.5% vs rest 11.5% (diff CI -3.9..+2.1)  by year top/base: {2024: (17.6, 18.0), 2025: (5.3, 5.3), 2026: (0.0, 19.4)}
+                   top-10% bucket: n=20, y20 rate 5.0%, mean gain 10.8%, mean 10-session close return -0.9% (all events +1.4%)
+M1 logistic L2   target y40: fewer than 10 positive training events before each test year, not run
+M2 boosting d2   target y20: AUC 0.700 (90% CI 0.616..0.785)  top-30% rate 21.7% vs base 13.6% (lift 1.60x)  top gain 15.4% vs rest 9.4% (diff CI +2.1..+10.2)  by year top/base: {2024: (27.3, 18.0), 2025: (8.7, 5.3), 2026: (30.8, 19.4)}
+                   top-10% bucket: n=20, y20 rate 30.0%, mean gain 17.3%, mean 10-session close return +5.4% (all events +1.4%)
+M2 boosting d2   target y40: fewer than 10 positive training events before each test year, not run
+
+Univariate AUC on the test events (optimistic, no training):
+  ret5 0.377, ret10 0.417, dist_lh 0.421, vdry3 0.426, gap 0.573, med_r10 0.429, ld_range 0.566, breadth 0.437

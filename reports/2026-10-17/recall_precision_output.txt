@@ -1,0 +1,50 @@
+trades 227  GOOD 54 (23.8%)  BAD 86 (37.9%)  open 22; GOOD share of total net profit: 93% of gross wins
+full-set mean net +5.29%   BAD mean -8.18%   GOOD mean +34.97%
+
+Out-of-sample (2024-26 pooled), threshold chosen on prior years to keep >= 80% of GOOD.
+lift = share of BAD rejected minus share of ALL trades rejected (0 = no better than random rejection)
+
+   feature keep  test_n  good  bad  recall_good  rej_bad  rej_all  lift  kept_net  full_net  rej_net
+ ld_sent60   le     176    42   72         92.9     22.2     15.9   6.3      5.98      4.95    -0.48
+ med_ret20   le     176    42   72         90.5     18.1     12.5   5.6      4.76      4.95     6.26
+  n_active   ge     176    42   72         92.9     19.4     14.2   5.2      5.99      4.95    -1.30
+    turn20   ge     176    42   72         88.1     19.4     14.8   4.7      5.08      4.95     4.20
+   ld_high   ge     176    42   72         69.0     37.5     33.5   4.0      6.39      4.95     2.09
+     ret10   le     176    42   72         83.3     27.8     23.9   3.9      5.19      4.95     4.21
+   range10   le     176    42   72         73.8     30.6     27.8   2.7      3.89      4.95     7.71
+      ret5   le     176    42   72         73.8     30.6     28.4   2.1      4.03      4.95     7.28
+  risk_pct   ge     176    42   72         92.9     16.7     14.8   1.9      5.66      4.95     0.85
+  ld_range   ge     176    42   72         88.1      9.7      8.0   1.8      5.25      4.95     1.49
+        vr   ge     176    42   72         69.0     34.7     33.0   1.8      5.36      4.95     4.13
+       gap   ge     176    42   72         83.3     18.1     16.5   1.6      5.42      4.95     2.59
+     ret10   ge     176    42   72         88.1     16.7     15.3   1.3      5.91      4.95    -0.35
+frac_above   le     176    42   72         95.2      4.2      2.8   1.3      5.17      4.95    -2.44
+     atr10   ge     176    42   72         88.1      9.7      8.5   1.2      4.80      4.95     6.57
+ med_ret20   ge     176    42   72         85.7     15.3     14.2   1.1      4.75      4.95     6.14
+        vr   le     176    42   72         73.8     23.6     22.7   0.9      4.73      4.95     5.71
+       age   le     176    42   72         85.7     13.9     13.1   0.8      4.16      4.95    10.22
+  ld_range   le     176    42   72         59.5     36.1     35.8   0.3      4.36      4.95     6.01
+   range10   ge     176    42   72         81.0     12.5     12.5   0.0      4.80      4.95     6.05
+  supply30   ge     176    42   72         83.3     13.9     14.2  -0.3      4.51      4.95     7.61
+       gap   le     176    42   72         69.0     19.4     19.9  -0.4      3.40      4.95    11.20
+       ext   ge     176    42   72         81.0     15.3     15.9  -0.6      4.67      4.95     6.47
+ dist_prev   le     176    42   72         81.0     23.6     24.4  -0.8      5.49      4.95     3.30
+     atr10   le     176    42   72         52.4     37.5     39.2  -1.7      3.93      4.95     6.53
+frac_above   ge     176    42   72         71.4     22.2     24.4  -2.2      3.04      4.95    10.88
+  risk_pct   le     176    42   72         90.5      5.6      8.0  -2.4      5.32      4.95     0.72
+ ld_sent60   ge     176    42   72         83.3     13.9     16.5  -2.6      5.59      4.95     1.73
+    turn20   le     176    42   72         76.2     26.4     29.0  -2.6      5.90      4.95     2.63
+       ext   le     176    42   72         76.2     25.0     27.8  -2.8      5.36      4.95     3.90
+      ret5   ge     176    42   72         81.0     11.1     14.8  -3.7      3.28      4.95    14.62
+   ld_high   le     176    42   72         76.2     12.5     16.5  -4.0      3.77      4.95    10.97
+ dist_prev   ge     176    42   72         83.3     12.5     16.5  -4.0      5.11      4.95     4.13
+  supply30   le     176    42   72         52.4     40.3     44.3  -4.0      4.84      4.95     5.10
+       age   ge     176    42   72         78.6     13.9     19.9  -6.0      5.70      4.95     1.95
+  n_active   le     176    42   72         45.2     38.9     45.5  -6.6      4.21      4.95     5.84
+
+Features passing recall >= 75%, bad rejected >= 35%, lift >= 10pp and higher kept net: NONE
+
+In-sample reference (all years, thresholds fitted on everything, OPTIMISTIC):
+  ld_sent60 keep le 0.00211: recall GOOD 81%  BAD rejected 29%  trades rejected 23%  kept net +5.22%  rejected net +5.51%
+  med_ret20 keep le 0.0529: recall GOOD 81%  BAD rejected 27%  trades rejected 19%  kept net +5.59%  rejected net +4.04%
+  n_active keep ge 23: recall GOOD 83%  BAD rejected 31%  trades rejected 26%  kept net +7.42%  rejected net -0.65%

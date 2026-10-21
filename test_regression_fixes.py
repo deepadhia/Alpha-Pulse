@@ -1019,10 +1019,19 @@ class TestRegressionFixes(unittest.TestCase):
             )
 
         # 5. Defense-in-depth: commit_trade_to_db refuses live entry when market is closed
-        with patch('listing_day_breakout_scanner._market_is_open_ist', return_value=False),              patch.dict(os.environ, {"PYTEST_CURRENT_TEST": ""}):
+        # The database layer is mocked here too: if the guard ever failed, this call must not write a
+        # COMMIT_CLEAN_TEST record into the real MongoDB (an unpatched version of this step did exactly that).
+        with patch('listing_day_breakout_scanner._market_is_open_ist', return_value=False), \
+             patch.dict(os.environ, {"PYTEST_CURRENT_TEST": "", "FORCE_OFFLINE_SCAN": ""}), \
+             patch('db.has_active_position', return_value=False), \
+             patch('db.db', mock_mongo), \
+             patch('db.upsert_signal') as _no_sig_write, \
+             patch('db.upsert_position') as _no_pos_write:
             # Clear test flag temporarily to simulate live production after-hours trigger
             success_after_hours, _, _, _, _ = commit_trade_to_db(breakout_payload)
             self.assertFalse(success_after_hours)
+            _no_sig_write.assert_not_called()
+            _no_pos_write.assert_not_called()
 
         # 6. scan_listing_day_breakouts halts cleanly outside market hours
         from listing_day_breakout_scanner import scan_listing_day_breakouts

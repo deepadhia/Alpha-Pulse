@@ -1,0 +1,98 @@
+================================================================================================================
+1. STOP STYLE (same entries; paired on symbol+entry bar; diff = variant minus resting intraday stop)
+================================================================================================================
+
+-- RESTING ENTRY (fill +0.3%, cap +2.5%)
+A resting intraday stop (gap-aware fill)       N=228 net +3.22% CI90[ +0.9, +5.8] PF 1.81 med -1.98 worst  -13.9% below -15%:  0.0% avg loser -6.79
+B close-based alert, sell next open  [LIVE]    N=227 net +5.29% CI90[ +2.6, +8.2] PF 2.45 med -1.44 worst  -16.9% below -15%:  2.4% avg loser -6.43
+C B + disaster stop 3% below the level         N=227 net +4.61% CI90[ +2.0, +7.4] PF 2.20 med -1.48 worst  -15.1% below -15%:  0.5% avg loser -6.77
+D B + disaster stop 5% below the level         N=227 net +4.72% CI90[ +2.1, +7.5] PF 2.24 med -1.44 worst  -16.4% below -15%:  2.9% avg loser -6.58
+E B + disaster stop 8% below the level         N=227 net +5.17% CI90[ +2.5, +8.1] PF 2.40 med -1.48 worst  -19.0% below -15%:  2.9% avg loser -6.46
+   paired vs A: B close-based alert, sell next open  [LIVE]  +2.03pp CI90[+0.79,+3.54] n=227 | ex-top3 +0.86[+0.29,+1.50] | years better 5/5
+   paired vs A: C B + disaster stop 3% below the level       +1.36pp CI90[+0.22,+2.80] n=227 | ex-top3 +0.29[-0.23,+0.85] | years better 4/5
+   paired vs A: D B + disaster stop 5% below the level       +1.47pp CI90[+0.34,+2.87] n=227 | ex-top3 +0.44[-0.10,+1.01] | years better 5/5
+   paired vs A: E B + disaster stop 8% below the level       +1.92pp CI90[+0.68,+3.43] n=227 | ex-top3 +0.75[+0.19,+1.34] | years better 5/5
+
+-- MODERATE ENTRY (fill +1.0%, cap +3.0%)
+A resting intraday stop (gap-aware fill)       N=229 net +1.92% CI90[ -0.3, +4.3] PF 1.44 med -2.26 worst  -14.5% below -15%:  0.0% avg loser -6.88
+B close-based alert, sell next open  [LIVE]    N=229 net +4.14% CI90[ +1.5, +7.0] PF 2.04 med -1.77 worst  -17.4% below -15%:  1.9% avg loser -6.61
+C B + disaster stop 3% below the level         N=229 net +3.27% CI90[ +0.8, +6.0] PF 1.78 med -1.86 worst  -14.6% below -15%:  0.0% avg loser -6.97
+D B + disaster stop 5% below the level         N=229 net +3.49% CI90[ +1.0, +6.1] PF 1.84 med -1.86 worst  -16.4% below -15%:  2.4% avg loser -6.69
+E B + disaster stop 8% below the level         N=229 net +4.01% CI90[ +1.4, +6.8] PF 2.00 med -1.77 worst  -19.0% below -15%:  2.4% avg loser -6.67
+   paired vs A: B close-based alert, sell next open  [LIVE]  +2.23pp CI90[+0.88,+3.89] n=228 | ex-top3 +0.99[+0.31,+1.76] | years better 5/5
+   paired vs A: C B + disaster stop 3% below the level       +1.36pp CI90[+0.09,+2.92] n=228 | ex-top3 +0.13[-0.42,+0.74] | years better 4/5
+   paired vs A: D B + disaster stop 5% below the level       +1.58pp CI90[+0.32,+3.10] n=228 | ex-top3 +0.38[-0.20,+1.04] | years better 4/5
+   paired vs A: E B + disaster stop 8% below the level       +2.10pp CI90[+0.77,+3.74] n=228 | ex-top3 +0.86[+0.22,+1.60] | years better 5/5
+
+================================================================================================================
+2-3. PROFIT FACTOR, LOSING STREAKS (policy stops = live close-based alert)
+================================================================================================================
+
+== RESTING 0.3%/cap2.5 | closed 205 open 22
+  PF closed-only 1.67 | incl. open runners at MTM 2.45 | closed ex-top-3 winners 1.14
+  PF by entry year (incl. open): {2022: 0.35, 2023: 4.88, 2024: 2.24, 2025: 1.12, 2026: 4.33}
+  longest losing streak (closed, chronological): 11; streak lengths: {1: np.int64(21), 2: np.int64(7), 3: np.int64(6), 4: np.int64(5), 5: np.int64(3), 6: np.int64(2), 8: np.int64(2), 11: np.int64(1)}
+  worst 5 consecutive closed trades: -54.8pp -> -5.5% of NAV at 10% weights, -7.8% at 14%
+  worst 8 consecutive closed trades: -76.9pp -> -7.7% of NAV at 10% weights, -11.0% at 14%
+  worst 10 consecutive closed trades: -83.1pp -> -8.3% of NAV at 10% weights, -11.9% at 14%
+  next 40 trades (bootstrap): longest losing streak median 6, p90 9, P(streak >= 8) 26% | PF median 1.56, p10 0.59, P(PF < 1) 26%, P(PF >= 2) 34%
+  next 100 trades (bootstrap): PF median 1.66, p10 0.97, P(PF >= 2) 31%
+  win rate 38.0%, avg win 17.47, avg loss 6.43, payoff 2.72; a PF of 2.0 at this win rate needs payoff 3.26
+
+== MODERATE 1.0%/cap3.0 | closed 209 open 20
+  PF closed-only 1.45 | incl. open runners at MTM 2.04 | closed ex-top-3 winners 0.98
+  PF by entry year (incl. open): {2022: 0.26, 2023: 4.46, 2024: 1.96, 2025: 0.98, 2026: 3.08}
+  longest losing streak (closed, chronological): 15; streak lengths: {1: np.int64(21), 2: np.int64(2), 3: np.int64(4), 4: np.int64(4), 5: np.int64(2), 6: np.int64(4), 7: np.int64(1), 8: np.int64(1), 9: np.int64(1), 10: np.int64(1), 15: np.int64(1)}
+  worst 5 consecutive closed trades: -55.6pp -> -5.6% of NAV at 10% weights, -8.0% at 14%
+  worst 8 consecutive closed trades: -76.1pp -> -7.6% of NAV at 10% weights, -10.9% at 14%
+  worst 10 consecutive closed trades: -88.8pp -> -8.9% of NAV at 10% weights, -12.7% at 14%
+  next 40 trades (bootstrap): longest losing streak median 7, p90 10, P(streak >= 8) 36% | PF median 1.35, p10 0.49, P(PF < 1) 33%, P(PF >= 2) 26%
+  next 100 trades (bootstrap): PF median 1.44, p10 0.80, P(PF >= 2) 19%
+  win rate 34.9%, avg win 17.88, avg loss 6.61, payoff 2.71; a PF of 2.0 at this win rate needs payoff 3.73
+
+== CHASE +1.7% (today's measured fills) | closed 213 open 20
+  PF closed-only 1.36 | incl. open runners at MTM 1.88 | closed ex-top-3 winners 0.93
+  PF by entry year (incl. open): {2022: 0.26, 2023: 4.06, 2024: 1.78, 2025: 0.91, 2026: 2.76}
+  longest losing streak (closed, chronological): 11; streak lengths: {1: np.int64(17), 2: np.int64(8), 3: np.int64(5), 4: np.int64(2), 5: np.int64(5), 6: np.int64(4), 7: np.int64(1), 8: np.int64(1), 9: np.int64(1), 11: np.int64(1)}
+  worst 5 consecutive closed trades: -52.0pp -> -5.2% of NAV at 10% weights, -7.4% at 14%
+  worst 8 consecutive closed trades: -64.2pp -> -6.4% of NAV at 10% weights, -9.2% at 14%
+  worst 10 consecutive closed trades: -79.6pp -> -8.0% of NAV at 10% weights, -11.4% at 14%
+  next 40 trades (bootstrap): longest losing streak median 7, p90 11, P(streak >= 8) 38% | PF median 1.27, p10 0.46, P(PF < 1) 36%, P(PF >= 2) 22%
+  next 100 trades (bootstrap): PF median 1.32, p10 0.77, P(PF >= 2) 13%
+  win rate 34.3%, avg win 18.08, avg loss 6.94, payoff 2.61; a PF of 2.0 at this win rate needs payoff 3.84
+
+================================================================================================================
+4. ACCOUNT LEVEL (Rs 1 lakh; Indian delivery charges + 0.3% exit slippage; entry slip is in the fill)
+================================================================================================================
+== chase +1.7% (today)  (open trades marked to market: 20)
+   1/7 weights, 7 slots             taken 152 ret   +72.6% CAGR +13.4% maxDD  -34.7% Calmar 0.39 PF 1.62 worst -15.2%
+   1/10 weights, 10 slots           taken 187 ret   +56.1% CAGR +10.8% maxDD  -29.6% Calmar 0.37 PF 1.58 worst -15.4%
+   1/7 + halve size at 10% DD       taken 161 ret   +39.0% CAGR  +7.9% maxDD  -27.9% Calmar 0.28 PF 1.47 worst -15.7%
+   1/10 + halve size at 10% DD      taken 194 ret   +43.0% CAGR  +8.6% maxDD  -24.2% Calmar 0.36 PF 1.60 worst -16.0%
+   1/7, risk-sized 1.0% per trade   taken 163 ret   +31.5% CAGR  +6.5% maxDD  -26.6% Calmar 0.24 PF 1.43 worst -15.6%
+== resting 0.3%/cap2.5  (open trades marked to market: 22)
+   1/7 weights, 7 slots             taken 143 ret  +124.3% CAGR +20.4% maxDD  -32.0% Calmar 0.64 PF 2.20 worst -17.6%
+   1/10 weights, 10 slots           taken 175 ret  +126.0% CAGR +20.6% maxDD  -25.4% Calmar 0.81 PF 2.35 worst -17.7%
+   1/7 + halve size at 10% DD       taken 151 ret   +70.6% CAGR +13.1% maxDD  -25.7% Calmar 0.51 PF 1.87 worst -17.6%
+   1/10 + halve size at 10% DD      taken 179 ret  +108.9% CAGR +18.5% maxDD  -21.0% Calmar 0.88 PF 2.43 worst -17.7%
+   1/7, risk-sized 1.0% per trade   taken 151 ret   +65.7% CAGR +12.3% maxDD  -22.1% Calmar 0.56 PF 2.05 worst -17.9%
+== moderate 1.0%/cap3.0  (open trades marked to market: 20)
+   1/7 weights, 7 slots             taken 154 ret   +55.6% CAGR +10.7% maxDD  -34.3% Calmar 0.31 PF 1.50 worst -18.2%
+   1/10 weights, 10 slots           taken 183 ret   +87.6% CAGR +15.6% maxDD  -26.7% Calmar 0.58 PF 1.87 worst -18.3%
+   1/7 + halve size at 10% DD       taken 161 ret    +8.7% CAGR  +1.9% maxDD  -29.1% Calmar 0.07 PF 1.11 worst -18.3%
+   1/10 + halve size at 10% DD      taken 187 ret   +85.3% CAGR +15.3% maxDD  -21.2% Calmar 0.72 PF 2.05 worst -18.7%
+   1/7, risk-sized 1.0% per trade   taken 161 ret   +34.0% CAGR  +7.0% maxDD  -26.0% Calmar 0.27 PF 1.49 worst -18.6%
+== resting, CLOSED trades only (conservative: drops the still-running trades)
+   1/7 weights, 7 slots             taken 153 ret   +42.9% CAGR  +8.6% maxDD  -33.3% Calmar 0.26 PF 1.38 worst -17.6%
+   1/10 weights, 10 slots           taken 180 ret   +53.1% CAGR +10.3% maxDD  -26.2% Calmar 0.39 PF 1.52 worst -17.7%
+
+================================================================================================================
+5. CAPACITY: position size vs the stock's 20-day average daily turnover at entry (policy P, 14% weights)
+================================================================================================================
+turnover20 (Rs Cr/day) percentiles 5/10/25/50: [  3.    5.1  18.5 101.5]
+capital Rs    1 lakh: position Rs   0.00 Cr | participation of avg daily turnover: median  0.00% p90   0.03% | trades above 2%:  0.0%, above 5%:  0.0%
+capital Rs   10 lakh: position Rs   0.01 Cr | participation of avg daily turnover: median  0.01% p90   0.28% | trades above 2%:  0.0%, above 5%:  0.0%
+capital Rs   25 lakh: position Rs   0.04 Cr | participation of avg daily turnover: median  0.04% p90   0.71% | trades above 2%:  3.1%, above 5%:  0.0%
+capital Rs   50 lakh: position Rs   0.07 Cr | participation of avg daily turnover: median  0.07% p90   1.41% | trades above 2%:  6.6%, above 5%:  1.3%
+capital Rs  100 lakh: position Rs   0.14 Cr | participation of avg daily turnover: median  0.14% p90   2.83% | trades above 2%: 14.1%, above 5%:  4.8%
+capital Rs  250 lakh: position Rs   0.36 Cr | participation of avg daily turnover: median  0.35% p90   7.06% | trades above 2%: 24.7%, above 5%: 14.1%

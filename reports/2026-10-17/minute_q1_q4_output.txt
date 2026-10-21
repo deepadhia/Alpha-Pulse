@@ -1,0 +1,54 @@
+status counts: {'filled': 226, 'no_minutes': 2}
+trades with minute bars on the entry day and a trigger cross: 226 of 228; GOOD 54 BAD 85
+
+==============================================================================================================
+Q1 EXECUTION (resting stop-limit at listing high +1.5%, limit +2.5%)
+==============================================================================================================
+cross time: median 16 minutes after the open; crossed within first 15 min: 49.1%, after 12:00 IST: 21.7%
+jumped through the limit at the cross minute: 0.0% (0);  unfilled after the jump: 0
+measured fill vs trigger (pct): mean +0.06  median +0.00  p90 +0.24   (replay assumed +0.30 on top of the trigger)
+measured fill vs replay fill (pct): mean -0.30  median -0.30  p90 -0.30
+mean net per filled trade: replay +5.34% (CI +2.6..+8.4)   with measured fills +5.66% (CI +2.9..+8.7)   PF 2.48 -> 2.64
+
+==============================================================================================================
+Q2 LIVE MID-SESSION GATES REPLAYED FROM MINUTE BARS (bar: keep a gate only if it rejects >= 35% of BAD while keeping >= 80% of GOOD and rejected mean net < 0)
+==============================================================================================================
+volume floor 150k at cross minute              rejects  90 (39.8%)  GOOD rejected  46.3%  BAD rejected  38.8%  rejected mean net  +7.71%  kept mean net +3.77%  outliers>=25% rejected 11
+volume floor 150k at cross+60                  rejects  47 (20.8%)  GOOD rejected  27.8%  BAD rejected  22.4%  rejected mean net  +9.60%  kept mean net +4.22%  outliers>=25% rejected 6
+close location >= 50% at cross minute          rejects  33 (14.6%)  GOOD rejected  13.0%  BAD rejected  14.1%  rejected mean net  +4.93%  kept mean net +5.41%  outliers>=25% rejected 3
+close location >= 50% at cross+60              rejects  77 (34.1%)  GOOD rejected  25.9%  BAD rejected  43.5%  rejected mean net  +3.55%  kept mean net +6.27%  outliers>=25% rejected 7
+hold test at cross+60 (confirmation)           rejects 123 (54.4%)  GOOD rejected  50.0%  BAD rejected  63.5%  rejected mean net  +6.35%  kept mean net +4.13%  outliers>=25% rejected 15
+all of: vol, loc, hold at cross+60             rejects 157 (69.5%)  GOOD rejected  64.8%  BAD rejected  78.8%  rejected mean net  +5.78%  kept mean net +4.34%  outliers>=25% rejected 18
+
+==============================================================================================================
+Q3 FIRST-60-MINUTE FEATURES, walk-forward 2024-26 (bar: recall GOOD >= 75%, BAD rejected >= 35%, lift >= 10pp, rejected mean net < 0)
+==============================================================================================================
+trades with all features: 210; GOOD 50  BAD 78
+     feature keep   n  recall_good  bad_rej  rej_all  lift  rej_net  kept_net
+  f_pullback   le 162         66.7     58.5     45.7  12.8     1.85      8.30
+f_hold_share   ge 162         71.8     41.5     29.0  12.5     6.93      4.71
+f_above_vwap   ge 162         74.4     38.5     30.9   7.6     5.90      5.11
+  f_vol_pace   le 162         87.2     18.5     15.4   3.0     3.04      5.78
+ f_mins_open   le 162         79.5     23.1     21.0   2.1     6.70      5.00
+       f_gap   ge 162         82.1     18.5     17.9   0.6     2.86      5.90
+f_above_vwap   le 162         92.3      6.2      6.2  -0.0    12.11      4.91
+       f_gap   le 162         74.4     20.0     20.4  -0.4    10.58      4.02
+  f_pullback   ge 162         97.4      0.0      1.9  -1.9    13.42      5.20
+f_hold_share   le 162         92.3      0.0      3.7  -3.7     8.13      5.25
+  f_vol_pace   ge 162         69.2     20.0     29.0  -9.0     4.93      5.53
+ f_mins_open   ge 162         71.8     16.9     27.8 -10.9    10.31      3.45
+passing the bar: NONE
+
+==============================================================================================================
+Q4 CONFIRM-THEN-BUY (enter at cross+60 minutes) vs RESTING ENTRY, per signal, a skipped signal counts 0
+==============================================================================================================
+signals compared: 210; resting book: mean net per signal +5.66%, total +1188 pp-of-position
+(a) always buy at cross+60: taken 210/210  mean net per signal +5.58%  paired diff vs resting -0.08pp (CI -0.45..+0.26); without top-3 +0.02; GOOD missed 0/50; BAD avoided 0/78
+      by year (pp): {2022: -0.43, 2023: 0.4, 2024: -0.76, 2025: -0.02, 2026: 0.16}
+(b) only if hold test passes: taken 87/210  mean net per signal +1.01%  paired diff vs resting -4.65pp (CI -7.44..-1.99); without top-3 -2.62; GOOD missed 27/50; BAD avoided 54/78
+      by year (pp): {2022: 1.84, 2023: -8.1, 2024: -4.64, 2025: -2.18, 2026: -6.64}
+(c) hold test AND price <= LH+3.5% (live-like): taken 55/210  mean net per signal +0.17%  paired diff vs resting -5.49pp (CI -8.56..-2.64); without top-3 -3.47; GOOD missed 36/50; BAD avoided 57/78
+      by year (pp): {2022: 2.49, 2023: -9.43, 2024: -6.63, 2025: -1.65, 2026: -8.07}
+
+price at cross+60 vs listing high (pct): median 1.4, share above the +3.5% chase cap: 18.1%
+GOOD trades whose price at cross+60 was above the cap: 10 of 50

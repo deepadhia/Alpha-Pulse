@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-3.5.0-orange.svg)](https://github.com/deepadhia/Alpha-Pulse)
+[![Version](https://img.shields.io/badge/version-3.6.0-orange.svg)](https://github.com/deepadhia/Alpha-Pulse)
 [![Automated](https://img.shields.io/badge/automation-GitHub%20Actions-green.svg)](https://github.com/features/actions)
 
 **AlphaPulse** is a high-conviction, behavior-driven quantitative momentum and breakout qualification system. It participates **only in confirmed breakouts** with structural and volume validation, ruthlessly filtering out noise and tracking setup forensics to continuously refine the statistical edge.
@@ -85,10 +85,10 @@ It is primarily a **tactical alerting** layer (JSONL logs + Telegram).
 ## 💼 Portfolio Allocation & Risk Control (v3.3.0)
 
 ### 1. Portfolio Caps & `PAPER_ONLY` Gating
-To protect live capital, scanners share a **Portfolio Cap Guard** (`MAX_ACTIVE_POSITIONS` soft default **5**, `HARD_ACTIVE_POSITIONS` default soft+2):
+To protect live capital, scanners share a **Portfolio Cap Guard** (`MAX_ACTIVE_POSITIONS` and `HARD_ACTIVE_POSITIONS`, both default **10** from `core/portfolio_caps.py`, i.e. one flat cap of 10 positions and a 10% equal weight; before 2026-10-14 the defaults were soft 5 / hard 7. Roll back by setting both variables to 5 and 7):
 * **Cap Check:** Before opening a new `ACTIVE` trade, the scanner counts `status: "ACTIVE"` in MongoDB.
   * At/above soft cap (non-pristine): signal + position are written as `"PAPER_ONLY"`.
-  * At/above hard cap: always `"PAPER_ONLY"` (listing soft-cap bypass only applies between soft and hard).
+  * At/above hard cap: always `"PAPER_ONLY"` (listing soft-cap bypass only applies between soft and hard; with the default soft = hard = 10 there is no such band).
 * **Consolidation (v3.4.0 OOS):** Forced `PAPER_ONLY` regardless of free slots (forward test).
 * **Listing / re-entry:** Can open `ACTIVE` when under cap; skips commit if symbol already has an `ACTIVE` row.
 * **Hourly:** Soft-cap → `PAPER_ONLY`; never overwrites an open book row.
@@ -672,4 +672,4 @@ All statistics, analytics scripts, and strategy evidence are strictly bounded to
 
 ---
 
-<sub>Built for systematic momentum trading | AlphaPulse v3.5.0 | Automated via GitHub Actions + Cloudflare Worker Dispatcher | MongoDB Atlas Infrastructure | Data-Driven Filter Optimization</sub>
+<sub>Built for systematic momentum trading | AlphaPulse v3.6.0 | Automated via GitHub Actions + Cloudflare Worker Dispatcher | MongoDB Atlas Infrastructure | Data-Driven Filter Optimization</sub>

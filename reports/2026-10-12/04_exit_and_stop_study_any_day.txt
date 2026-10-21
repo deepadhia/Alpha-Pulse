@@ -1,0 +1,39 @@
+baseline (live exits) on 5323 signals (any liquid IPO-day): mean net -0.84%  PF 0.81  win 25.8%  avg days 15.6
+pre-registered variants: 35  (Bonferroni one-sided threshold p < 0.0014)
+
+                             label        axis    n  changed  mean_net    PF    win   diff     lo    hi     p  yrs_pos  yrs   days
+        winner cushion 0.70 x peak     cushion 5242      347    -1.062 0.761 24.609  0.430 -0.199 1.231 0.118        2    5 20.129
+        winner cushion 0.75 x peak     cushion 5271      366    -0.824 0.814 25.043  0.391 -0.175 1.180 0.126        2    5 17.871
+      winner min lock 1.10 x entry    min_lock 5323      694    -0.734 0.832 26.038  0.106 -0.095 0.287 0.142        2    5 13.300
+       dead-money peak run-up < 2%  dead_runup 5317      191    -0.738 0.834 23.923  0.104 -0.017 0.252 0.047        3    5 16.413
+                swing lookback 25d        stop 4620      165    -0.882 0.802 25.346  0.069 -0.037 0.265 0.353        2    5 15.218
+        winner cushion 0.85 x peak     cushion 5323      577    -0.789 0.819 25.944  0.051 -0.291 0.367 0.364        2    5 13.454
+      winner threshold +10% run-up  winner_thr 5323      414    -0.793 0.817 29.438  0.047 -0.085 0.165 0.227        3    5 14.383
+     trail distance 7% below price   trail_pct 5323     1433    -0.796 0.808 29.513  0.043 -0.115 0.190 0.288        2    5 13.683
+       stage-1 trail starts at +8% trail_start 5315      234    -0.799 0.818 26.265  0.031 -0.019 0.087 0.141        2    5 15.831
+   velocity gate 28d / 20 sessions    velocity 5282     1610    -0.800 0.838 27.698  0.029 -0.206 0.308 0.435        2    5 19.835
+   velocity + dead-money gates OFF   gates_off 5273     1642    -0.808 0.841 27.916  0.021 -0.292 0.404 0.470        2    5 20.958
+   velocity gate 21d / 15 sessions    velocity 5293     1559    -0.815 0.828 27.017  0.016 -0.139 0.190 0.446        1    5 18.243
+              initial stop cap 15%        stop 2860       57    -0.268 0.935 25.699  0.014 -0.011 0.042 0.141        3    5 15.515
+      winner threshold +20% run-up  winner_thr 5321      454    -0.827 0.811 25.841  0.014 -0.068 0.074 0.321        4    5 15.337
+min trail move 0% (always ratchet)    min_move 5323      216    -0.826 0.811 25.944  0.014  0.004 0.021 0.003        4    5 15.582
+              initial stop cap 10%        stop 2565      168    -0.269 0.937 25.536  0.013 -0.028 0.048 0.238        4    5 15.603
+        winner cushion 0.90 x peak     cushion 5323      852    -0.834 0.809 26.019  0.005 -0.475 0.453 0.487        2    5 11.065
+       stage-1 trail starts at +5% trail_start 5319      106    -0.834 0.810 25.964  0.000 -0.028 0.037 0.547        1    5 15.698
+     trail distance 5% below price   trail_pct 5323     1831    -0.841 0.786 33.158 -0.001 -0.358 0.316 0.491        3    5 11.289
+      winner threshold +25% run-up  winner_thr 5321      626    -0.843 0.807 25.860 -0.002 -0.171 0.153 0.493        2    5 14.260
+                 min trail move 2%    min_move 5316      230    -0.848 0.807 25.470 -0.009 -0.056 0.045 0.649        3    5 15.829
+       stage-1 trail starts at +2% trail_start 5323       46    -0.849 0.806 25.813 -0.010 -0.022 0.001 0.950        1    5 15.597
+                swing lookback 10d        stop 4291      249    -0.921 0.792 24.610 -0.012 -0.067 0.032 0.655        2    5 14.670
+       stage-1 trail starts at +0% trail_start 5323      128    -0.853 0.806 25.756 -0.013 -0.033 0.006 0.904        1    5 15.571
+               swing-low buffer 5%        stop 3206      991    -0.701 0.849 26.669 -0.028 -0.192 0.181 0.635        3    5 16.411
+     trail distance 6% below price   trail_pct 5323     1648    -0.884 0.781 31.242 -0.044 -0.369 0.235 0.583        3    5 12.655
+      winner min lock 1.00 x entry    min_lock 5292      508    -0.925 0.792 21.712 -0.057 -0.162 0.065 0.832        2    5 17.145
+               initial stop cap 8%        stop 2371      369    -0.641 0.848 23.661 -0.059 -0.170 0.038 0.881        2    5 14.877
+    trail distance 12% below price   trail_pct 5308      667    -0.912 0.798 23.531 -0.076 -0.143 0.015 0.953        1    5 16.083
+    velocity gate 10d / 7 sessions    velocity 5323     2024    -0.916 0.777 24.178 -0.076 -0.261 0.087 0.808        1    5 13.355
+    trail distance 15% below price   trail_pct 5302      683    -0.912 0.802 23.765 -0.080 -0.193 0.054 0.892        2    5 16.420
+               swing-low buffer 1%        stop 3757     1478    -0.985 0.769 23.529 -0.084 -0.321 0.122 0.761        3    5 13.652
+     trail distance 8% below price   trail_pct 5323     1199    -0.925 0.782 27.954 -0.085 -0.223 0.044 0.894        1    5 14.283
+       dead-money peak run-up < 6%  dead_runup 5323      214    -0.944 0.781 27.654 -0.104 -0.239 0.008 0.963        1    5 14.624
+       dead-money peak run-up < 8%  dead_runup 5323      457    -0.993 0.767 29.870 -0.153 -0.398 0.047 0.920        1    5 13.667
