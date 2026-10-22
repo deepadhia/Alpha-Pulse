@@ -4,6 +4,19 @@ All notable changes, quantitative safeguards, and alerting architecture updates 
 
 ---
 
+## [v3.6.1] — 2026-10-22 (patch, no milestone bump, nothing committed): S3 paper book 1.0.0 (PAPER_ONLY) and research
+
+* **No milestone bump:** `SCANNER_VERSION` / `EXPECTED_VERSION` stay `3.6.0` (the six touchpoints are untouched). Nothing here changes policy P, a scanner, a gate, a stop, a slot cap or a live order. Policy P still replays 228 trades at +5.22% and `run_honest_backtest.py --verify-legacy` still prints EXACT MATCH.
+* **New, versioned separately: S3 paper book 1.0.0** (`core/setup3.py`: `S3_PAPER_VERSION = "1.0.0"`, `S3_PAPER_COHORT`, `paper_rules_fingerprint()`; every stored order, position and heartbeat carries `s3_version` and `rules_fp`; `test_s3_paper.py` fails if a paper rule changes without a version bump). Rules: resting stop-limit BUY at the highest high since listing +1.5% (limit +2.5%), IPOs 61-400 days old, 20-session mean turnover <= Rs 25 Cr, X1 exits (stop and trailing ratchet only, no time-based exits), one position per symbol, 30-bar cooldown, 10 x 10% paper slots. **PAPER_ONLY, unproven**: replay evidence in `LEARNINGS.md` sections 20-20.5; judged by `s3_scorecard.py` (no verdict below 40 closed paper trades).
+* **Storage:** MongoDB only, in three new collections `s3_paper_orders`, `s3_paper_positions`, `s3_paper_runs` (`core/s3_store.py`, handles and indexes in `db.py`), deliberately not the policy-P `positions` collection. Record fills and exits with `s3_paper.py fill|exit|list|orders`.
+* **Alerts:** `s3_paper_alerts.py` plus `.github/workflows/s3-paper-alerts.yml` (13:20 UTC Mon-Fri): same Telegram bot and chat as the rest of the system, message prefix "S3 PAPER", silent unless something needs action, reports data freshness, writes a daily heartbeat. The workflow runs only once pushed.
+* **order_sheet.py:** a separate "S3 PAPER BOOK" section (default on, `--no-s3` hides, `--no-s3-store` prints without storing); `core/order_sheet.format_resting_entries` gained optional `title` and `footer` arguments (default text unchanged).
+* **Research (no live change):** `research_setup3.py` (S3: primary with P exits fails the account bar, X1 exits pass), `research_setup2_x1.py` (S2 with X1 exits still fails), `research_w50_deep.py`, `research_early_strength.py` (S4 fails the year rule), `research_few_quality.py` (volatility filter hurts; low turnover is the carried-forward secondary), `research_s3_validation.py` (parity 0 mismatches, out-of-time, permutation, replication, cost stress, capacity: all pass; this is replay validation, not proof). Outputs in `reports/2026-10-22/`.
+* **Tests:** `test_setup3.py` (9), `test_s3_paper.py` (29), `test_s3_alerts_scorecard.py` (13); full suite passes.
+* **Known and pre-existing:** `python order_sheet.py --help` raises a formatting error (a literal "%" in the `--hard-cap` help text); running the sheet is unaffected.
+
+---
+
 ## [v3.6.0] — 2026-10-21 (MILESTONE bump: hardened execution release; entry rules unchanged)
 
 * **Why a milestone bump:** the uncommitted hardening of v3.5.5-v3.5.7 changes how capital is allocated and exited live (flat 10 x 10% slots instead of 5/7, close-based stop alerts,

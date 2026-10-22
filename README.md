@@ -470,6 +470,13 @@ python manage_db.py backup         # Export MongoDB to local JSON
 python manage_db.py quality        # Analyze log structural quality
 python manage_db.py analyze        # Run Phase 4 Data Intelligence
 
+# S3 paper book (PAPER_ONLY, stored in MongoDB; see LEARNINGS.md 20-20.5)
+python order_sheet.py --capital 100000     # prints the S3 PAPER BOOK section too (--no-s3 hides it)
+python s3_paper.py fill SYMBOL PRICE       # record a paper entry (qty from the stored order, or --qty N)
+python s3_paper.py exit SYMBOL PRICE       # record a paper exit
+python s3_paper_alerts.py --dry-run        # the evening alert, printed only
+python s3_scorecard.py                     # forward proof test (no verdict below 40 closed paper trades)
+
 # Update stop-losses on active positions
 python streamlined_ipo_scanner.py stop_loss_update
 
@@ -519,6 +526,7 @@ Low-frequency, time-tolerant jobs (weekly summary, monthly review) continue to u
 | `ipo-scanner-v2.yml` (monthly review) | GitHub `on:schedule` | 1st of month 2:45 PM IST (`15 09 1 * *`) |
 | `master-audit-and-verification.yml` | GitHub `on:schedule` | Daily 11:00 PM IST (`30 17 * * *`) |
 | `biweekly-db-quality-analysis.yml` | GitHub `on:schedule` | 1st & 15th 8:00 PM IST (`30 14 1,15 * *`) |
+| `s3-paper-alerts.yml` | GitHub `on:schedule` | Mon-Fri 6:50 PM IST (`20 13 * * 1-5`); PAPER_ONLY S3 book alerts, same Telegram bot, own collections |
 
 #### Cloudflare Worker Dispatcher
 
@@ -649,6 +657,8 @@ All statistics, analytics scripts, and strategy evidence are strictly bounded to
 
 | Version | Date | Key Changes |
 |---|---|---|
+| **v3.6.1** *(patch, no milestone bump)* | 2026-10-22 | **S3 paper book 1.0.0 (PAPER_ONLY, versioned separately by `S3_PAPER_VERSION`):** late breakout of the post-listing high with X1 exits and a Rs 25 Cr turnover cap; MongoDB-only storage (`s3_paper_*`), own alerts and workflow, forward scorecard with fixed verdict rules, replay validation. Policy P and `SCANNER_VERSION` untouched. See `CHANGELOG.md` and `LEARNINGS.md` 20-20.5. |
+| **v3.6.0** | 2026-10-21 | **Hardened execution release (milestone bump):** flat 10 x 10% slots, close-based stop alerts, atomic commit lock, fail-safe corporate-action guard, shelf and hourly signals PAPER_ONLY, resting-order tooling, `core/versioning.py` forward cohort (3.5.0 + 3.6.0). Entry rules unchanged. |
 | **v3.5.0** | 2026-10-07 | **Volume Conjunction Integrity, Session-Scoped Pending Engine & Test Alert Isolation:** (1) Fixed Boolean bypass bug in `check_listing_day_breakout` so relative volume expansion ($\ge 1.5	imes$) is strictly mandatory alongside the institutional turnover floor ($\ge ₹10 	ext{ Cr}$), eliminating dead-volume false triggers like PRASOLCHEM (0.30x); (2) Bounded `_assign_breakout_tier` to reject shelf breakouts with $< 1.5	imes$ volume; (3) Session-scoped `load_pending_breakouts` with auto-purge of overnight and expired ($>120	ext{ min}$) pending states and dynamic ejection (`_eject_pending`) on upper-wick exhaustion, eliminating overnight leaks and invalid pending holds; (4) Enforced same-day duplicate trigger lockout (`_already_triggered_today`); (5) Suppressed Telegram alerts on `PAPER_ONLY` trades (`ALERT_ON_PAPER_ONLY=False`) when portfolio is at capacity; (6) Complete network isolation of Telegram dispatches during testing/regression suites (`DISABLE_TELEGRAM=1` / `unittest` module guard). |
 | **v3.5.0** | 2026-10-06 | **High Shelf Breakout Execution Realism & Confirmation Parity:** (1) Unified `SHELF_BREAKOUT` into the existing 60-minute intraday `PENDING` confirmation engine to eliminate immediate-entry churn; (2) Enforced strict arithmetic invariant `entry_price = max(current_price, base_range_high)` and removed premature below-pivot wicks (`current_price >= s_high`); (3) Added guaranteed $\ge 2.0\%$ limit order execution corridor across `commit_trade_to_db` and Telegram alert formatters to absorb real-world bid-ask spreads and broker latency; (4) Upgraded institutional shelf turnover floor to ₹10.0 Cr while strictly preserving `PRNG <= 18%` and standard 5.0% extension cap to avoid curve-fitting. |
 | **v3.5.0** | 2026-09-27 | **Institutional Risk, Re-Entry & Alerting Upgrades:** (1) Peak-Gated 14-Day Velocity Speed Gate (`max_runup < 3.5%` + `pnl <= 0%`) protecting developing base-builders while eliminating non-performers; (2) 5-Day Re-Entry Cooldown Quarantine in `db.py:get_reentry_watchlist()` to eliminate next-day whipsaw churn; (3) Institutional Volume Surge Gate (`volume_spike >= 1.50x`) on re-entries; (4) Consolidated Telegram Alert Suite (batched SL moves + unified EOD Portfolio & Risk report with setup types and shadow tracking). |

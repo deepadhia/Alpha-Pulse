@@ -5,6 +5,7 @@ This file tracks analysis and logging cutovers so experiment windows stay compar
 ## Current Active Baseline
 
 - `scanner_version`: `3.6.0` (bumped 2026-10-21; hardened execution release, entry rules unchanged; rows tagged `3.5.0` and `3.6.0` entered natively on/after 2026-09-29 form ONE forward cohort, see `core/versioning.py`)
+- `s3_paper_version`: `1.0.0` (2026-10-22; PAPER_ONLY S3 book, versioned independently of `scanner_version`; documents in `s3_paper_orders`, `s3_paper_positions`, `s3_paper_runs` carry `s3_version` and `rules_fp`; the forward scorecard `s3_scorecard.py` judges one rule version only; any paper-rule change bumps this string, see `core/setup3.py`)
 - `log_schema_version`: `2026-04-23.v1`
 - recommended clean analysis start: `2026-07-05` (param tightening: CONSOL_WINDOWS=10,20, MIN_LIVE_GRADE=B)
 

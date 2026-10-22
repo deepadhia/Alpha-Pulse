@@ -1,0 +1,84 @@
+research_few_quality.py  costs flat 1.0%; CI = 90% symbol-cluster bootstrap; tier REPLAY
+  trades 419 (P 135, S3-X1 284); thresholds (medians): ATR20 4.61%  TURN20 Rs 21.8 Cr
+
+WHOLE SET (reference)                        N=419 (open 33, symbols 285) win=41.1% net=+4.39% CI90=[ +2.2, +6.8] median=-2.56% exTop1=+3.92% exTop3=+3.23%
+    PF  incl open 1.85 [1.38, 2.44] | closed only 1.30 [0.97, 1.73] | ex-top3 all 1.62 [1.18, 2.18] | closed ex-top3 1.08 [0.79, 1.46]   (n closed 386)
+    dead money: 50 trades = 12% | capital-days 3% | mean -4.31% || outliers (net >= +25%): 51 = 12.2% of trades, 81% of gross profit || median days held 27, median initial risk 12.0%
+
+========================================================================================================================
+POOLED
+========================================================================================================================
+--- rule R3 ---
+  kept (R3)                                  N=100 (open  5, symbols  85) win=43.0% net=+3.77% CI90=[ +0.0, +7.8] median=-1.76% exTop1=+2.37% exTop3=+0.88%
+    PF  incl open 1.74 [1.03, 2.76] | closed only 1.38 [0.81, 2.17] | ex-top3 all 1.17 [0.66, 1.99] | closed ex-top3 0.99 [0.52, 1.68]   (n closed 95)
+    dead money: 8 trades = 8% | capital-days 2% | mean -4.35% || outliers (net >= +25%): 15 = 15.0% of trades, 79% of gross profit || median days held 22, median initial risk 12.0%
+  rejected (R3)                              N=319 (open 28, symbols 225) win=40.4% net=+4.59% CI90=[ +1.9, +7.3] median=-3.08% exTop1=+3.96% exTop3=+3.09%
+  kept minus rejected: -0.81pp CI90 [-5.3, +3.8]; kept share of gross profit 22%; kept trades per year 23
+  by entry year (kept R3):
+    2022  N=  3  mean -10.04%  PF  0.00  win  0.0%  open 0
+    2023  N= 26  mean  +0.98%  PF  1.18  win 46.2%  open 0
+    2024  N= 34  mean  +2.56%  PF  1.48  win 35.3%  open 0
+    2025  N= 15  mean +18.30%  PF 10.80  win 73.3%  open 1
+    2026  N= 22  mean  +0.95%  PF  1.16  win 36.4%  open 4
+--- rule R1 ---
+  kept (R1)                                  N=210 (open 17, symbols 167) win=40.0% net=+2.46% CI90=[ +0.0, +5.1] median=-2.16% exTop1=+1.79% exTop3=+0.74%
+    PF  incl open 1.50 [1.01, 2.08] | closed only 0.97 [0.64, 1.38] | ex-top3 all 1.15 [0.76, 1.67] | closed ex-top3 0.74 [0.46, 1.11]   (n closed 193)
+    dead money: 33 trades = 16% | capital-days 6% | mean -4.17% || outliers (net >= +25%): 23 = 11.0% of trades, 76% of gross profit || median days held 19, median initial risk 12.0%
+  rejected (R1)                              N=209 (open 16, symbols 160) win=42.1% net=+6.33% CI90=[ +2.9, +9.9] median=-3.14% exTop1=+5.39% exTop3=+4.06%
+  kept minus rejected: -3.87pp CI90 [-8.1, +0.1]; kept share of gross profit 39%; kept trades per year 48
+--- rule R2 ---
+  kept (R2)                                  N=210 (open 15, symbols 166) win=45.2% net=+7.70% CI90=[ +3.9,+11.7] median=-1.84% exTop1=+6.77% exTop3=+5.41%
+    PF  incl open 2.49 [1.74, 3.46] | closed only 1.82 [1.20, 2.61] | ex-top3 all 2.03 [1.37, 2.94] | closed ex-top3 1.37 [0.90, 2.06]   (n closed 195)
+    dead money: 18 trades = 9% | capital-days 2% | mean -4.85% || outliers (net >= +25%): 36 = 17.1% of trades, 85% of gross profit || median days held 33, median initial risk 12.0%
+  rejected (R2)                              N=209 (open 18, symbols 152) win=36.8% net=+1.07% CI90=[ -1.4, +3.8] median=-3.53% exTop1=+0.46% exTop3=-0.54%
+  kept minus rejected: +6.63pp CI90 [+2.2, +11.4]; kept share of gross profit 67%; kept trades per year 48
+
+========================================================================================================================
+P
+========================================================================================================================
+--- rule R3 ---
+  kept (R3)                                  N= 27 (open  4, symbols  27) win=40.7% net=+2.97% CI90=[ -4.0,+13.5] median=-2.09% exTop1=-2.42% exTop3=-3.83%
+    PF  incl open 1.70 [0.24, 4.77] | closed only 0.22 [0.07, 0.50] | ex-top3 all 0.20 [0.05, 0.72] | closed ex-top3 0.07 [0.00, 0.25]   (n closed 23)
+    dead money: 8 trades = 30% | capital-days 13% | mean -4.35% || outliers (net >= +25%): 1 = 3.7% of trades, 73% of gross profit || median days held 15, median initial risk 12.0%
+  rejected (R3)                              N=108 (open  8, symbols 108) win=42.6% net=+4.77% CI90=[ +1.4, +8.4] median=-1.47% exTop1=+3.77% exTop3=+1.95%
+  kept minus rejected: -1.80pp CI90 [-10.0, +9.0]; kept share of gross profit 18%; kept trades per year 6
+--- rule R1 ---
+  kept (R1)                                  N= 86 (open 11, symbols  86) win=39.5% net=+1.29% CI90=[ -1.8, +5.0] median=-1.73% exTop1=-0.38% exTop3=-1.49%
+    PF  incl open 1.32 [0.62, 2.41] | closed only 0.51 [0.23, 0.89] | ex-top3 all 0.64 [0.30, 1.26] | closed ex-top3 0.22 [0.11, 0.51]   (n closed 75)
+    dead money: 33 trades = 38% | capital-days 21% | mean -4.17% || outliers (net >= +25%): 5 = 5.8% of trades, 65% of gross profit || median days held 14, median initial risk 12.0%
+  rejected (R1)                              N= 49 (open  1, symbols  49) win=46.9% net=+9.90% CI90=[ +3.4,+17.0] median=-0.64% exTop1=+7.77% exTop3=+3.80%
+  kept minus rejected: -8.62pp CI90 [-16.5, -1.3]; kept share of gross profit 41%; kept trades per year 20
+--- rule R2 ---
+  kept (R2)                                  N= 51 (open  4, symbols  51) win=47.1% net=+5.67% CI90=[ -0.2,+12.4] median=-1.48% exTop1=+2.92% exTop3=-0.61%
+    PF  incl open 2.51 [1.01, 4.98] | closed only 1.71 [0.57, 3.64] | ex-top3 all 0.85 [0.28, 2.57] | closed ex-top3 0.54 [0.16, 1.69]   (n closed 47)
+    dead money: 18 trades = 35% | capital-days 12% | mean -4.85% || outliers (net >= +25%): 5 = 9.8% of trades, 81% of gross profit || median days held 15, median initial risk 12.0%
+  rejected (R2)                              N= 84 (open  8, symbols  84) win=39.3% net=+3.65% CI90=[ +0.2, +7.5] median=-1.56% exTop1=+2.34% exTop3=+0.49%
+  kept minus rejected: +2.02pp CI90 [-5.2, +10.0]; kept share of gross profit 44%; kept trades per year 12
+
+========================================================================================================================
+S3
+========================================================================================================================
+--- rule R3 ---
+  kept (R3)                                  N= 73 (open  1, symbols  65) win=43.8% net=+4.07% CI90=[ -0.1, +8.4] median=-1.74% exTop1=+3.02% exTop3=+1.42%
+    PF  incl open 1.76 [0.97, 2.96] | closed only 1.69 [0.93, 2.88] | ex-top3 all 1.25 [0.62, 2.31] | closed ex-top3 1.19 [0.58, 2.22]   (n closed 72)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 14 = 19.2% of trades, 80% of gross profit || median days held 27, median initial risk 12.0%
+  rejected (R3)                              N=211 (open 20, symbols 165) win=39.3% net=+4.49% CI90=[ +1.0, +8.3] median=-4.60% exTop1=+3.55% exTop3=+2.21%
+  kept minus rejected: -0.42pp CI90 [-6.1, +5.2]; kept share of gross profit 24%; kept trades per year 17
+--- rule R1 ---
+  kept (R1)                                  N=124 (open  6, symbols 106) win=40.3% net=+3.28% CI90=[ -0.2, +7.0] median=-2.63% exTop1=+2.26% exTop3=+0.87%
+    PF  incl open 1.58 [0.97, 2.38] | closed only 1.19 [0.70, 1.83] | ex-top3 all 1.15 [0.66, 1.86] | closed ex-top3 0.84 [0.46, 1.42]   (n closed 118)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 18 = 14.5% of trades, 81% of gross profit || median days held 24, median initial risk 12.0%
+  rejected (R1)                              N=160 (open 15, symbols 131) win=40.6% net=+5.24% CI90=[ +1.2, +9.6] median=-4.43% exTop1=+4.00% exTop3=+2.23%
+  kept minus rejected: -1.95pp CI90 [-7.5, +3.5]; kept share of gross profit 38%; kept trades per year 28
+--- rule R2 ---
+  kept (R2)                                  N=159 (open 11, symbols 134) win=44.7% net=+8.35% CI90=[ +4.1,+13.0] median=-1.90% exTop1=+7.13% exTop3=+5.39%
+    PF  incl open 2.48 [1.66, 3.54] | closed only 1.85 [1.17, 2.78] | ex-top3 all 1.94 [1.27, 2.89] | closed ex-top3 1.30 [0.82, 2.10]   (n closed 148)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 31 = 19.5% of trades, 86% of gross profit || median days held 40, median initial risk 12.0%
+  rejected (R2)                              N=125 (open 10, symbols 101) win=35.2% net=-0.67% CI90=[ -3.9, +2.8] median=-4.90% exTop1=-1.71% exTop3=-3.14%
+  kept minus rejected: +9.02pp CI90 [+3.5, +14.7]; kept share of gross profit 76%; kept trades per year 36
+
+========================================================================================================================
+PRIMARY: R3 on the pooled set
+========================================================================================================================
+  kept N>=60 PASS | kept CI lower>0 PASS | kept-rejected CI lower>0 FAIL | kept ex-top1>0 PASS | <=1 negative year PASS   (kept N 100, mean +3.77% CI [+0.01,+7.84], difference -0.81pp [-5.3,+3.8], negative years [])
+  VERDICT: DOES NOT MEET THE BAR

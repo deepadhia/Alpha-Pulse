@@ -25,6 +25,10 @@ watchlist_col = db["watchlist"] if db is not None else None
 system_audits_col = db["system_audits"] if db is not None else None
 daily_candles_col = db["daily_candles_cache"] if db is not None else None
 market_holidays_col = db["market_holidays"] if db is not None else None
+# PAPER_ONLY S3 book (LEARNINGS 20.4): separate from `positions`, which the live scanners manage with policy P's exits
+s3_paper_orders_col = db["s3_paper_orders"] if db is not None else None
+s3_paper_positions_col = db["s3_paper_positions"] if db is not None else None
+s3_paper_runs_col = db["s3_paper_runs"] if db is not None else None
 
 # In-process cache — avoids a DB round-trip on every data fetch
 _instrument_key_cache: dict = {}
@@ -107,6 +111,9 @@ def ensure_indexes():
         daily_candles_col.create_index("symbol", unique=True)
     if market_holidays_col is not None:
         market_holidays_col.create_index("year", unique=True)
+    if s3_paper_orders_col is not None and s3_paper_positions_col is not None:
+        from core.s3_store import ensure_indexes as _s3_indexes
+        _s3_indexes(s3_paper_orders_col, s3_paper_positions_col, s3_paper_runs_col)
 
 def insert_log(scanner: str, symbol: str, action: str, candle_timestamp, details: dict, version: str = SCANNER_VERSION, source: str = "live", log_type: str = "ACCEPTED"):
     global _rejection_guard_warned

@@ -1,0 +1,43 @@
+research_early_strength.py  costs flat 1.0% round trip; CI = 90% symbol-cluster bootstrap; tier REPLAY
+  eligible entries at session 11: P-arm 345, X1-arm 345; with signal A-C: 65
+
+========================================================================================================================
+ARM P exits
+========================================================================================================================
+S4 signal (P)                                N= 65 (open  0, symbols  65) win=24.6% net=-1.31% CI90=[ -4.7, +2.8] median=-4.04% exTop1=-3.32% exTop3=-4.45%
+    PF  incl open 0.77 [0.26, 1.59] | closed only 0.77 [0.26, 1.59] | ex-top3 all 0.25 [0.07, 0.62] | closed ex-top3 0.25 [0.07, 0.62]   (n closed 65)
+    dead money: 26 trades = 40% | capital-days 19% | mean -4.36% || outliers (net >= +25%): 3 = 4.6% of trades, 68% of gross profit || median days held 14, median initial risk 12.0%
+  by entry year (S4 P):
+    2022  N=  7  mean  +2.20%  PF  1.66  win 28.6%  open 0
+    2023  N= 13  mean  +3.05%  PF  1.43  win 15.4%  open 0
+    2024  N= 15  mean  -5.20%  PF  0.25  win 26.7%  open 0
+    2025  N= 22  mean  -2.90%  PF  0.49  win 18.2%  open 0
+    2026  N=  8  mean  +0.23%  PF  1.09  win 50.0%  open 0
+Unconditional control, all eligible (P)      N=345 (open  1, symbols 345) win=23.5% net=-1.92% CI90=[ -3.3, -0.4] median=-4.58% exTop1=-2.33% exTop3=-2.99%
+Fail A-C (P)                                 N=280 (open  1, symbols 280) win=23.2% net=-2.06% CI90=[ -3.6, -0.4] median=-4.79% exTop1=-2.56% exTop3=-3.20%
+  signal minus unconditional control: +0.61pp CI90 [-2.6, +4.2]
+  signal minus fail group           : +0.76pp CI90 [-3.1, +5.2]
+  overlap with policy P: S4 symbols with a P entry in sessions 1-10: 28, in 11-30: 12 of 65
+  BAR: N>=60 PASS | CI lower>0 FAIL | ex-top1>0 FAIL | <=1 negative year FAIL | beats control (CI lower>0) FAIL   negative years [2024, 2025]
+  VERDICT P: DOES NOT MEET THE BAR
+
+========================================================================================================================
+ARM X1 exits
+========================================================================================================================
+S4 signal (X1)                               N= 65 (open  2, symbols  65) win=40.0% net=+8.14% CI90=[ +0.5,+17.0] median=-4.04% exTop1=+4.44% exTop3=+0.29%
+    PF  incl open 2.40 [1.05, 4.36] | closed only 2.22 [0.90, 4.10] | ex-top3 all 1.05 [0.40, 2.44] | closed ex-top3 0.87 [0.30, 2.21]   (n closed 63)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 9 = 13.8% of trades, 88% of gross profit || median days held 35, median initial risk 12.0%
+  by entry year (S4 X1):
+    2022  N=  7  mean +59.47%  PF 45.89  win 71.4%  open 0
+    2023  N= 13  mean +12.14%  PF  3.35  win 53.8%  open 0
+    2024  N= 15  mean  -1.97%  PF  0.77  win 20.0%  open 0
+    2025  N= 22  mean  -1.12%  PF  0.84  win 27.3%  open 2
+    2026  N=  8  mean  +1.12%  PF  1.48  win 62.5%  open 0
+Unconditional control, all eligible (X1)     N=345 (open  4, symbols 345) win=31.0% net=+1.25% CI90=[ -1.1, +3.8] median=-6.94% exTop1=+0.54% exTop3=-0.36%
+Fail A-C (X1)                                N=280 (open  2, symbols 280) win=28.9% net=-0.35% CI90=[ -2.6, +2.2] median=-7.24% exTop1=-0.97% exTop3=-1.93%
+  signal minus unconditional control: +6.89pp CI90 [+0.3, +14.6]
+  signal minus fail group           : +8.49pp CI90 [+0.4, +17.9]
+  overlap with policy P: S4 symbols with a P entry in sessions 1-10: 28, in 11-30: 12 of 65
+  BAR: N>=60 PASS | CI lower>0 PASS | ex-top1>0 PASS | <=1 negative year FAIL | beats control (CI lower>0) PASS   negative years [2024, 2025]
+  VERDICT X1: DOES NOT MEET THE BAR
+
