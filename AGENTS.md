@@ -93,6 +93,7 @@ Whenever the system version is updated, it **MUST be updated everywhere simultan
   - `daily_candles_cache`: Fast local cache for Upstox daily OHLCV candles.
   - `instrument_keys`: Upstox instrument key mappings.
   - `positions_legacy_archive` & `signals_legacy_archive`: Isolated historical archives.
+  - `s3_paper_orders`, `s3_paper_positions`, `s3_paper_runs`: the PAPER_ONLY S3 book (added 2026-10-22; never mix with `positions`, see section 11 below).
 
 ### Status Field Conventions
 - `ACTIVE`: Live capital allocated trade.
@@ -308,3 +309,13 @@ If any answer is "no" to the last four or "yes" to the first two, rewrite before
 
 ### 10.6 Optional red-team prompt (the owner can paste this to any AI reviewing results)
 "Act as a skeptical quant reviewer. Assume the result is wrong until shown otherwise. Look for look-ahead, dropped open trades, fill and stop-model mismatch, survivorship, outlier dependence, tuning on small samples and cohort contamination. Report the verdict first, bad news first, and give a profit factor closed-only, including open trades and excluding the top 3. Do not soften conclusions or praise the work."
+
+---
+
+## 11. S3 paper book (added 2026-10-22, see `LEARNINGS.md` sections 20-20.5, `SESSION_HANDOFF.md` section 14)
+
+25. **S3 is PAPER_ONLY and separately versioned.** The rules live in `core/setup3.py` (`PAPER_PARAMS`, `NO_TIME_EXITS`) and carry `S3_PAPER_VERSION` (now `1.0.0`). Changing any paper rule requires, in one change: bump `S3_PAPER_VERSION` (and extend `S3_PAPER_COHORT` only if the old sample may be pooled), add a CHANGELOG patch note, and register the new `paper_rules_fingerprint()` in `test_s3_paper.py`. `SCANNER_VERSION` (the six touchpoints) is NOT touched by S3 work; it versions policy P and the live scanners.
+26. **Never store S3 rows in `positions` or `signals`.** They live in `s3_paper_orders`, `s3_paper_positions`, `s3_paper_runs` (`core/s3_store.py`). The live scanners manage `positions` with policy P's exits (time stops) and a unique index on `symbol`.
+27. **S3 is judged forward, with fixed rules.** `core/s3_scorecard.py` gives no verdict below 40 closed paper trades and counts one rule version only. Do not promote S3 to live capital, change its turnover cap or exits, or add it to P's slots before that verdict; replay numbers (LEARNINGS 20.4, 20.5) are in-sample for the turnover threshold and cover a hot 2023-26 period.
+28. **Do not retest:** below-the-high pivot breakouts with any exit set tried (S2 with P exits and with X1 exits both fail), sector tags, listing-time features (market cap, issue size and price, subscription, listing gain, minute-bar listing-day shape), volatility as a selection filter (it hurts realised trades), early-strength entry S4 without new information (fails the year rule). Low turnover is the one carried-forward marker and is already in the paper rule.
+29. **The S3 alert uses the same Telegram bot and chat as the rest of the system** (owner decision); keep the "S3 PAPER" prefix so the two systems stay distinguishable, and keep it silent unless something needs action.

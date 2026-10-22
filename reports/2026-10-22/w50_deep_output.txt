@@ -1,0 +1,69 @@
+research_w50_deep.py  eligible 430; W50 83 (19.3%); W100 26 (6.0%); minute features 428; market cap 194; meta 279
+
+==============================================================================================================
+1. HOW THE W50 NAMES MOVED
+==============================================================================================================
+  W50 rate by listing year: {2022: '9% of 32', 2023: '27% of 88', 2024: '19% of 118', 2025: '11% of 142', 2026: '36% of 50'}
+  calendar days to reach +50%: median 55; <=14d 11%, 15-30d 12%, 31-60d 35%, 61-120d 42%
+  dip BEFORE reaching +50% (lowest low after listing vs the listing close): median -4.5%; deeper than -5%: 47%, -10%: 27%, -15%: 12%, -25%: 1%
+  dip vs the LISTING HIGH (what a listing-high buyer sees): median -11.0%; deeper than -12% (the stop cap): 41%
+  closed above the listing-day high at least once before reaching +50%: 100%
+  FAST (<= 30 d)    N= 19 max gain median +89%  pre-dip median +0.9%  share dipping below -10%: 11%  W100: 9
+  MEDIUM (31-60 d)  N= 29 max gain median +84%  pre-dip median -6.1%  share dipping below -10%: 24%  W100: 10
+  SLOW (61-120 d)   N= 35 max gain median +68%  pre-dip median -7.0%  share dipping below -10%: 37%  W100: 7
+
+==============================================================================================================
+2. MARKERS: W50 vs ALL other eligible IPOs (AUC, 90% bootstrap CI, by listing year with 25+ IPOs)
+==============================================================================================================
+  price              n=430 AUC 0.49 [0.43,0.56] hit% by tercile low/mid/high [19, 19, 20] medians W50 279.90 vs rest 308.45 years {2023: 0.46, 2024: 0.51, 2025: 0.52, 2026: 0.57} same-sign 1 
+  log_mcap           n=194 AUC 0.44 [0.38,0.52] hit% by tercile low/mid/high [34, 30, 25] medians W50 8.23 vs rest 8.66 years {2023: 0.49, 2024: 0.44, 2025: 0.42} same-sign 3 
+  log_issue          n=279 AUC 0.49 [0.42,0.57] hit% by tercile low/mid/high [20, 16, 22] medians W50 6.43 vs rest 6.53 years {2023: 0.47, 2024: 0.52, 2025: 0.44} same-sign 2 
+  issue_price_n      n=279 AUC 0.48 [0.41,0.56] hit% by tercile low/mid/high [20, 18, 19] medians W50 269.00 vs rest 282.00 years {2023: 0.42, 2024: 0.5, 2025: 0.51} same-sign 1 
+  log_total_sub      n=279 AUC 0.50 [0.42,0.58] hit% by tercile low/mid/high [19, 18, 20] medians W50 3.53 vs rest 3.39 years {2023: 0.52, 2024: 0.63, 2025: 0.45} same-sign 2 
+  list_gain_pct      n=279 AUC 0.56 [0.48,0.62] hit% by tercile low/mid/high [16, 19, 23] medians W50 12.65 vs rest 7.60 years {2023: 0.56, 2024: 0.61, 2025: 0.54} same-sign 3 
+  close_vs_issue     n=279 AUC 0.53 [0.46,0.60] hit% by tercile low/mid/high [18, 18, 22] medians W50 12.57 vs rest 10.49 years {2023: 0.54, 2024: 0.6, 2025: 0.5} same-sign 2 
+  d1_turn_cr         n=430 AUC 0.48 [0.43,0.54] hit% by tercile low/mid/high [20, 20, 17] medians W50 190.43 vs rest 273.73 years {2023: 0.51, 2024: 0.51, 2025: 0.54, 2026: 0.51} same-sign 0 
+  d1_turn_over_mcap  n=194 AUC 0.50 [0.43,0.58] hit% by tercile low/mid/high [28, 34, 26] medians W50 9.01 vs rest 8.26 years {2023: 0.58, 2024: 0.43, 2025: 0.54} same-sign 2 
+  turn_1_10          n=430 AUC 0.52 [0.46,0.58] hit% by tercile low/mid/high [17, 20, 20] medians W50 21.88 vs rest 22.00 years {2023: 0.58, 2024: 0.6, 2025: 0.57, 2026: 0.49} same-sign 3 
+  d1_range           n=430 AUC 0.53 [0.47,0.58] hit% by tercile low/mid/high [19, 17, 22] medians W50 8.24 vs rest 8.31 years {2023: 0.54, 2024: 0.55, 2025: 0.57, 2026: 0.53} same-sign 4 
+  d1_closeloc        n=430 AUC 0.49 [0.43,0.55] hit% by tercile low/mid/high [22, 19, 17] medians W50 0.39 vs rest 0.36 years {2023: 0.55, 2024: 0.41, 2025: 0.52, 2026: 0.49} same-sign 2 
+  d1_open_to_close   n=430 AUC 0.45 [0.39,0.50] hit% by tercile low/mid/high [22, 20, 16] medians W50 -1.70 vs rest -1.07 years {2023: 0.43, 2024: 0.37, 2025: 0.46, 2026: 0.58} same-sign 3 
+  ret5               n=430 AUC 0.68 [0.62,0.73] hit% by tercile low/mid/high [10, 20, 29] medians W50 1.47 vs rest -2.31 years {2023: 0.75, 2024: 0.65, 2025: 0.66, 2026: 0.66} same-sign 4 <== MEETS BAR
+  ret10              n=430 AUC 0.79 [0.75,0.83] hit% by tercile low/mid/high [5, 13, 40] medians W50 10.27 vs rest -1.61 years {2023: 0.79, 2024: 0.84, 2025: 0.72, 2026: 0.84} same-sign 4 <== MEETS BAR
+  held_low           n=430 AUC 0.61 [0.56,0.66] hit% by tercile low/mid/high [24, 7, 27] medians W50 0.00 vs rest 0.00 years {2023: 0.67, 2024: 0.59, 2025: 0.59, 2026: 0.59} same-sign 4 <== MEETS BAR
+  above_p0_share     n=430 AUC 0.71 [0.65,0.75] hit% by tercile low/mid/high [6, 23, 29] medians W50 0.80 vs rest 0.20 years {2023: 0.73, 2024: 0.71, 2025: 0.64, 2026: 0.73} same-sign 4 <== MEETS BAR
+  vol_decay          n=430 AUC 0.53 [0.47,0.59] hit% by tercile low/mid/high [17, 19, 22] medians W50 0.18 vs rest 0.16 years {2023: 0.51, 2024: 0.63, 2025: 0.48, 2026: 0.4} same-sign 2 
+  m_open15           n=428 AUC 0.51 [0.46,0.57] hit% by tercile low/mid/high [17, 23, 18] medians W50 0.65 vs rest 0.20 years {2023: 0.56, 2024: 0.48, 2025: 0.42, 2026: 0.6} same-sign 2 
+  m_tod_high         n=428 AUC 0.53 [0.47,0.59] hit% by tercile low/mid/high [18, 19, 21] medians W50 0.04 vs rest 0.04 years {2023: 0.52, 2024: 0.55, 2025: 0.44, 2026: 0.6} same-sign 3 
+  m_close_vs_vwap    n=428 AUC 0.47 [0.42,0.53] hit% by tercile low/mid/high [21, 18, 19] medians W50 -0.61 vs rest -0.82 years {2023: 0.47, 2024: 0.38, 2025: 0.57, 2026: 0.44} same-sign 3 
+  m_last60           n=428 AUC 0.43 [0.37,0.48] hit% by tercile low/mid/high [25, 19, 14] medians W50 -0.52 vs rest 0.00 years {2023: 0.38, 2024: 0.38, 2025: 0.48, 2026: 0.39} same-sign 4 
+  m_vol15            n=428 AUC 0.53 [0.48,0.59] hit% by tercile low/mid/high [17, 18, 23] medians W50 0.28 vs rest 0.25 years {2023: 0.51, 2024: 0.54, 2025: 0.57, 2026: 0.59} same-sign 4 
+  m_hi_to_close      n=428 AUC 0.47 [0.41,0.53] hit% by tercile low/mid/high [25, 13, 20] medians W50 -5.20 vs rest -4.91 years {2023: 0.52, 2024: 0.41, 2025: 0.49, 2026: 0.43} same-sign 3 
+  m_open_to_vwap     n=428 AUC 0.49 [0.43,0.54] hit% by tercile low/mid/high [18, 24, 16] medians W50 -1.27 vs rest -0.62 years {2023: 0.43, 2024: 0.53, 2025: 0.6, 2026: 0.32} same-sign 2 
+  m_range            n=428 AUC 0.50 [0.45,0.55] hit% by tercile low/mid/high [19, 21, 18] medians W50 10.67 vs rest 10.53 years {2023: 0.5, 2024: 0.48, 2025: 0.57, 2026: 0.53} same-sign 2 
+  features meeting the bar: ['ret5', 'ret10', 'held_low', 'above_p0_share']  (of 26 tested; about 3 would pass by chance at the CI alone)
+
+==============================================================================================================
+3. WHAT POLICY P AND S3-X1 HELD ON THE W50 NAMES (first 120 days)
+==============================================================================================================
+  W50 names: 83 | {'held by P before +50%': 43, 'first cross gapped above the +2.5% limit (no fill)': 26, 'crossed, no P trade (gate, cooldown or exit before)': 9, 'held by S3-X1 only': 4, 'never crossed listing high +1.5% in age 5-60 d (and no S3 entry)': 1}
+  W100 names: 26 | {'held by P before +50%': 12, 'first cross gapped above the +2.5% limit (no fill)': 10, 'crossed, no P trade (gate, cooldown or exit before)': 3, 'held by S3-X1 only': 1}
+  P: trades on W50 names 46 symbols; mean of best trade per symbol +26.1% vs mean available max gain from listing close +85%
+  S3: trades on W50 names 42 symbols; mean of best trade per symbol +18.0% vs mean available max gain from listing close +93%
+  W50 names with NO trade from either setup at any time: 24
+  largest misses (max gain, days to +50%, reason):
+    IREDA         +258%   13 d  pre-dip  +0.9%  first cross gapped above the +2.5% limit (no fill)
+    SCILAL        +144%   20 d  pre-dip -18.9%  first cross gapped above the +2.5% limit (no fill)
+    RBZJEWEL      +143%   14 d  pre-dip  +5.0%  first cross gapped above the +2.5% limit (no fill)
+    DIFFNKG       +141%   14 d  pre-dip  +5.0%  first cross gapped above the +2.5% limit (no fill)
+    FORCEMOT      +132%   15 d  pre-dip  +1.3%  first cross gapped above the +2.5% limit (no fill)
+    KPL           +125%   51 d  pre-dip  -6.1%  crossed, no P trade (gate, cooldown or exit before)
+    RAMRAT        +117%   32 d  pre-dip  +2.1%  first cross gapped above the +2.5% limit (no fill)
+    PLAZACABLE    +116%   14 d  pre-dip  +5.0%  first cross gapped above the +2.5% limit (no fill)
+    COCKERILL     +109%   43 d  pre-dip  -3.6%  crossed, no P trade (gate, cooldown or exit before)
+    GENSOL        +109%   65 d  pre-dip  -3.5%  first cross gapped above the +2.5% limit (no fill)
+    PTCIL         +107%   12 d  pre-dip  +1.9%  first cross gapped above the +2.5% limit (no fill)
+    MUFIN         +104%   79 d  pre-dip -19.7%  first cross gapped above the +2.5% limit (no fill)
+    PROSTARM      +101%   36 d  pre-dip -14.3%  crossed, no P trade (gate, cooldown or exit before)
+    GALAPREC       +95%   52 d  pre-dip  -9.9%  crossed, no P trade (gate, cooldown or exit before)
+    SAGILITY       +92%   36 d  pre-dip  -7.8%  first cross gapped above the +2.5% limit (no fill)

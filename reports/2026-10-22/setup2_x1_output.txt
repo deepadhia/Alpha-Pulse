@@ -1,0 +1,74 @@
+research_setup2_x1.py  clean universe 676  costs flat 1.0% round trip; CI = 90% symbol-cluster bootstrap; tier: REPLAY
+
+Policy P (harness check, expect N=228 PF 2.43/1.71/1.91) N=228 (open 19, symbols 228) win=42.5% net=+5.22% CI90=[ +2.5, +8.1] median=-1.46% exTop1=+4.57% exTop3=+3.36%
+    PF  incl open 2.43 [1.65, 3.40] | closed only 1.71 [1.07, 2.55] | ex-top3 all 1.91 [1.22, 2.82] | closed ex-top3 1.19 [0.67, 1.96]   (n closed 209)
+    dead money: 81 trades = 36% | capital-days 14% | mean -4.60% || outliers (net >= +25%): 23 = 10.1% of trades, 79% of gross profit || median days held 15, median initial risk 12.0%
+
+S2-X1 trades: slip 0.3% -> 143, slip 1.0% -> 143
+
+========================================================================================================================
+1. PRIMARY: S2 pooled with X1 exits
+========================================================================================================================
+S2-X1 pooled (slip 0.3%)                     N=143 (open  5, symbols 125) win=25.9% net=-0.31% CI90=[ -3.5, +3.3] median=-5.55% exTop1=-1.36% exTop3=-3.15%
+    PF  incl open 0.96 [0.55, 1.47] | closed only 0.88 [0.49, 1.39] | ex-top3 all 0.57 [0.27, 1.03] | closed ex-top3 0.49 [0.23, 0.95]   (n closed 138)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 11 = 7.7% of trades, 84% of gross profit || median days held 29, median initial risk 12.0%
+  by entry year (S2-X1 pooled):
+    2022  N=  2  mean  -6.70%  PF  0.00  win  0.0%  open 0
+    2023  N= 17  mean +22.49%  PF 12.59  win 52.9%  open 0
+    2024  N= 32  mean  -1.44%  PF  0.79  win 31.2%  open 0
+    2025  N= 59  mean  -4.15%  PF  0.53  win 15.3%  open 0
+    2026  N= 33  mean  -3.71%  PF  0.49  win 27.3%  open 5
+  H1_BASE_OLD                                N= 73 (open  2, symbols  69) win=24.7% net=-1.72% CI90=[ -5.2, +2.2] median=-4.43% exTop1=-3.33% exTop3=-5.15%
+    PF  incl open 0.74 [0.27, 1.37] | closed only 0.73 [0.26, 1.38] | ex-top3 all 0.24 [0.08, 0.67] | closed ex-top3 0.23 [0.07, 0.67]   (n closed 71)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 4 = 5.5% of trades, 75% of gross profit || median days held 26, median initial risk 12.0%
+  by entry year (H1_BASE_OLD):
+    2023  N=  9  mean +20.21%  PF  9.69  win 44.4%  open 0
+    2024  N= 17  mean  -3.84%  PF  0.44  win 23.5%  open 0
+    2025  N= 30  mean  -4.71%  PF  0.34  win 16.7%  open 0
+    2026  N= 17  mean  -5.92%  PF  0.18  win 29.4%  open 2
+  H2_RECOVERY                                N= 24 (open  2, symbols  24) win=25.0% net=+0.89% CI90=[ -6.4, +9.5] median=-7.46% exTop1=-2.49% exTop3=-7.55%
+    PF  incl open 1.12 [0.25, 2.62] | closed only 0.71 [0.12, 1.76] | ex-top3 all 0.14 [0.00, 1.10] | closed ex-top3 0.07 [0.00, 0.57]   (n closed 22)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 3 = 12.5% of trades, 87% of gross profit || median days held 30, median initial risk 12.0%
+  by entry year (H2_RECOVERY):
+    2022  N=  1  mean -10.91%  PF  0.00  win  0.0%  open 0
+    2023  N=  2  mean +32.02%  PF 18.33  win 50.0%  open 0
+    2024  N=  3  mean  -0.36%  PF  0.92  win 66.7%  open 0
+    2025  N= 11  mean  -4.35%  PF  0.50  win 18.2%  open 0
+    2026  N=  7  mean  +2.47%  PF  1.28  win 14.3%  open 2
+  H3_BASE_YOUNG                              N= 46 (open  1, symbols  46) win=28.3% net=+1.29% CI90=[ -6.1,+10.0] median=-6.80% exTop1=-1.97% exTop3=-6.67%
+    PF  incl open 1.16 [0.31, 2.41] | closed only 1.18 [0.32, 2.46] | ex-top3 all 0.20 [0.04, 1.08] | closed ex-top3 0.21 [0.04, 1.10]   (n closed 45)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 4 = 8.7% of trades, 89% of gross profit || median days held 33, median initial risk 12.0%
+  by entry year (H3_BASE_YOUNG):
+    2022  N=  1  mean  -2.49%  PF  0.00  win  0.0%  open 0
+    2023  N=  6  mean +22.73%  PF 17.31  win 66.7%  open 0
+    2024  N= 12  mean  +1.69%  PF  1.24  win 33.3%  open 0
+    2025  N= 18  mean  -3.10%  PF  0.73  win 11.1%  open 0
+    2026  N=  9  mean  -4.33%  PF  0.30  win 33.3%  open 1
+
+  Stress slip 1.0%:
+S2-X1 pooled (slip 1.0%)                     N=143 (open  5, symbols 125) win=26.6% net=-1.34% CI90=[ -4.5, +2.3] median=-5.91% exTop1=-2.38% exTop3=-4.17%
+S2-X1 closed only                            N=138 (open  0, symbols 120) win=25.4% net=-0.84% CI90=[ -4.1, +3.1] median=-6.52% exTop1=-1.93% exTop3=-3.80%
+S2-X1 without its 10 best symbols (post hoc) N=132 (open  4, symbols 115) win=20.5% net=-6.20% CI90=[ -7.4, -5.0] median=-6.70% exTop1=-6.51% exTop3=-6.93%
+
+========================================================================================================================
+2. ACCOUNT: Rs 1 lakh, 10 x 10%, P wins ties and same-symbol overlaps
+========================================================================================================================
+  P alone                            signals 228 taken 177 skipped {'cap': 7, 'too_expensive': 32, 'cash': 12} ret  +124.6% CAGR +20.4% maxDD  -25.0% Calmar 0.82 PF 2.35
+  S2-X1 alone (slip 0.3%)            signals 143 taken 130 skipped {'cap': 1, 'too_expensive': 11, 'cash': 1} ret   -10.3% CAGR  -2.7% maxDD  -44.1% Calmar -0.06 PF 0.91
+  P + S2-X1 (slip 0.3%)              signals 365 taken 215 skipped {'cap': 8, 'too_expensive': 91, 'cash': 51} ret   +92.3% CAGR +16.2% maxDD  -34.1% Calmar 0.48 PF 1.61
+    S2 taken 77 (mean net +1.91%); P displaced 45 (mean +7.91%); contribution -209.1pp CI90 [-748.5, +360.7]
+  S2-X1 alone (slip 1.0%)            signals 143 taken 133 skipped {'cap': 2, 'too_expensive': 8, 'cash': 0} ret   -23.3% CAGR  -6.4% maxDD  -47.1% Calmar -0.14 PF 0.79
+  P + S2-X1 (slip 1.0%)              signals 365 taken 223 skipped {'cap': 8, 'too_expensive': 65, 'cash': 69} ret   +57.7% CAGR +11.0% maxDD  -38.1% Calmar 0.29 PF 1.37
+    S2 taken 79 (mean net +0.07%); P displaced 43 (mean +9.74%); contribution -413.3pp CI90 [-950.8, +115.6]
+  P + S2-X1 + S3-X1 (slip 0.3%)      signals 622 taken 205 skipped {'cap': 143, 'too_expensive': 198, 'cash': 76} ret  +109.1% CAGR +18.5% maxDD  -39.8% Calmar 0.46 PF 1.57
+      by year P:           2022: -3%  2023: +19%  2024: +55%  2025: -15%  2026: +44%
+      by year P+S2X1+S3X1: 2022: -6%  2023: +52%  2024: +52%  2025: -23%  2026: +19%
+
+========================================================================================================================
+3. BAR
+========================================================================================================================
+  B1 PASS | B2 FAIL | B3 FAIL | B4 FAIL | B5 FAIL   (N=143, mean -0.31% CI [-3.50, +3.33], exTop1 -1.36%, negative years [2024, 2025, 2026])
+  VERDICT S2-X1: DOES NOT MEET THE BAR (not adopted)
+  H1_BASE_OLD: N=73 mean -1.72% CI [-5.19, +2.20] exTop1 -3.33%
+  H2_RECOVERY: UNDERPOWERED (N=24)
+  H3_BASE_YOUNG: N=46 mean +1.29% CI [-6.06, +10.03] exTop1 -1.97%

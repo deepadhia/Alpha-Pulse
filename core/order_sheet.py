@@ -303,12 +303,14 @@ def build_resting_entries(candidates: List[dict], slots_used: int, cfg: SheetCon
 
 
 def format_resting_entries(entries: List[RestingEntry], skipped: List[str], cfg: SheetConfig = SheetConfig(),
-                           warnings: Optional[List[str]] = None) -> str:
-    lines = ["PRE-MARKET RESTING ENTRY ORDERS  (stop-limit BUY, DAY validity; cancel what is unfilled before the close)", ""]
+                           warnings: Optional[List[str]] = None, title: Optional[str] = None,
+                           footer: Optional[List[str]] = None) -> str:
+    """`title` / `footer` replace the policy-P header and explanation (used by the PAPER_ONLY S3 section); defaults keep P's text byte for byte."""
+    lines = [title or "PRE-MARKET RESTING ENTRY ORDERS  (stop-limit BUY, DAY validity; cancel what is unfilled before the close)", ""]
     if entries:
         for e in entries:
             lines.append(f"  {e.symbol:<12} BUY {e.quantity:>5}  trigger {e.trigger:>9.2f}  limit {e.limit:>9.2f}  "
-                         f"(~Rs {e.est_value:,.0f}, age {e.age}d, R:R {e.rr:.2f})  initial stop alert {e.stop_alert:.2f}  "
+                         f"(~Rs {e.est_value:,.0f}, age {e.age}d{f', R:R {e.rr:.2f}' if e.rr else ''})  initial stop alert {e.stop_alert:.2f}  "
                          f"risk ~Rs {e.risk_rupees:,.0f} ({e.risk_pct_of_capital:.2f}% of capital)"
                          + (f"  <- {e.note}" if e.note else ""))
     else:
@@ -318,6 +320,11 @@ def format_resting_entries(entries: List[RestingEntry], skipped: List[str], cfg:
         lines.append("  not placed:")
         lines += [f"    {x}" for x in skipped]
     lines.append("")
+    if footer is not None:
+        lines += footer
+        if warnings:
+            lines += [f"  ! {w}" for w in warnings]
+        return "\n".join(lines)
     lines.append("  Why: replaying 2022-26, buying at the trigger with a resting order beat buying after the alert (about +3.2% "
                  "fills over the listing high) by about 1.3-1.9pp net per trade, paired, positive in every year. The edge "
                  "is unproven in absolute terms (see LEARNINGS.md section 12). Record every fill price and time.")

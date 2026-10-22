@@ -1,0 +1,57 @@
+research_s3_validation.py  clean universe 676; costs flat 1.0% round trip; CI = 90% symbol-cluster bootstrap; tier REPLAY
+
+==============================================================================================================
+V1 PARITY: order-sheet preview vs replay state, every bar of every symbol with a replay state
+==============================================================================================================
+  replay states 3319, previews 3319, mismatches 0 
+
+trade set: 284 S3-X1 trades; kept by the Rs 25 Cr rule: 170
+all trades                                   N=284 (open 21, symbols 214) win=40.5% net=+4.38% CI90=[ +1.5, +7.3] median=-3.92% exTop1=+3.68% exTop3=+2.70%
+kept (turnover <= 25 Cr)                     N=170 (open 11, symbols 143) win=45.3% net=+8.00% CI90=[ +3.9,+12.4] median=-1.84% exTop1=+6.85% exTop3=+5.22%
+    PF  incl open 2.46 [1.64, 3.48] | closed only 1.85 [1.19, 2.68] | ex-top3 all 1.94 [1.25, 2.85] | closed ex-top3 1.33 [0.85, 2.06]   (n closed 159)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 32 = 18.8% of trades, 86% of gross profit || median days held 40, median initial risk 12.0%
+rest                                         N=114 (open 10, symbols  94) win=33.3% net=-1.01% CI90=[ -4.3, +2.8] median=-5.10% exTop1=-2.15% exTop3=-3.73%
+
+==============================================================================================================
+V2 OUT OF TIME: threshold = median turnover of earlier-year trades, applied to the next year
+==============================================================================================================
+  2024: threshold Rs  11.0 Cr (from 69 earlier trades): kept N= 28 mean  +4.36%  all N= 90 mean  -0.98%  rest mean  -3.39%
+  2025: threshold Rs  13.7 Cr (from 159 earlier trades): kept N= 13 mean  +5.77%  all N= 51 mean  +5.19%  rest mean  +4.99%
+  2026: threshold Rs  16.8 Cr (from 210 earlier trades): kept N= 26 mean +15.95%  all N= 74 mean  +7.24%  rest mean  +2.52%
+  pooled out-of-time kept: N=67 mean +9.13% CI90 [+3.5, +15.4] PF 2.85  | all trades same years: N=215 mean +3.31% PF 1.59
+  kept minus all: +5.82pp CI90 [+1.3, +10.6]; years where kept is worse than all: 0 of 3
+
+==============================================================================================================
+V3 PERMUTATION: turnover shuffled within entry year (20,000 shuffles)
+==============================================================================================================
+  observed kept minus rest +9.00pp; one-sided permutation p = 0.0012
+
+==============================================================================================================
+V4 INDEPENDENT REPLICATION: random eligible S3-state day per symbol, bought at the open (not selected by the S3 trigger), X1 exits
+==============================================================================================================
+control kept (turnover <= cap)               N=2115 (open 204, symbols 261) win=29.9% net=+0.86% CI90=[ -1.0, +3.0] median=-5.43% exTop1=+0.77% exTop3=+0.61%
+control rest                                 N=1355 (open 135, symbols 192) win=27.7% net=-2.99% CI90=[ -4.5, -1.4] median=-7.26% exTop1=-3.09% exTop3=-3.26%
+  control kept minus rest: +3.85pp CI90 [+1.5, +6.2]; by year: 2023: +4.5pp  2024: +4.0pp  2025: +0.2pp  2026: +2.4pp
+
+==============================================================================================================
+V5 COST STRESS: paper rule at slippage 1.0%
+==============================================================================================================
+paper rule, slip 1.0%                        N=180 (open 10, symbols 150) win=43.3% net=+6.74% CI90=[ +2.9,+10.9] median=-3.31% exTop1=+5.66% exTop3=+4.13%
+    PF  incl open 2.16 [1.50, 3.10] | closed only 1.65 [1.07, 2.43] | ex-top3 all 1.70 [1.15, 2.54] | closed ex-top3 1.19 [0.78, 1.88]   (n closed 170)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 30 = 16.7% of trades, 84% of gross profit || median days held 36, median initial risk 12.0%
+
+==============================================================================================================
+V6 CAPACITY
+==============================================================================================================
+  lowest 20-day turnover among paper-rule trades: Rs 0.78 Cr; a Rs 10,000 position is 0.129% of it
+
+==============================================================================================================
+VERDICT
+==============================================================================================================
+  V1: PASS
+  V2: PASS
+  V3: PASS
+  V4: PASS
+  V5: PASS
+  V6: PASS
+  V1-V5 ALL PASS: replay-validated (not proven: 2023-26 is one hot period; the forward paper sample decides)

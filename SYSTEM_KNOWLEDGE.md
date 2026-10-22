@@ -57,6 +57,9 @@ IPO-Base-Scanner/
 │   ├── stamp_active_versions.py     # Backfill version fields on old documents
 │   └── purge_penny_stocks.py        # Cleanup script
 │
+├── order_sheet.py                   # Daily manual-execution sheet (policy P) + PAPER_ONLY S3 section
+├── core/setup3.py, core/s3_store.py, core/s3_scorecard.py   # S3 paper book engine, MongoDB store, forward verdict (section 19)
+├── s3_paper.py, s3_paper_alerts.py, s3_scorecard.py         # S3 CLI (fill/exit/list/orders), evening alert, forward scorecard
 ├── cloudflare-dispatcher/           # Precision cron dispatcher (Cloudflare Workers)
 │   └── src/index.js                 # Dispatch schedule + GitHub API calls
 │
@@ -762,3 +765,16 @@ npx wrangler deploy
 | `GITHUB_PAT` | Required in Cloudflare | GitHub Personal Access Token (workflow scope) |
 
 All other variables have safe defaults and are optional overrides.
+
+---
+
+## 19. S3 Paper Book (PAPER_ONLY, added 2026-10-22; patch note v3.6.1, `S3_PAPER_VERSION = "1.0.0"`)
+
+A third, separate setup next to the two core scanners; it never trades live capital and never touches `positions` or `signals`.
+
+* **Rule (core/setup3.py, `PAPER_PARAMS`):** resting stop-limit BUY at the highest HIGH since listing x 1.015 (limit x 1.025, fill +0.3% in the replay) for IPOs 61-400 calendar days old; pivot at least 6 sessions old; prior close within 10% of the pivot; policy P's causal liquidity gates (price >= Rs 25, prior-bar volume >= 150k, 20-session mean turnover >= Rs 0.75 Cr, fewer than 3 circuit days); plus the owner's cap: 20-session mean turnover <= Rs 25 Cr. Stop = 15-session swing low x 0.97, at most 12% below the fill. **X1 exits:** close-based stop (sell at the next open) and the trailing ratchet only; all time-based exits are off. One position per symbol, 30-bar cooldown, 10 x 10% paper slots.
+* **Storage (MongoDB `ipo_scanner_v2`):** `s3_paper_orders` (key `order_date` + `symbol`; PLACED -> FILLED), `s3_paper_positions` (OPEN / CLOSED), `s3_paper_runs` (daily heartbeat of the alert job). Every document carries `s3_version` and `rules_fp`.
+* **Commands:** `python order_sheet.py --capital N` (S3 section, stores the orders it prints unless `--no-s3-store`), `python s3_paper.py fill|exit|list|orders`, `python s3_paper_alerts.py [--dry-run]`, `python s3_scorecard.py`.
+* **Alerts:** `.github/workflows/s3-paper-alerts.yml` (13:20 UTC Mon-Fri), same Telegram bot and chat, prefix "S3 PAPER", silent unless a stop alert, an order, stale data or an error needs attention.
+* **Versioning:** `S3_PAPER_VERSION` is independent of `SCANNER_VERSION` (which versions policy P and the live scanners and has six touchpoints). A paper-rule change bumps it and updates the fingerprint test (AGENTS rule 25).
+* **Evidence state:** replay 2023-26, rule as stored: N = 179, +7.86% net per trade (CI +4.0..+12.1), PF 2.48 incl. open / 1.88 closed / 1.97 ex-top-3, in-sample for the turnover threshold. Replay validation V1-V6 (LEARNINGS 20.5) passes; the forward verdict (`core/s3_scorecard.py`) is INSUFFICIENT until 40 closed paper trades. Read LEARNINGS 20-20.5 before trusting any number.
