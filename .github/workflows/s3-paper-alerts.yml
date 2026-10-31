@@ -3,8 +3,9 @@ name: S3 Paper Alerts
 # PAPER_ONLY S3 book (LEARNINGS.md 20.4): evening stop alerts for open S3 paper positions and the resting orders for the next session.
 # Completely separate from the policy-P workflows: own message prefix, same Telegram bot and chat as the rest of the system
 # (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID), own MongoDB collections (s3_paper_*).  It never touches `positions` or `signals`.
-# 13:20 UTC = 18:50 IST, after the 18:30 IST stop_loss_update run has refreshed the candle cache.  GitHub schedules can start late; the
-# message reports the data date and says STALE when the cache lacks the last completed session.
+# 13:20 UTC = 18:50 IST.  The shared candle cache only holds sessions up to the previous day at this hour (the 18:30 run refreshes only policy-P
+# holdings), so the job fetches the missing completed bars itself from Upstox, in memory (core/s3_refresh.py, needs UPSTOX_ACCESS_TOKEN).
+# GitHub schedules can start late; the message reports the data date and says STALE when the last completed session could not be loaded.
 
 on:
   schedule:
@@ -40,6 +41,7 @@ jobs:
           MONGO_URI: ${{ secrets.MONGO_URI }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          UPSTOX_ACCESS_TOKEN: ${{ secrets.UPSTOX_ACCESS_TOKEN }}
           S3_PAPER_CAPITAL: ${{ vars.S3_PAPER_CAPITAL || '100000' }}
         run: |
           if [ -z "$MONGO_URI" ]; then echo "MONGO_URI is missing"; exit 1; fi

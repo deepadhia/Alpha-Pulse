@@ -14,14 +14,16 @@ What it sends (one message a day, silent unless something needs action):
   2. Trailing levels of every open position, with open P&L and peak run-up.
   3. Orders for the NEXT session: stop-limit BUY at highest-since-listing +1.5% (limit +2.5%) for IPOs aged 61-400 days with 20-session mean
      turnover <= Rs 25 Cr.  They are stored in s3_paper_orders; after a paper fill run `python s3_paper.py fill SYMBOL PRICE`.
-  4. A data-freshness line: the candle cache must hold the last completed session, otherwise the message says the data is stale.
+  4. A data-freshness line: the candles must hold the last completed session, otherwise the message says the data is stale.  The shared candle
+     cache only holds sessions up to the previous day at 18:50 IST, so this job first fetches the missing completed bars for the held positions and
+     the names near their pivot from Upstox, in memory only (core/s3_refresh.py; needs UPSTOX_ACCESS_TOKEN).  If that fails the message says STALE.
 Every run writes one heartbeat to s3_paper_runs, so "did the job run, with which data" can be audited (s3_scorecard.py prints it).
 """
 
 import argparse
 import html
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
@@ -97,12 +99,25 @@ def main(argv=None):
     from db import s3_paper_orders_col, s3_paper_positions_col, s3_paper_runs_col
     from utils import send_telegram_msg
 
+    from core import s3_refresh
+    from db import get_instrument_key_mapping
+
     run_day = pd.Timestamp(a.today) if a.today else pd.Timestamp(datetime.now().date())
     order_day = next_session(run_day)
     cfg = SheetConfig(capital=a.capital)
-    res = osh.s3_collect(order_day, cfg)
+    now_ist = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=5, minutes=30))).replace(tzinfo=None)
+    max_date = s3_refresh.last_complete_date(now_ist, run_day)
+
+    def refresh(candles, listing_syms, held):
+        # The shared candle cache holds sessions up to D-1 at 18:50 IST on day D; fetch the missing completed bars in memory (nothing is written).
+        return s3_refresh.refresh_candles(candles, listing_syms, held, max_date, os.getenv("UPSTOX_ACCESS_TOKEN"), get_instrument_key_mapping())
+
+    res = osh.s3_collect(order_day, cfg, refresh=refresh)
     if res is None:
         raise SystemExit("MongoDB is not connected")
+    rf = res.get("refresh") or {}
+    print(f"[s3_refresh] max_date {max_date.date()}: {len(rf.get('selected', ()))} names near pivot or held, {rf.get('fetched', 0)} fetched, "
+          f"{rf.get('updated', 0)} updated, {len(rf.get('failed', {}))} failed")
     msg = build_message(res["rows"], res["entries"], order_day, res["data_asof"], res["warnings"])
     print(msg["text"])
     if a.dry_run:
@@ -112,7 +127,8 @@ def main(argv=None):
         s3_store.record_orders(s3_paper_orders_col, order_day, osh.s3_order_docs(res["entries"], res["cands"]))
     sent = send_telegram_msg(msg["text"], disable_notification=not msg["actionable"])
     s3_store.record_run(s3_paper_runs_col, run_day, order_day=order_day.to_pydatetime(), data_asof=(res["data_asof"].to_pydatetime() if res["data_asof"] is not None else None),
-                        n_open=msg["n_open"], n_alerts=msg["n_alerts"], n_orders=msg["n_orders"], stale=msg["stale"], sent=bool(sent), capital=a.capital)
+                        n_open=msg["n_open"], n_alerts=msg["n_alerts"], n_orders=msg["n_orders"], stale=msg["stale"], sent=bool(sent), capital=a.capital,
+                        n_refreshed=rf.get("updated", 0), n_refresh_failed=len(rf.get("failed", {})))
 
 
 if __name__ == "__main__":

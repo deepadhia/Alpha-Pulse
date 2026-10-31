@@ -108,6 +108,9 @@ jobs:
           LISTING_MIN_RISK_REWARD: ${{ vars.LISTING_MIN_RISK_REWARD || '1.25' }}
           LISTING_STOP_LOSS_PCT: ${{ vars.LISTING_STOP_LOSS_PCT || '8.0' }}
           LISTING_MAX_DAYS_SINCE_LISTING: ${{ vars.LISTING_MAX_DAYS_SINCE_LISTING || '60' }}
+          # Intraday (partial-day) volume gates: '1' = ON (unchanged behaviour). Set the repository variable to '0' to switch a gate off, back to '1' to roll back.
+          LISTING_INTRADAY_VOLUME_FLOOR_ENABLED: ${{ vars.LISTING_INTRADAY_VOLUME_FLOOR_ENABLED || '1' }}
+          LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED: ${{ vars.LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED || '1' }}
           MONGO_URI: ${{ secrets.MONGO_URI }}
         run: |
           echo "🔄 Fetching recent IPO symbols to MongoDB..."

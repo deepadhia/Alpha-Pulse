@@ -250,10 +250,12 @@ S3_FOOTER = [
 ]
 
 
-def s3_collect(today: pd.Timestamp, cfg: SheetConfig, guard=None) -> dict:
+def s3_collect(today: pd.Timestamp, cfg: SheetConfig, guard=None, refresh=None) -> dict:
     """
     Everything the S3 paper section and the S3 alerts need, for orders to be placed on session `today` (completed sessions before it only):
-    dict(rows, entries, skipped, warnings, cands, notes, open_n, data_asof).  Reads MongoDB, writes nothing.  Returns None when Mongo is off.
+    dict(rows, entries, skipped, warnings, cands, notes, open_n, data_asof, refresh).  Reads MongoDB, writes nothing.  Returns None when Mongo is off.
+    `refresh` (optional): callable(candles, listing_symbols, held_symbols) -> (candles, report) that merges the completed sessions the shared
+    cache lacks (core.s3_refresh); `data_asof` is then judged on the held positions and the names near their pivot, not on the whole universe.
     """
     from db import daily_candles_col, listing_data_col, positions_col, s3_paper_orders_col, s3_paper_positions_col
     if s3_paper_orders_col is None or s3_paper_positions_col is None:
@@ -297,13 +299,25 @@ def s3_collect(today: pd.Timestamp, cfg: SheetConfig, guard=None) -> dict:
         if lo <= _naive_ts(ld) <= hi:
             listings[d["symbol"]] = d
     candles = fetch(set(listings) | set(open_h))
+    rep = None
+    if refresh is not None:
+        candles, rep = refresh(candles, set(listings), set(open_h))
     rows = s3_position_rows(open_h, candles)
     cands, notes = s3_candidates(listings, candles, skip, today)
     entries, skipped, warnings = build_resting_entries(cands, slots_used=len(open_h), cfg=cfg, guard=guard)
-    lasts = sorted(_naive_ts(df["DATE"].iloc[-1]) for sym, df in candles.items() if len(df) and sym in listings)
-    # the MEDIAN last-candle date of the watched universe: one fresh symbol must not hide a stale cache
+    if rep is not None:
+        from core.s3_refresh import describe
+        warnings = list(warnings) + describe(rep)
+    # the MEDIAN last-candle date of the names that matter (the watched universe, or after a refresh the held names and those near their pivot):
+    # one fresh symbol must not hide a stale cache.  A held position whose own candles lag caps the date, its stop alert depends on them.
+    relevant = (rep["selected"] & set(listings)) if rep is not None and rep["selected"] & set(listings) else set(listings)
+    lasts = sorted(_naive_ts(df["DATE"].iloc[-1]) for sym, df in candles.items() if len(df) and sym in relevant)
+    data_asof = lasts[len(lasts) // 2] if lasts else None
+    held_lasts = [_naive_ts(candles[s]["DATE"].iloc[-1]) for s in open_h if s in candles and len(candles[s])]
+    if held_lasts and (data_asof is None or min(held_lasts) < data_asof):
+        data_asof = min(held_lasts)
     return dict(rows=rows, entries=entries, skipped=skipped, warnings=warnings, cands=cands, notes=notes, open_n=len(open_h),
-                data_asof=lasts[len(lasts) // 2] if lasts else None)
+                data_asof=data_asof, refresh=rep)
 
 
 def s3_order_docs(entries, cands) -> list:
