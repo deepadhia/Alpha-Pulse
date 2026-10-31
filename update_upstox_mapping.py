@@ -90,6 +90,13 @@ def search_instrument_key(symbol, listing_date=None):
         # Use ISIN in instrument key format (same as existing mappings: NSE_EQ|INE...)
         instrument_key = f"NSE_EQ|{isin}"
         logger.info(f"Found ISIN for {symbol}: {isin}")
+
+        # Verify the key before storing it: Upstox rejects keys it does not carry (http 400 UDAPI100011), and an unverified key
+        # silently breaks the symbol's candle fetch.  An undecidable probe (rate limit, network) keeps the old behaviour.
+        from core.instrument_keys import probe_key
+        if probe_key(instrument_key, UPSTOX_ACCESS_TOKEN) == "invalid":
+            logger.warning(f"Upstox rejects {instrument_key} for {symbol} - not storing it")
+            return None
         
         # Step 2: Get company name from NSE data (if available)
         name = symbol  # Default to symbol

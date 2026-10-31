@@ -132,6 +132,15 @@ LISTING_SHELF_MAX_ENTRY_ABOVE_PIVOT_PCT = _env_float("LISTING_SHELF_MAX_ENTRY_AB
 LISTING_SHELF_MIN_TURNOVER_CR = _env_float("LISTING_SHELF_MIN_TURNOVER_CR", 10.0)
 LISTING_SHELF_LIVE_CAPITAL_ENABLED = _env_bool("LISTING_SHELF_LIVE_CAPITAL_ENABLED", False)
 ALERT_ON_PAPER_ONLY = _env_bool("ALERT_ON_PAPER_ONLY", False)
+
+# Intraday (partial-day) volume gates on the live breakout decision.  Default ON = behaviour unchanged.  The replay evidence (LEARNINGS 17, AGENTS rule 21,
+# SESSION_HANDOFF 11.8) is that gates reading volume-so-far reject about 40% of trades including 46% of the winners (rejected mean +7.7%), and the replayed
+# policy P has no same-day volume gate.  Set a flag to 0 to switch that gate off; set it back to 1 to roll back.  Both gates must be off for a breakout
+# to pass on low morning volume: with only the floor off, the strict relative-volume check still rejects it.
+#   LISTING_INTRADAY_VOLUME_FLOOR_ENABLED       the hard 150,000-share floor on today's volume so far (rejection BREAKOUT_VOLUME_BELOW_FLOOR)
+#   LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED  strict mode's "today's volume so far >= LISTING_MIN_VOLUME_MULT x average" rejection (volume_spike_failed)
+LISTING_INTRADAY_VOLUME_FLOOR_ENABLED = _env_bool("LISTING_INTRADAY_VOLUME_FLOOR_ENABLED", True)
+LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED = _env_bool("LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED", True)
 LISTING_CONFIRMATION_MAX_MINUTES = _env_int("LISTING_CONFIRMATION_MAX_MINUTES", 120)
 LISTING_PENDING_CUTOFF_HOUR = _env_int("LISTING_PENDING_CUTOFF_HOUR", 14)
 LISTING_PENDING_CUTOFF_MINUTE = _env_int("LISTING_PENDING_CUTOFF_MINUTE", 30)
@@ -1121,6 +1130,25 @@ def update_listing_data_for_new_ipos():
     except Exception as e:
         logger.error(f"Error updating listing data: {e}")
 
+def _would_have_triggered(current_high: float, listing_day_high: float, days_since_listing) -> bool:
+    """
+    True when the PRICE side of a listing-high breakout held at scan time, whatever gate then rejected it: the live high is above the listing
+    high, the IPO is inside the breakout age window (1..LISTING_MAX_DAYS_SINCE_LISTING days), and the live high is within the entry-extension cap
+    (MAX_ENTRY_ABOVE_HIGH_PCT) above the listing high.  The v1 definition was only "live high > listing high", which flagged every old IPO trading
+    above its listing high (NESTLEIND, HYUNDAI) and made the field useless for counting missed signals.
+    """
+    try:
+        if not (current_high and listing_day_high and current_high > 0 and listing_day_high > 0):
+            return False
+        if current_high <= listing_day_high:
+            return False
+        if days_since_listing is None or not (0 < int(days_since_listing) <= MAX_DAYS_SINCE_LISTING_FOR_BREAKOUT):
+            return False
+        return bool(current_high <= listing_day_high * (1.0 + MAX_ENTRY_ABOVE_HIGH_PCT / 100.0) + 1e-9)   # tolerance: 100 x 1.035 is 103.49999999999999
+    except (TypeError, ValueError):
+        return False
+
+
 def calculate_signal_score_components(tier, volume_ratio, perfect_base, post_confirm_pct):
     tier_weight = 4.0 if tier == 'A+' else (3.0 if tier == 'A' else (2.0 if tier == 'B' else 1.0))
     volume_score = min(2.0, float(volume_ratio) / 2.0) if volume_ratio else 0.0
@@ -1248,7 +1276,7 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
             if not is_interesting: return
 
             _rejection_logged = True
-            would_have_triggered = bool(current_high > 0 and current_high > listing_day_high)
+            would_have_triggered = _would_have_triggered(current_high, listing_day_high, days_since_listing)
             try:
                 f_val = round(float(value), 2) if (value is not None and not isinstance(value, str)) else value
             except Exception:
@@ -1267,6 +1295,8 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
                 "threshold": t_val,
                 "base_zone_passed": True,
                 "would_have_triggered": would_have_triggered,
+                "would_have_triggered_v": 2,     # v1 rows (before 2026-10-31) only meant "price above the listing high", at any age and extension
+                "days_since_listing": days_since_listing,
                 "future_20d_return": None,
                 "metrics": {
                     "perf": metrics.get("perf", None),
@@ -1381,7 +1411,12 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
         # Day-0 (days_since_listing == 0) is intentionally exempt: listing-day
         # volume may not be fully settled in the DB yet, so we don't reject on Day 0.
         if days_since_listing > 0:
-            if current_volume < 150000 and not is_nse_addition:
+            if current_volume < 150000 and not is_nse_addition and not LISTING_INTRADAY_VOLUME_FLOOR_ENABLED:
+                logger.info(
+                    f"ℹ️ {symbol}: volume so far {current_volume:,.0f} < 150k, floor DISABLED "
+                    f"(LISTING_INTRADAY_VOLUME_FLOOR_ENABLED=0), continuing"
+                )
+            elif current_volume < 150000 and not is_nse_addition:
                 logger.info(
                     f"⏭️ Skipping {symbol} — breakout_day_volume={current_volume:,.0f} < 150k floor "
                     f"(days_since_listing={days_since_listing})"
@@ -1707,7 +1742,7 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
                     return None
 
                 # Mandatory relative volume expansion: all breakouts must have volume_spike >= 1.5x
-                if not volume_spike:
+                if not volume_spike and LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED:
                     rejection_reason = (
                         f"Strict: volume spike required for {signal_type} "
                         f"(current {current_volume:,.0f} vs avg {avg_volume:,.0f}, need {MIN_VOLUME_MULTIPLIER}x)"
