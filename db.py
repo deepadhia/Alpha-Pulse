@@ -43,7 +43,7 @@ db_metrics = {
 }
 
 # Versioning and Safeguards
-SCANNER_VERSION = "3.6.0"  # v3.6.0: Hardened execution release (10 x 10% slots, close-based stop alerts, atomic commit lock, shelf/hourly PAPER_ONLY); v3.5.0 entry rules unchanged
+SCANNER_VERSION = "3.7.0"  # v3.7.0: Trusted-records release (entry guard, append-only trade ledger, reconciler); entry and exit rules unchanged from v3.5.0/v3.6.0
 MAX_DAILY_REJECTIONS = 500
 _rejection_guard_warned = False
 

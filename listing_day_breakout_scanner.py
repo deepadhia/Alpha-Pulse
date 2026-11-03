@@ -50,7 +50,7 @@ spec.loader.exec_module(scanner_module)
 from core.portfolio_caps import DEFAULT_MAX_ACTIVE_POSITIONS, DEFAULT_HARD_ACTIVE_POSITIONS
 
 # Import version and logging utilities from main scanner
-SCANNER_VERSION = "3.6.0"  # v3.6.0: Hardened execution release (10 x 10% slots, close-based stop alerts, atomic commit lock, shelf/hourly PAPER_ONLY); v3.5.0 entry rules unchanged
+SCANNER_VERSION = "3.7.0"  # v3.7.0: Trusted-records release (entry guard, append-only trade ledger, reconciler); entry and exit rules unchanged from v3.5.0/v3.6.0
 write_daily_log = getattr(scanner_module, 'write_daily_log', lambda *a, **k: None)
 
 fetch_data = scanner_module.fetch_data
