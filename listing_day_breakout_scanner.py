@@ -2290,6 +2290,26 @@ def _commit_trade_to_db_unlocked(breakout_data, force_paper=False):
         if limit_buy_price < entry_p:
             limit_buy_price = round(entry_p * 1.02, 2)
 
+        # Entry guard (core/trade_guard.py): refuse impossible records BEFORE the signal is stored or alerted
+        # (non-trading day, future date, stop at/above entry, risk above cap, entry more than 8% over the listing high / shelf pivot).
+        # Rollback: TRADE_GUARD_DISABLED=1.
+        try:
+            from db import _trade_guard_enabled, _ledger
+            if _trade_guard_enabled():
+                from core.trade_guard import validate_new_entry
+                verdict = validate_new_entry(
+                    dict(symbol=symbol, entry_price=entry_p, stop_loss=breakout_data.get('stop_loss'), limit_buy_price=limit_buy_price,
+                         current_price=breakout_data.get('current_price'), entry_date=datetime.now()),
+                    ref_high=lh_ref)
+                if verdict["hard"]:
+                    logger.error(f"🚫 Listing commit REJECTED for {symbol}: {'; '.join(verdict['hard'])}")
+                    _ledger("ENTRY_REJECTED", symbol, dict(reasons=verdict["hard"], warnings=verdict["warn"], entry_price=entry_p,
+                                                           stop_loss=breakout_data.get('stop_loss'), ref_high=lh_ref, type=breakout_data.get('type')),
+                            source="listing_day_breakout_scanner")
+                    return False, False, 0, 'UNKNOWN', 0.4
+        except Exception as guard_err:
+            logger.warning(f"entry guard error for {symbol} (commit allowed): {guard_err}")
+
         # Create signal doc
         signal_doc = {
             "signal_id": signal_id,
