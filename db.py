@@ -29,6 +29,8 @@ market_holidays_col = db["market_holidays"] if db is not None else None
 s3_paper_orders_col = db["s3_paper_orders"] if db is not None else None
 s3_paper_positions_col = db["s3_paper_positions"] if db is not None else None
 s3_paper_runs_col = db["s3_paper_runs"] if db is not None else None
+# Append-only trade ledger (core/ledger.py): insert-only, hash-chained; `positions` is overwritten on every re-entry, this is not
+trade_ledger_col = db["trade_ledger"] if db is not None else None
 
 # In-process cache — avoids a DB round-trip on every data fetch
 _instrument_key_cache: dict = {}
@@ -41,7 +43,7 @@ db_metrics = {
 }
 
 # Versioning and Safeguards
-SCANNER_VERSION = "3.6.0"  # v3.6.0: Hardened execution release (10 x 10% slots, close-based stop alerts, atomic commit lock, shelf/hourly PAPER_ONLY); v3.5.0 entry rules unchanged
+SCANNER_VERSION = "3.7.0"  # v3.7.0: Trusted-records release (entry guard, append-only trade ledger, reconciler); entry and exit rules unchanged from v3.5.0/v3.6.0
 MAX_DAILY_REJECTIONS = 500
 _rejection_guard_warned = False
 
@@ -114,6 +116,9 @@ def ensure_indexes():
     if s3_paper_orders_col is not None and s3_paper_positions_col is not None:
         from core.s3_store import ensure_indexes as _s3_indexes
         _s3_indexes(s3_paper_orders_col, s3_paper_positions_col, s3_paper_runs_col)
+    if trade_ledger_col is not None:
+        from core.ledger import ensure_indexes as _ledger_indexes
+        _ledger_indexes(trade_ledger_col)
 
 def insert_log(scanner: str, symbol: str, action: str, candle_timestamp, details: dict, version: str = SCANNER_VERSION, source: str = "live", log_type: str = "ACCEPTED"):
     global _rejection_guard_warned
@@ -201,6 +206,59 @@ def upsert_signal(signal_doc: dict):
     except Exception as e:
         logger.error(f"Failed to upsert signal {signal_id} into MongoDB: {e}")
 
+
+def _trade_guard_enabled() -> bool:
+    """The entry guard (core/trade_guard.py) is on unless TRADE_GUARD_DISABLED=1 (rollback switch); unit tests skip it unless TRADE_GUARD_FORCE=1."""
+    if os.environ.get("TRADE_GUARD_DISABLED") == "1":
+        return False
+    if os.environ.get("PYTEST_CURRENT_TEST") and os.environ.get("TRADE_GUARD_FORCE") != "1":
+        return False
+    return True
+
+
+def _validate_new_open(position_doc: dict) -> dict:
+    try:
+        from core.trade_guard import validate_new_entry
+        return validate_new_entry(position_doc)
+    except Exception as e:                       # a bug in the guard must never block trading or crash a scan
+        logger.warning(f"trade guard error (position allowed): {e}")
+        return {"hard": [], "warn": []}
+
+
+def _ledger_view(position_doc: dict) -> dict:
+    keys = ("signal_id", "status", "grade", "entry_date", "entry_price", "limit_buy_price", "stop_loss", "trailing_stop",
+            "current_price", "exit_date", "exit_price", "exit_reason", "pnl_pct", "version", "_backfilled")
+    return {k: position_doc.get(k) for k in keys if k in position_doc}
+
+
+def _ledger(event_type: str, symbol: str, payload: dict, source: str = "db.upsert_position") -> None:
+    if trade_ledger_col is None:
+        return
+    try:
+        from core.ledger import append
+        append(trade_ledger_col, event_type, symbol, payload, source, code_version=SCANNER_VERSION,
+               local_path=os.environ.get("LEDGER_LOCAL_PATH", os.path.join("logs", "ledger.jsonl")))
+    except Exception as e:
+        logger.warning(f"ledger write skipped for {event_type} {symbol}: {e}")
+
+
+def _ledger_position_events(position_doc: dict, existing, opening: bool) -> None:
+    """Best-effort ledger entries for the three transitions that matter: open, stop raised, close."""
+    symbol = position_doc.get("symbol")
+    status = position_doc.get("status", "")
+    prev_status = (existing or {}).get("status")
+    if opening:
+        _ledger("ENTRY_ACCEPTED", symbol, _ledger_view(position_doc))
+    elif status in ("CLOSED", "PAPER_CLOSED") and prev_status in ("ACTIVE", "PAPER_ONLY"):
+        _ledger("POSITION_CLOSED", symbol, dict(_ledger_view(position_doc), entry_price=position_doc.get("entry_price", (existing or {}).get("entry_price"))))
+    elif status in ("ACTIVE", "PAPER_ONLY") and existing is not None:
+        old, new = existing.get("trailing_stop"), position_doc.get("trailing_stop")
+        try:
+            if old is not None and new is not None and float(new) > float(old):
+                _ledger("STOP_MOVED", symbol, dict(status=status, old=float(old), new=float(new), current_price=position_doc.get("current_price")))
+        except (TypeError, ValueError):
+            pass
+
 def upsert_position(position_doc: dict):
     if positions_col is None:
         return
@@ -228,9 +286,25 @@ def upsert_position(position_doc: dict):
         return
         
     position_doc["updated_at"] = datetime.now(timezone.utc)
+
+    status = position_doc.get("status", "")
+    existing = None
+    try:
+        existing = positions_col.find_one({"symbol": symbol}, {"_id": 0, "status": 1, "trailing_stop": 1, "entry_price": 1})
+    except Exception as ex_err:
+        logger.warning(f"Could not read existing position for {symbol} (guard and ledger skipped): {ex_err}")
+    prev_status = (existing or {}).get("status")
+    opening = status in ("ACTIVE", "PAPER_ONLY") and (existing is None or prev_status in ("CLOSED", "PAPER_CLOSED"))
+    if opening and not position_doc.get("_backfilled") and _trade_guard_enabled():
+        verdict = _validate_new_open(position_doc)
+        if verdict["hard"]:
+            logger.error(f"REJECTED new position {symbol}: {'; '.join(verdict['hard'])}")
+            _ledger("ENTRY_REJECTED", symbol, dict(reasons=verdict["hard"], warnings=verdict["warn"], doc=_ledger_view(position_doc)))
+            return False
+        if verdict["warn"]:
+            logger.warning(f"{symbol}: {'; '.join(verdict['warn'])}")
     
     try:
-        status = position_doc.get("status", "")
         if status in ("ACTIVE", "PAPER_ONLY"):
             # Clear stale *exit-cycle* fields from a prior closed trade on reopen /
             # refresh. Do NOT unset live open-book metrics (pnl_pct, days_held,
@@ -277,8 +351,11 @@ def upsert_position(position_doc: dict):
                     upsert=True
                 )
         increment_metric("db_inserts")
+        _ledger_position_events(position_doc, existing, opening)
+        return True
     except Exception as e:
         logger.error(f"Failed to upsert position for {symbol} into MongoDB: {e}")
+        return False
 
 def signal_exists(signal_id: str) -> bool:
     """Return True if a signal_id already exists in MongoDB."""

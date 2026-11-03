@@ -31,7 +31,7 @@ against them later; the S3 book needs no log file.
 import argparse
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
@@ -41,6 +41,7 @@ from core.order_sheet import (SheetConfig, build_resting_entries, build_sheet, f
 from core.portfolio_caps import DEFAULT_HARD_ACTIVE_POSITIONS
 from core import s3_store
 from s3_paper_alerts import previous_session
+from core.trade_guard import default_is_trading_day, previous_trading_day
 from core.risk_guard import GuardConfig, evaluate
 from core.setup3 import PAPER_MAX_TURN_CR, PAPER_PARAMS, Setup3Params, paper_exit_params, preview_s3_entry, s3_paper_status
 
@@ -120,8 +121,28 @@ def shadow_pre_open(df, li, today, mkt, supply):
         return dict(status=f"error:{type(e).__name__}")
 
 
-def resting_candidates(today: pd.Timestamp, p: Params):
+def refresh_p_candles(candles: dict, listings: dict, today: pd.Timestamp):
+    """
+    Merge the completed sessions the shared candle cache lacks into the frames of the names near their listing high (IN MEMORY ONLY, core/s3_refresh.py).
+    The cache holds sessions up to D-2 on the morning of day D (fetch_data treats D-1 as fresh), while the replay decides on data through D-1.
+    Returns (candles, report-or-None).  Needs UPSTOX_ACCESS_TOKEN; without it the cache is used as it is and the freshness line says so.
+    """
+    try:
+        from core import s3_refresh
+        from db import get_instrument_key_mapping
+        now_ist = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=5, minutes=30))).replace(tzinfo=None)
+        max_date = min(s3_refresh.last_complete_date(now_ist), today - pd.Timedelta(days=1))
+        return s3_refresh.refresh_candles(candles, set(listings), set(), max_date, os.getenv("UPSTOX_ACCESS_TOKEN"), get_instrument_key_mapping())
+    except Exception as e:
+        return candles, dict(selected=set(), fetched=0, updated=0, failed={}, note=f"refresh error: {type(e).__name__}: {e}")
+
+
+def resting_candidates(today: pd.Timestamp, p: Params, with_asof: bool = False, refresh: bool = False):
+    """(candidates, notes), or (candidates, notes, data_asof, refresh_report) with with_asof=True.  data_asof is the median last candle date of the cache."""
     listings, candles, skip = load_watchlist(today, p)
+    rep = None
+    if refresh and candles:
+        candles, rep = refresh_p_candles(candles, listings, today)
     cands, notes = [], []
     mkt, supply = None, None
     try:
@@ -145,6 +166,9 @@ def resting_candidates(today: pd.Timestamp, p: Params):
             pv["symbol"] = sym
             pv["shadow"] = shadow_pre_open(df, li, today, mkt, supply)
             cands.append(pv)
+    if with_asof:
+        lasts = sorted(_naive_ts(df["DATE"].iloc[-1]) for df in candles.values() if df is not None and len(df))
+        return cands, notes, (lasts[len(lasts) // 2] if lasts else None), rep
     return cands, notes
 
 
@@ -358,13 +382,16 @@ def main(argv=None):
     ap.add_argument("--holdings", default=None, help="JSON file {symbol: quantity}")
     ap.add_argument("--hard-cap", type=int, default=DEFAULT_HARD_ACTIVE_POSITIONS,
                     help="max open positions; weight per position is 1 / this. Default comes from core/portfolio_caps.py "
-                         "(10 slots, 10% each; the scanners use the same constant). Pass 7 for the pre-2026-10-14 behaviour")
+                         "(10 slots, 10%% each; the scanners use the same constant). Pass 7 for the pre-2026-10-14 behaviour")
     ap.add_argument("--buffer", type=float, default=2.0, help="sell-limit buffer below a stop trigger, percent")
     ap.add_argument("--stop-mode", choices=["close_alert", "resting"], default="close_alert")
     ap.add_argument("--disaster-buffer", type=float, default=8.0,
                     help="close_alert mode: optional GTT this far below the alert level, percent")
     ap.add_argument("--no-resting-entries", action="store_true", help="hide the pre-market resting entry orders")
-    ap.add_argument("--log", action="store_true", help="append generated resting orders to logs/resting_orders.jsonl")
+    ap.add_argument("--log", action="store_true", help="append generated resting orders to logs/resting_orders.jsonl (and the trade ledger)")
+    ap.add_argument("--no-refresh", action="store_true", help="do not fetch the sessions the candle cache lacks (offline; the cache lags one session)")
+    ap.add_argument("--allow-stale", action="store_true",
+                    help="print and log resting orders even when the candle cache is older than the last completed session (not recommended)")
     ap.add_argument("--no-s3", action="store_true", help="hide the S3 PAPER_ONLY section")
     ap.add_argument("--no-s3-store", action="store_true", help="print the S3 section without storing its orders in MongoDB")
     ap.add_argument("--peak-capital", type=float, default=None,
@@ -393,18 +420,50 @@ def main(argv=None):
 
     if not args.no_resting_entries:
         today = pd.Timestamp(datetime.now().date())
-        cands, notes = resting_candidates(today, Params())
-        entries, skipped, warnings = build_resting_entries(cands, slots_used=len(held_symbols), cfg=cfg, guard=guard)
-        print()
-        print(format_resting_entries(entries, skipped, cfg, warnings))
+        cands, notes, data_asof, rep = resting_candidates(today, Params(), with_asof=True, refresh=not args.no_refresh)
+        expected = pd.Timestamp(previous_trading_day(today.date()))
+        lag = 99 if data_asof is None else max(0, sum(1 for d in pd.date_range(data_asof + pd.Timedelta(days=1), expected) if default_is_trading_day(d.date())))
+        if rep is not None:
+            print(f"\n[candle refresh] {len(rep['selected'])} name(s) near their listing high, {rep['fetched']} fetched, {rep['updated']} updated, "
+                  f"{len(rep['failed'])} failed" + (f"; {rep['note']}" if rep.get("note") else ""))
+        stale = lag >= 2
+        if stale and not args.allow_stale:
+            print()
+            print(f"RESTING ENTRY ORDERS WITHHELD: candle data is as of {data_asof.date() if data_asof is not None else 'n/a'}, {lag if lag < 99 else 'many'} "
+                  f"session(s) older than the last completed session {expected.date()}.  Orders built on stale data can name the wrong levels.  "
+                  f"Refresh the candle cache and run again (or pass --allow-stale to override).  Nothing was logged.")
+            entries, skipped, warnings = [], [], []
+        else:
+            entries, skipped, warnings = build_resting_entries(cands, slots_used=len(held_symbols), cfg=cfg, guard=guard)
+            print()
+            print(format_resting_entries(entries, skipped, cfg, warnings))
+            if lag == 1:
+                print(f"\nNOTE: candle data is as of {data_asof.date()}, one session behind {expected.date()} (the shared cache lags by design and the refresh "
+                      f"above did not cover every name).  The trigger levels (listing high) do not change, but eligibility ignores {expected.date()}'s bar.")
+            elif stale:
+                print(f"\nWARNING: --allow-stale: candle data is {lag} sessions old.")
         if args.log and entries:
             os.makedirs("logs", exist_ok=True)
+            asof_s = str(data_asof.date()) if data_asof is not None else None  # logged so the forward test knows how old the inputs were
             with open(os.path.join("logs", "resting_orders.jsonl"), "a", encoding="utf-8") as fh:
                 shadow = {c["symbol"]: c.get("shadow") for c in cands}
                 for e in entries:
                     fh.write(json.dumps(dict(date=str(today.date()), generated_at=datetime.now().isoformat(timespec="seconds"),
-                                             shadow=shadow.get(e.symbol), **e.__dict__), default=str) + "\n")
+                                             data_asof=asof_s, capital=args.capital, shadow=shadow.get(e.symbol), **e.__dict__), default=str) + "\n")
             print(f"\nlogged {len(entries)} order(s) to logs/resting_orders.jsonl")
+            try:
+                from core.ledger import append as ledger_append
+                from db import trade_ledger_col, SCANNER_VERSION
+                if trade_ledger_col is not None:
+                    from core.ledger import ensure_indexes as ledger_indexes
+                    ledger_indexes(trade_ledger_col)
+                for e in entries:
+                    ledger_append(trade_ledger_col, "ORDER_GENERATED", e.symbol, dict(order_date=str(today.date()), data_asof=asof_s,
+                                                                                      capital=args.capital, **e.__dict__),
+                                  "order_sheet.py", code_version=SCANNER_VERSION)
+                print(f"recorded {len(entries)} ORDER_GENERATED event(s) in the trade ledger")
+            except Exception as led_err:
+                print(f"(ledger not written: {led_err})")
 
     if not args.no_s3:
         s3_section(pd.Timestamp(datetime.now().date()), cfg, guard, store=not args.no_s3_store)

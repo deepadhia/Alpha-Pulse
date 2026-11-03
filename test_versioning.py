@@ -5,7 +5,7 @@ import os
 import re
 import unittest
 
-from core.versioning import NATIVE_FORWARD_CUTOFF, NATIVE_FORWARD_VERSIONS, is_native_forward
+from core.versioning import NATIVE_FORWARD_CUTOFF, NATIVE_FORWARD_VERSIONS, TRUSTED_RECORD_VERSIONS, is_native_forward, is_trusted_record
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 SCANNER_RE = r'SCANNER_VERSION\s*=\s*["\']([^"\']+)["\']'
@@ -40,8 +40,21 @@ class TestNativeForward(unittest.TestCase):
         self.assertTrue(is_native_forward("3.6.0", False, "2026-11-01"))
         self.assertFalse(is_native_forward("3.6.0", True, "2026-11-01"))      # backfilled
         self.assertFalse(is_native_forward("3.5.0", False, "2026-09-28"))     # before the cutoff
+        self.assertTrue(is_native_forward("3.7.0", False, "2026-11-05"))      # entry rules unchanged in 3.7.0: same forward cohort
         self.assertFalse(is_native_forward("3.3.0", False, "2026-11-01"))     # other version
         self.assertFalse(is_native_forward(None, False, "2026-11-01"))
+
+
+class TestTrustedRecords(unittest.TestCase):
+    def test_only_guarded_native_rows_are_trusted(self):
+        self.assertTrue(is_trusted_record("3.7.0", False))
+        self.assertFalse(is_trusted_record("3.7.0", True))        # backfilled
+        self.assertFalse(is_trusted_record("3.6.0", False))       # stored before the entry guard existed
+        self.assertFalse(is_trusted_record(None, False))
+
+    def test_trusted_versions_are_inside_the_forward_cohort(self):
+        for v in TRUSTED_RECORD_VERSIONS:
+            self.assertIn(v, NATIVE_FORWARD_VERSIONS)
 
 
 if __name__ == "__main__":

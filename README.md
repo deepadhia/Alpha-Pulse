@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-3.6.0-orange.svg)](https://github.com/deepadhia/Alpha-Pulse)
+[![Version](https://img.shields.io/badge/version-3.7.0-orange.svg)](https://github.com/deepadhia/Alpha-Pulse)
 [![Automated](https://img.shields.io/badge/automation-GitHub%20Actions-green.svg)](https://github.com/features/actions)
 
 **AlphaPulse** is a high-conviction, behavior-driven quantitative momentum and breakout qualification system. It participates **only in confirmed breakouts** with structural and volume validation, ruthlessly filtering out noise and tracking setup forensics to continuously refine the statistical edge.
@@ -657,6 +657,7 @@ All statistics, analytics scripts, and strategy evidence are strictly bounded to
 
 | Version | Date | Key Changes |
 |---|---|---|
+| **v3.7.0** | 2026-11-04 | **Trusted-records release (milestone bump):** entry guard (no new position on a non-trading day, with a stop at or above entry, risk above 12.5%, or more than 8% over the listing high), append-only hash-chained trade ledger (`trade_ledger` collection, `trade_ledger.py`), read-only `reconcile_trades.py`, fresher and safer pre-market order sheet. Entry and exit rules unchanged; rows tagged 3.7.0 are the first cohort whose records are guarded and ledgered. Report with `python trades_by_version.py`. |
 | **v3.6.1** *(patch, no milestone bump)* | 2026-10-22 | **S3 paper book 1.0.0 (PAPER_ONLY, versioned separately by `S3_PAPER_VERSION`):** late breakout of the post-listing high with X1 exits and a Rs 25 Cr turnover cap; MongoDB-only storage (`s3_paper_*`), own alerts and workflow, forward scorecard with fixed verdict rules, replay validation. Policy P and `SCANNER_VERSION` untouched. See `CHANGELOG.md` and `LEARNINGS.md` 20-20.5. |
 | **v3.6.0** | 2026-10-21 | **Hardened execution release (milestone bump):** flat 10 x 10% slots, close-based stop alerts, atomic commit lock, fail-safe corporate-action guard, shelf and hourly signals PAPER_ONLY, resting-order tooling, `core/versioning.py` forward cohort (3.5.0 + 3.6.0). Entry rules unchanged. |
 | **v3.5.0** | 2026-10-07 | **Volume Conjunction Integrity, Session-Scoped Pending Engine & Test Alert Isolation:** (1) Fixed Boolean bypass bug in `check_listing_day_breakout` so relative volume expansion ($\ge 1.5	imes$) is strictly mandatory alongside the institutional turnover floor ($\ge ₹10 	ext{ Cr}$), eliminating dead-volume false triggers like PRASOLCHEM (0.30x); (2) Bounded `_assign_breakout_tier` to reject shelf breakouts with $< 1.5	imes$ volume; (3) Session-scoped `load_pending_breakouts` with auto-purge of overnight and expired ($>120	ext{ min}$) pending states and dynamic ejection (`_eject_pending`) on upper-wick exhaustion, eliminating overnight leaks and invalid pending holds; (4) Enforced same-day duplicate trigger lockout (`_already_triggered_today`); (5) Suppressed Telegram alerts on `PAPER_ONLY` trades (`ALERT_ON_PAPER_ONLY=False`) when portfolio is at capacity; (6) Complete network isolation of Telegram dispatches during testing/regression suites (`DISABLE_TELEGRAM=1` / `unittest` module guard). |
@@ -682,4 +683,4 @@ All statistics, analytics scripts, and strategy evidence are strictly bounded to
 
 ---
 
-<sub>Built for systematic momentum trading | AlphaPulse v3.6.0 | Automated via GitHub Actions + Cloudflare Worker Dispatcher | MongoDB Atlas Infrastructure | Data-Driven Filter Optimization</sub>
+<sub>Built for systematic momentum trading | AlphaPulse v3.7.0 | Automated via GitHub Actions + Cloudflare Worker Dispatcher | MongoDB Atlas Infrastructure | Data-Driven Filter Optimization</sub>

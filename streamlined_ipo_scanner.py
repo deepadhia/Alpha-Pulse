@@ -12,7 +12,7 @@ Optimized IPO breakout scanner:
 - Dry-run and heartbeat modes
 """
 
-SCANNER_VERSION = "3.6.0"  # v3.6.0: Hardened execution release (10 x 10% slots, close-based stop alerts, atomic commit lock, shelf/hourly PAPER_ONLY); v3.5.0 entry rules unchanged
+SCANNER_VERSION = "3.7.0"  # v3.7.0: Trusted-records release (entry guard, append-only trade ledger, reconciler); entry and exit rules unchanged from v3.5.0/v3.6.0
 LOG_SCHEMA_VERSION = "2026-04-23.v1"
 
 import os
