@@ -2272,7 +2272,7 @@ def _commit_trade_to_db_unlocked(breakout_data, force_paper=False):
             portfolio_full = True
 
         # Generate signal_id (deterministic format)
-        today_str = datetime.now().strftime("%Y%m%d")
+        today_str = _now_ist().strftime("%Y%m%d")   # IST calendar date (the runner clock is UTC)
         sig_prefix = "SHELF" if breakout_data.get('type') == 'SHELF_BREAKOUT' else "BREAKOUT"
         signal_id = f"{sig_prefix}_{symbol}_{today_str}"
 
@@ -2289,6 +2289,7 @@ def _commit_trade_to_db_unlocked(breakout_data, force_paper=False):
         limit_buy_price = max(round(entry_p * 1.02, 2), limit_ceiling)
         if limit_buy_price < entry_p:
             limit_buy_price = round(entry_p * 1.02, 2)
+        breakout_data['limit_buy_price'] = limit_buy_price   # lets the alert show exactly what is stored
 
         # Entry guard (core/trade_guard.py): refuse impossible records BEFORE the signal is stored or alerted
         # (non-trading day, future date, stop at/above entry, risk above cap, entry more than 8% over the listing high / shelf pivot).
@@ -2299,7 +2300,7 @@ def _commit_trade_to_db_unlocked(breakout_data, force_paper=False):
                 from core.trade_guard import validate_new_entry
                 verdict = validate_new_entry(
                     dict(symbol=symbol, entry_price=entry_p, stop_loss=breakout_data.get('stop_loss'), limit_buy_price=limit_buy_price,
-                         current_price=breakout_data.get('current_price'), entry_date=datetime.now()),
+                         current_price=breakout_data.get('current_price'), entry_date=_now_ist()),
                     ref_high=lh_ref)
                 if verdict["hard"]:
                     logger.error(f"🚫 Listing commit REJECTED for {symbol}: {'; '.join(verdict['hard'])}")
@@ -2314,7 +2315,7 @@ def _commit_trade_to_db_unlocked(breakout_data, force_paper=False):
         signal_doc = {
             "signal_id": signal_id,
             "symbol": symbol,
-            "signal_date": datetime.now(),
+            "signal_date": _now_ist(),   # naive IST: db.make_utc treats naive datetimes as IST (datetime.now() on the UTC runner was shifted -5:30 h)
             "signal_time": _now_ist().strftime("%H:%M:%S"),
             "entry_price": breakout_data['entry_price'],
             "limit_buy_price": limit_buy_price,
@@ -2359,7 +2360,7 @@ def _commit_trade_to_db_unlocked(breakout_data, force_paper=False):
         pos_doc = {
             "signal_id": signal_id,
             "symbol": symbol,
-            "entry_date": datetime.now(),
+            "entry_date": _now_ist(),    # naive IST, see signal_date
             "entry_price": breakout_data['entry_price'],
             "limit_buy_price": limit_buy_price,
             "max_chase_pct": max_chase,
@@ -2468,6 +2469,68 @@ def classify_listing_winner_traits(
         'winner_flags': criteria_fail
     }
 
+# Re-entry age cap.  Defaults to the breakout age cap (AGENTS rule 10: listing-scanner trades are <= 60 days after listing).
+# Rollback: set LISTING_REENTRY_MAX_DAYS_SINCE_LISTING to a large number.
+REENTRY_MAX_DAYS_SINCE_LISTING = _env_int("LISTING_REENTRY_MAX_DAYS_SINCE_LISTING", MAX_DAYS_SINCE_LISTING_FOR_BREAKOUT)
+
+
+def reentry_listing_age_days(listing_date, today=None):
+    """Calendar days from the listing date to `today`; None when the listing date is missing or unreadable (the caller must then reject)."""
+    try:
+        if listing_date is None or pd.isna(listing_date):
+            return None
+        ld = pd.to_datetime(listing_date)
+        ld = ld.tz_convert(None) if getattr(ld, "tzinfo", None) is not None else ld
+        return (pd.Timestamp(today or datetime.now().date()).normalize() - ld.normalize()).days
+    except Exception:
+        return None
+
+
+# Re-entry volume gates compare volume traded SO FAR with full-day numbers (150k shares, Rs 1 Cr, 1.5x the 20-day average).  Early in the session
+# that is a fraction of a day against a whole day (10:45 IST: a typical IPO session has traded 35% of its volume), so genuine surges were rejected.
+# The gates now use the measured intraday profile (core/intraday_volume.py).  Rollback: LISTING_REENTRY_TIME_ADJUST_VOLUME=0.
+REENTRY_TIME_ADJUST_VOLUME = _env_bool("LISTING_REENTRY_TIME_ADJUST_VOLUME", True)
+
+
+def reentry_volume_fraction(now_ist=None) -> float:
+    """Share of a typical session's volume traded by now (1.0 when the adjustment is off or the session is over)."""
+    if not REENTRY_TIME_ADJUST_VOLUME:
+        return 1.0
+    from core.intraday_volume import cum_volume_fraction
+    return cum_volume_fraction(now_ist if now_ist is not None else _now_ist())
+
+
+def reentry_volume_metrics(live_vol, live_price, avg20_vol, fraction):
+    """
+    (projected day volume, projected day turnover in Rs, surge ratio) from the volume so far.  Surge = volume so far / (20-day average x fraction of the
+    day gone), i.e. like for like; 1.0 when there is no average to compare with (the caller's 1.5x gate then rejects, as before).
+    """
+    f = fraction if fraction and fraction > 0 else 1.0
+    vol = float(live_vol or 0.0)
+    proj = vol / f
+    exp = float(avg20_vol or 0.0) * f
+    return proj, proj * float(live_price or 0.0), (round(vol / exp, 2) if exp > 0 else 1.0)
+
+
+def reentry_trigger_crossed(live_price, peak_price) -> bool:
+    """Re-entry fires only while the LIVE price is above the prior peak (a day high that has already faded back under it is a failed breakout)."""
+    try:
+        return float(peak_price) > 0 and float(live_price) > float(peak_price)
+    except (TypeError, ValueError):
+        return False
+
+
+def reentry_close_location(live_price, day_low, day_high):
+    """(price - low) / (high - low) for TODAY's session, or None when the session low/high are not known (the gate is then reported as not evaluated)."""
+    try:
+        lo, hi, px = float(day_low), float(day_high), float(live_price)
+    except (TypeError, ValueError):
+        return None
+    if not (lo > 0 and hi > lo):
+        return None
+    return (px - lo) / (hi - lo)
+
+
 def _format_dna_section(breakout_data):
     """Format compact DNA edge summary for breakout alerts"""
     # Use 'winner_score' — the key populated by classify_listing_winner_traits()
@@ -2483,7 +2546,8 @@ def _format_dna_section(breakout_data):
 
     return (
         f"• <b>Setup Edge:</b> Score <b>{winner_score}/5</b> ({conviction})"
-        f" • Vol <b>{vol_spike:.1f}x</b> • Base Coil <b>{prng:.1f}%</b> • Upper 50% Body ✅"
+        f" • Vol <b>{vol_spike:.1f}x</b> • Base Coil <b>{prng:.1f}%</b> • "
+        + ("Upper 50% Body ✅" if breakout_data.get('upper_body_checked', True) else "Upper 50% Body not checked ⚠️")
     )
 
 
@@ -2906,23 +2970,40 @@ def scan_listing_day_breakouts():
                 symbol = pos.get('symbol')
                 entry_price = float(pos.get('entry_price', 0))
                 peak_price = float(pos.get('peak_price_during_trade', entry_price))
-                
+
                 logger.info(f"\n🔍 Checking Re-Entry for {symbol} (Trigger > ₹{peak_price:.2f})...")
-                
+
                 # Reset network call flag
                 if hasattr(scanner_module, 'network_call_made'):
                     scanner_module.network_call_made = False
-                    
+
                 try:
+                    today_date = datetime.now().date()
+
+                    # 0. Lifecycle age cap (AGENTS rule 10): a re-entry is a listing-scanner trade, so the IPO must still be inside the age window.
+                    #    Before 2026-11-05 this path had no age check (LGEINDIA, listed 2025-10-14, was re-entered at 387 days).
+                    _lrow = listing_data[listing_data['symbol'] == symbol] if listing_data is not None and not listing_data.empty else None
+                    listing_date_val = _lrow.iloc[0].get('listing_date') if (_lrow is not None and not _lrow.empty) else None
+                    ipo_age = reentry_listing_age_days(listing_date_val, today_date)
+                    if ipo_age is None or ipo_age > REENTRY_MAX_DAYS_SINCE_LISTING:
+                        logger.info(f"🚫 Skipping Re-Entry for {symbol}: IPO age {ipo_age}d > {REENTRY_MAX_DAYS_SINCE_LISTING}d (or unknown listing date)")
+                        write_daily_log("listing_day", symbol, "REJECTED_REENTRY", {
+                            "reason": "REENTRY_IPO_TOO_OLD",
+                            "failing_metric": "REENTRY_IPO_TOO_OLD",
+                            "failing_value": ipo_age,
+                            "threshold": REENTRY_MAX_DAYS_SINCE_LISTING,
+                        }, log_type="REJECTED")
+                        continue
+
                     live_price, live_source, day_high, live_vol = scanner_module.get_live_price(symbol)
                     if live_price is None or live_price <= 0:
                         continue
-                    
-                    # Ensure naive datetime for today
-                    today_date = datetime.now().date()
-                    
-                    if day_high > peak_price or live_price > peak_price:
-                        # 1. Anti-Chasing Extension Guard: reject if price is > 8.0% extended above peak_price
+                    day_low = getattr(scanner_module, 'get_live_day_low', lambda _s: None)(symbol)
+
+                    # 1. Trigger: the price must be ABOVE the prior peak now.  (It used to fire when only the day's high had touched the peak,
+                    #    which alerted a failed breakout that had already faded back under the trigger: LGEINDIA 2026-11-05, +-0.1% "extension".)
+                    if reentry_trigger_crossed(live_price, peak_price):
+                        # Anti-Chasing Extension Guard: reject if price is > 8.0% extended above peak_price
                         entry_extension_pct = ((live_price - peak_price) / peak_price * 100.0) if peak_price > 0 else 0.0
                         if entry_extension_pct > 8.0:
                             logger.info(f"🚫 Skipping Re-Entry for {symbol}: Overextended {entry_extension_pct:.1f}% > 8.0% above peak trigger (₹{peak_price:.2f})")
@@ -2936,50 +3017,57 @@ def scan_listing_day_breakouts():
                             }, log_type="REJECTED")
                             continue
 
-                        # 2. Liquidity & Volume Floor Check
-                        turnover = live_price * live_vol
-                        if live_vol < 150000 or turnover < 10000000:
-                            logger.info(f"🚫 {symbol} crossed trigger (₹{peak_price:.2f}) but failed Re-Entry Liquidity check (Vol: {live_vol:,.0f}, T/O: ₹{turnover/10000000:.2f}Cr)")
+                        # 2. Liquidity & Volume Floor Check, on the PROJECTED day volume (volume so far / share of a typical day gone by now)
+                        vol_fraction = reentry_volume_fraction()
+                        proj_vol, turnover, _ = reentry_volume_metrics(live_vol, live_price, 0.0, vol_fraction)
+                        if proj_vol < 150000 or turnover < 10000000:
+                            logger.info(f"🚫 {symbol} crossed trigger (₹{peak_price:.2f}) but failed Re-Entry Liquidity check (Vol so far: {live_vol:,.0f}, projected {proj_vol:,.0f} at {vol_fraction*100:.0f}% of the day, T/O: ₹{turnover/10000000:.2f}Cr)")
                             write_daily_log("listing_day", symbol, "REJECTED_REENTRY", {
                                 "reason": "LIQUIDITY_BELOW_FLOOR",
                                 "failing_metric": "LIQUIDITY_BELOW_FLOOR",
-                                "failing_value": live_vol,
+                                "failing_value": round(proj_vol),
                                 "threshold": 150000,
                                 "live_vol": live_vol,
+                                "volume_fraction_of_day": round(vol_fraction, 3),
                                 "turnover_cr": round(turnover / 10000000.0, 2)
                             }, log_type="REJECTED")
                             continue
 
-                        # 3. Upper 50% Candle Body Gate (Anti-Wick Rejection)
-                        day_low = None
+                        # 3. Upper 50% Candle Body Gate (Anti-Wick Rejection), on TODAY's real session low from the live quote.
+                        #    (It used to read df.iloc[-1]['LOW'], which with a fresh cache is a synthetic row whose low IS the live price:
+                        #    close-location came out 0 and rejected every pullback, or the gate was skipped at the high.)
+                        close_location = reentry_close_location(live_price, day_low, day_high)
+                        upper_body_checked = close_location is not None
+                        if close_location is not None and close_location < 0.50:
+                            logger.info(f"🚫 Skipping Re-Entry for {symbol}: Upper wick exhaustion ({close_location*100:.1f}% < 50.0% of range)")
+                            write_daily_log("listing_day", symbol, "REJECTED_REENTRY", {
+                                "reason": "UPPER_WICK_REJECTION",
+                                "failing_metric": "UPPER_WICK_REJECTION",
+                                "failing_value": round(close_location * 100.0, 1),
+                                "threshold": 50.0,
+                                "day_high": day_high,
+                                "day_low": day_low,
+                                "live_price": live_price
+                            }, log_type="REJECTED")
+                            continue
+                        if not upper_body_checked:
+                            logger.warning(f"⚠️ {symbol}: no session low in the live quote, upper-50% body gate NOT evaluated (alert says so)")
+
+                        # Completed sessions only: today's forming bar must not enter the averages or the base range.
+                        df_check = None
                         try:
-                            df_check = scanner_module.fetch_data(symbol, "2026-01-01")
+                            _start = pd.to_datetime(listing_date_val).strftime("%Y-%m-%d")
+                            _quote = scanner_module.BulkPriceQuote(live_price, day_high or live_price, day_low or live_price, live_price, live_vol)
+                            df_check = scanner_module.fetch_data(symbol, _start, _quote)
                             if df_check is not None and not df_check.empty:
                                 df_check.columns = [c.upper() for c in df_check.columns]
-                                day_low = float(df_check['LOW'].iloc[-1])
-                                day_high_candle = float(df_check['HIGH'].iloc[-1])
-                                day_high = max(day_high, day_high_candle)
+                                df_check = df_check[df_check['DATE'].dt.date < today_date]
                         except Exception:
-                            day_low = None
+                            df_check = None
+                        _has_hist = df_check is not None and not df_check.empty
 
-                        if day_low is not None and day_high > day_low:
-                            close_location = (live_price - day_low) / (day_high - day_low)
-                            if close_location < 0.50:
-                                logger.info(f"🚫 Skipping Re-Entry for {symbol}: Upper wick exhaustion ({close_location*100:.1f}% < 50.0% of range)")
-                                write_daily_log("listing_day", symbol, "REJECTED_REENTRY", {
-                                    "reason": "UPPER_WICK_REJECTION",
-                                    "failing_metric": "UPPER_WICK_REJECTION",
-                                    "failing_value": round(close_location * 100.0, 1),
-                                    "threshold": 50.0,
-                                    "day_high": day_high,
-                                    "day_low": day_low,
-                                    "live_price": live_price
-                                }, log_type="REJECTED")
-                                continue
-
-                        # Compute genuine metrics from df_check to preserve data collection integrity
-                        r20_vol = float(df_check['VOLUME'].tail(20).mean()) if (df_check is not None and not df_check.empty and 'VOLUME' in df_check.columns) else 0.0
-                        vol_spike_calc = round(live_vol / r20_vol, 2) if r20_vol > 0 else 1.0
+                        r20_vol = float(df_check['VOLUME'].tail(20).mean()) if (_has_hist and 'VOLUME' in df_check.columns) else 0.0
+                        _, _, vol_spike_calc = reentry_volume_metrics(live_vol, live_price, r20_vol, vol_fraction)   # like for like with the time of day
 
                         # 4. Institutional Volume Surge Gate: Require >= 1.50x volume spike on re-entry
                         if vol_spike_calc < 1.50:
@@ -2990,13 +3078,32 @@ def scan_listing_day_breakouts():
                                 "failing_value": vol_spike_calc,
                                 "threshold": 1.50,
                                 "live_vol": live_vol,
-                                "r20_vol": r20_vol
+                                "r20_vol": r20_vol,
+                                "volume_fraction_of_day": round(vol_fraction, 3)
                             }, log_type="REJECTED")
                             continue
-                        r10_low = float(df_check['LOW'].tail(10).min()) if (df_check is not None and not df_check.empty and 'LOW' in df_check.columns) else 0.0
-                        r10_high = float(df_check['HIGH'].tail(10).max()) if (df_check is not None and not df_check.empty and 'HIGH' in df_check.columns) else 0.0
+                        r10_low = float(df_check['LOW'].tail(10).min()) if (_has_hist and 'LOW' in df_check.columns) else 0.0
+                        r10_high = float(df_check['HIGH'].tail(10).max()) if (_has_hist and 'HIGH' in df_check.columns) else 0.0
                         prng_calc = round(((r10_high - r10_low) / r10_low) * 100.0, 1) if r10_low > 0 else float(pos.get("listing_range_pct", 0) or 0)
-                        days_since_calc = len(df_check) if (df_check is not None and not df_check.empty) else int(pos.get("days_since_listing", 0) or 0)
+                        days_since_calc = int(ipo_age)   # real calendar days since listing (was len(df) from a hardcoded 2026-01-01 start)
+
+                        # Winner-trait score computed for real (the alert used to print a hardcoded "0/5").
+                        _lh, _ll = _lrow.iloc[0].get('listing_day_high'), _lrow.iloc[0].get('listing_day_low')
+                        try:
+                            listing_range_pct_re = (float(_lh) - float(_ll)) / float(_lh) * 100.0 if float(_lh) > 0 else 0.0
+                        except (TypeError, ValueError):
+                            listing_range_pct_re = 0.0
+                        if _has_hist:
+                            _circ = int(((df_check['HIGH'] == df_check['LOW']) & (df_check['VOLUME'] > 0)).tail(15).sum())
+                        else:
+                            _circ = 99   # unknown history: do not award the circuit-free point
+                        _winner_meta = classify_listing_winner_traits(
+                            days_since_listing=days_since_calc,
+                            listing_range_pct=listing_range_pct_re,
+                            volume_ratio_vs_avg=vol_spike_calc,
+                            entry_above_high_pct=entry_extension_pct,
+                            circuit_days_15=_circ,
+                        )
 
                         # Construct breakout dict
                         breakout = {
@@ -3021,14 +3128,19 @@ def scan_listing_day_breakouts():
                             "market_regime": scanner_module.get_market_regime(today_date),
                             "tier": "RE-ENTRY",
                             "position_size_pct": 100,
-                            "tier_rationale": "Re-Entry Breakout (Strict Extension & Candle Body passed)"
+                            "winner_label": _winner_meta['winner_label'],
+                            "winner_score": _winner_meta['winner_score'],
+                            "winner_criteria": _winner_meta['winner_criteria'],
+                            "winner_flags": _winner_meta['winner_flags'],
+                            "upper_body_checked": upper_body_checked,
+                            "tier_rationale": "Re-Entry Breakout (Strict Extension & Candle Body passed)" if upper_body_checked else "Re-Entry Breakout (Extension passed; candle body gate not evaluated: no session low)"
                         }
-                        
+
                         # Save signal and position atomically
                         success, portfolio_full, active_count, _mr, size_mult = commit_trade_to_db(breakout)
                         if success:
-                            # Send Alert
-                            limit_buy = live_price * 1.02
+                            # Send Alert (limit shown = the limit stored by commit_trade_to_db, so alert and database agree)
+                            limit_buy = breakout.get('limit_buy_price') or live_price * 1.02
                             # Enrich breakout dict with live metrics for DNA formatter
                             breakout['volume_spike'] = vol_spike_calc
                             breakout['listing_range_pct'] = prng_calc
@@ -3041,7 +3153,7 @@ def scan_listing_day_breakouts():
 
 • <b>Trigger / LTP:</b> ₹{live_price:,.2f}  <i>(Limit Max: ≤ ₹{limit_buy:,.2f})</i>
 • <b>Stop Loss:</b> ₹{breakout['stop_loss']:,.2f} (<code>-8.0%</code>)  •  <b>Target:</b> ₹{breakout['target_price']:,.2f} (<code>+20.0%</code>)
-• <b>Extension:</b> +{entry_extension_pct:.1f}%
+• <b>Extension:</b> {entry_extension_pct:+.1f}%
 {re_entry_dna}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

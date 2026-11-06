@@ -259,6 +259,19 @@ def _ledger_position_events(position_doc: dict, existing, opening: bool) -> None
         except (TypeError, ValueError):
             pass
 
+_STALE_TRADE_FIELDS = (
+    "exit_version", "next_day_open", "peak_price_during_trade", "max_runup_pct", "max_drawdown_pct", "pnl_pct", "days_held",
+    "archetype", "trap_flags", "trap_score", "algo_takeaway", "winner_traits",
+)
+
+
+def stale_trade_fields(existing_doc: dict) -> list:
+    """Field names of a previous trade's document that must not survive into a NEW trade on the same symbol (pure; used on re-entry)."""
+    if not existing_doc:
+        return []
+    return [k for k in existing_doc if k.startswith("shadow_") or k in _STALE_TRADE_FIELDS]
+
+
 def upsert_position(position_doc: dict):
     if positions_col is None:
         return
@@ -289,8 +302,10 @@ def upsert_position(position_doc: dict):
 
     status = position_doc.get("status", "")
     existing = None
+    existing_full = {}
     try:
-        existing = positions_col.find_one({"symbol": symbol}, {"_id": 0, "status": 1, "trailing_stop": 1, "entry_price": 1})
+        existing_full = positions_col.find_one({"symbol": symbol}, {"_id": 0}) or {}
+        existing = {k: existing_full[k] for k in ("status", "trailing_stop", "entry_price") if k in existing_full} if existing_full else None
     except Exception as ex_err:
         logger.warning(f"Could not read existing position for {symbol} (guard and ledger skipped): {ex_err}")
     prev_status = (existing or {}).get("status")
@@ -313,16 +328,22 @@ def upsert_position(position_doc: dict):
             position_doc.pop("exit_reason", None)
             if "lifecycle_state" not in position_doc or position_doc.get("lifecycle_state") in ("CLOSED", "PAPER_CLOSED"):
                 position_doc["lifecycle_state"] = "POSITION_ACTIVE"
+            unset_fields = [
+                "exit_date", "exit_price",
+                "outcome_type", "holding_efficiency_pct",
+                "time_to_failure_days", "time_to_failure_min",
+                "exit_reason",
+            ]
+            if opening and existing is not None:
+                # A re-entry reuses the symbol's document ($set merges), so everything the CLOSED trade accumulated (shadow-stop
+                # status and exits, exit version, next-day open, trap archetype, peak, run-up) would otherwise be inherited by the
+                # new trade (seen on LGEINDIA 2026-11-05).  Drop it unless this payload sets it again.
+                unset_fields += [k for k in stale_trade_fields(existing_full) if k not in position_doc]
             positions_col.update_one(
                 {"symbol": symbol},
                 [
                     {"$set": position_doc},
-                    {"$unset": [
-                        "exit_date", "exit_price",
-                        "outcome_type", "holding_efficiency_pct",
-                        "time_to_failure_days", "time_to_failure_min",
-                        "exit_reason",
-                    ]},
+                    {"$unset": unset_fields},
                 ],
                 upsert=True
             )

@@ -1358,6 +1358,25 @@ def fetch_from_yfinance(symbol, start_date, end_date):
         logger.warning(f"⚠️ YFinance fallback failed for {symbol}: {e}")
         return None
 
+# Today's session low per symbol, recorded by the live-price fetchers below (the 4-tuple returned by get_live_price has no low).
+# Read it with get_live_day_low(symbol) right after get_live_price(symbol); it is cleared at the start of each get_live_price call.
+_live_day_low = {}
+
+
+def _record_day_low(symbol, low):
+    try:
+        low = float(low)
+        if low > 0:
+            _live_day_low[symbol] = low
+    except (TypeError, ValueError):
+        pass
+
+
+def get_live_day_low(symbol):
+    """Session low captured by the most recent get_live_price(symbol) call, or None when the quote did not carry one."""
+    return _live_day_low.get(symbol)
+
+
 def get_live_price_upstox(symbol):
     """Get live price from Upstox market quote API"""
     try:
@@ -1409,6 +1428,7 @@ def get_live_price_upstox(symbol):
                         ohlc = info.get('ohlc', {})
                         day_high = ohlc.get('high')
                         day_volume = info.get('volume', 0) or 0
+                        _record_day_low(symbol, ohlc.get('low'))
                         if live_price is not None:
                             return (
                                 float(live_price),
@@ -1446,6 +1466,7 @@ def get_live_price_yfinance(symbol):
             lp = float(info.lastPrice)
             dh = float(info.dayHigh) if hasattr(info, 'dayHigh') and info.dayHigh is not None else lp
             dv = float(info.dayVolume) if hasattr(info, 'dayVolume') and info.dayVolume is not None else 0.0
+            _record_day_low(symbol, getattr(info, 'dayLow', None))
             return lp, dh, dv
         
         # Fallback: Get latest quote
@@ -1454,6 +1475,7 @@ def get_live_price_yfinance(symbol):
             last_price = float(data['Close'].iloc[-1])
             day_high = float(data['High'].max())
             day_volume = float(data['Volume'].sum()) if 'Volume' in data.columns else 0.0
+            _record_day_low(symbol, float(data['Low'].min()))
             return last_price, day_high, day_volume
         
         return None
@@ -1474,8 +1496,9 @@ def get_live_price(symbol, prefer_source=None):
     """
     global network_call_made
     network_call_made = True
+    _live_day_low.pop(symbol, None)   # never reuse a low from an earlier scan
     sources = []
-    
+
     # Determine source priority
     if prefer_source == 'yfinance':
         sources = [('yfinance', get_live_price_yfinance), ('upstox', get_live_price_upstox)]
@@ -2853,7 +2876,7 @@ def detect_live_patterns(symbols, listing_map):
                     "signal_id": sid,
                     "symbol": sym,
                     "signal_date": date_str,
-                    "signal_time": datetime.now().strftime("%H:%M:%S"),
+                    "signal_time": _now_ist().strftime("%H:%M:%S"),
                     "entry_price": round(entry, 2),
                     "limit_buy_price": round(entry * 1.02, 2),
                     "max_chase_pct": 2.0,
@@ -3615,7 +3638,7 @@ def detect_scan(symbols, listing_map):
 
                 row = {
                     "signal_id": sid, "symbol": sym, "signal_date": date_str,
-                    "signal_time": datetime.now().strftime("%H:%M:%S"),
+                    "signal_time": _now_ist().strftime("%H:%M:%S"),
                     "entry_price": entry,
                     "limit_buy_price": round(entry * 1.02, 2),
                     "max_chase_pct": 2.0,
@@ -3979,7 +4002,7 @@ def format_alphapulse_portfolio_report():
             r = r.split("(")[0].strip()
         return r
 
-    now_ist = datetime.now()
+    now_ist = _now_ist()   # was datetime.now(): the job runs on a UTC runner, so the 'IST' label showed UTC (13:06 instead of 18:36)
     active_live = [p for p in positions if p.get('status') == 'ACTIVE']
     active_paper = [p for p in positions if p.get('status') == 'PAPER_ONLY']
 
@@ -4003,7 +4026,7 @@ def format_alphapulse_portfolio_report():
             w_score_int = int(float(w_score))
         except (ValueError, TypeError):
             w_score_int = w_score
-        w_badge = f" | 💎 {w_score_int}/4" if w_score_int else ""
+        w_badge = f" | 💎 {w_score_int}/{4 if p.get('_backfilled') else 5}" if w_score_int else ""   # live scoring has 5 criteria; backfilled rows use the old 4-criteria scheme
         if w_label == "POSSIBLE_WINNER":
             w_badge += " 🔥"
             
@@ -4011,6 +4034,8 @@ def format_alphapulse_portfolio_report():
         pnl_s = '+' if pnl >= 0 else ''
         sl_dist = ((sl - curr) / curr * 100) if curr > 0 else 0.0
 
+        if p.get('_backfilled'):
+            w_badge += " 📦"
         live_lines.append(
             f"• <b>{sym}</b> ({grd} · {days}d){w_badge}\n"
             f"  CMP: ₹{curr:,.2f} ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>)  •  SL: ₹{sl:,.2f} ({sl_dist:.1f}%)"
@@ -4037,7 +4062,7 @@ def format_alphapulse_portfolio_report():
             w_score_int = int(float(w_score))
         except (ValueError, TypeError):
             w_score_int = w_score
-        w_badge = f" | 💎 {w_score_int}/4" if w_score_int else ""
+        w_badge = f" | 💎 {w_score_int}/{4 if p.get('_backfilled') else 5}" if w_score_int else ""   # live scoring has 5 criteria; backfilled rows use the old 4-criteria scheme
         if w_label == "POSSIBLE_WINNER":
             w_badge += " 🔥"
             
@@ -4045,6 +4070,8 @@ def format_alphapulse_portfolio_report():
         pnl_s = '+' if pnl >= 0 else ''
         sl_dist = ((sl - curr) / curr * 100) if curr > 0 else 0.0
 
+        if p.get('_backfilled'):
+            w_badge += " 📦"
         paper_lines.append(
             f"• <b>{sym}</b> ({grd} · {days}d){w_badge}\n"
             f"  CMP: ₹{curr:,.2f} ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>)  •  SL: ₹{sl:,.2f} ({sl_dist:.1f}%)"
@@ -4098,6 +4125,9 @@ def format_alphapulse_portfolio_report():
 
     if exit_lines:
         report += f"🚪 <b>RECENT EXITS</b>\n" + '\n'.join(exit_lines) + "\n\n"
+
+    if any(p.get('_backfilled') for p in active_live + active_paper):
+        report += "📦 <i>= backfilled legacy row (not live evidence; excluded from the clean cohort)</i>\n\n"
 
     report += """━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>AlphaPulse EOD Snapshot</i>"""
