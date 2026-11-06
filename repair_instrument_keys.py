@@ -8,8 +8,8 @@ repair_instrument_keys.py -- find and repair dead Upstox instrument keys (see co
   python repair_instrument_keys.py --symbols AZADIND BUILDPRO --apply
 
 Only a "repair" row is ever written: the stored key was rejected by Upstox AND NSE lists a different ISIN AND Upstox accepts the new key.
-Unresolved symbols are listed and left untouched.  After a repair the next scanner run refetches that symbol's full candle history (the cache is
-treated as stale because it stopped at the date the old key died), so no cache edit is needed.  Needs MONGO_URI and UPSTOX_ACCESS_TOKEN.
+Unresolved symbols are listed and left untouched.  After a repair the candle cache of each repaired symbol is rebuilt at once (refresh_stale_caches.py; the scanners
+only refetch IPOs inside their 60-day window, so older ones would stay stale).  Needs MONGO_URI and UPSTOX_ACCESS_TOKEN.
 """
 
 import argparse
@@ -60,6 +60,12 @@ def main(argv=None):
         instrument_keys_col.update_one({"ipo_symbol": r["symbol"]},
                                        {"$set": dict(instrument_key=r["new_key"], isin=r["new_isin"], previous_instrument_key=r["old_key"], repaired_at=now, updated_at=now)})
     print(f"\nwrote {len(fixes)} repair(s)")
+    if fixes:
+        # The cached candles of a repaired symbol stop where the old key died, and only IPOs inside the scanners' 60-day window are ever refetched
+        # automatically: rebuild these caches now (core/cache_refresh.py), otherwise older IPOs stay stale for weeks (2026-11-05: 11 of 19).
+        import refresh_stale_caches
+        print("\nrebuilding the candle caches of the repaired symbols:")
+        refresh_stale_caches.main(["--apply", "--min-lag-days", "0", "--symbols"] + [r["symbol"] for r in fixes])
 
 
 if __name__ == "__main__":

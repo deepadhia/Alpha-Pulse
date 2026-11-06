@@ -40,7 +40,7 @@ from core.order_sheet import (SheetConfig, build_resting_entries, build_sheet, f
                                format_sheet)
 from core.portfolio_caps import DEFAULT_HARD_ACTIVE_POSITIONS
 from core import s3_store
-from s3_paper_alerts import previous_session
+from s3_paper_alerts import previous_session, enable_exchange_holidays
 from core.trade_guard import default_is_trading_day, previous_trading_day
 from core.risk_guard import GuardConfig, evaluate
 from core.setup3 import PAPER_MAX_TURN_CR, PAPER_PARAMS, Setup3Params, paper_exit_params, preview_s3_entry, s3_paper_status
@@ -277,7 +277,7 @@ S3_FOOTER = [
 def s3_collect(today: pd.Timestamp, cfg: SheetConfig, guard=None, refresh=None) -> dict:
     """
     Everything the S3 paper section and the S3 alerts need, for orders to be placed on session `today` (completed sessions before it only):
-    dict(rows, entries, skipped, warnings, cands, notes, open_n, data_asof, refresh).  Reads MongoDB, writes nothing.  Returns None when Mongo is off.
+    dict(rows, entries, skipped, warnings, cands, notes, open_n, data_asof, refresh, candles).  Reads MongoDB, writes nothing.  Returns None when Mongo is off.
     `refresh` (optional): callable(candles, listing_symbols, held_symbols) -> (candles, report) that merges the completed sessions the shared
     cache lacks (core.s3_refresh); `data_asof` is then judged on the held positions and the names near their pivot, not on the whole universe.
     """
@@ -341,7 +341,7 @@ def s3_collect(today: pd.Timestamp, cfg: SheetConfig, guard=None, refresh=None) 
     if held_lasts and (data_asof is None or min(held_lasts) < data_asof):
         data_asof = min(held_lasts)
     return dict(rows=rows, entries=entries, skipped=skipped, warnings=warnings, cands=cands, notes=notes, open_n=len(open_h),
-                data_asof=data_asof, refresh=rep)
+                data_asof=data_asof, refresh=rep, candles=candles)
 
 
 def s3_order_docs(entries, cands) -> list:
@@ -377,6 +377,7 @@ def s3_section(today: pd.Timestamp, cfg: SheetConfig, guard, store: bool = True)
 
 
 def main(argv=None):
+    enable_exchange_holidays()      # the S3 section picks sessions with previous_session: skip NSE holidays, not only weekends
     ap = argparse.ArgumentParser()
     ap.add_argument("--capital", type=float, required=True, help="current total account value in Rs")
     ap.add_argument("--holdings", default=None, help="JSON file {symbol: quantity}")

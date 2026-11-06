@@ -75,7 +75,7 @@ def closed_since(positions_col, cutoff) -> List[dict]:
     return [d for d in positions_col.find({"status": "CLOSED"}, {"_id": 0}) if d.get("exit_date") is not None and to_utc_midnight(d["exit_date"]) >= c]
 
 
-def open_position(positions_col, orders_col, symbol: str, entry_date, entry_price: float, quantity: Optional[int] = None) -> dict:
+def open_position(positions_col, orders_col, symbol: str, entry_date, entry_price: float, quantity: Optional[int] = None, extra: Optional[dict] = None) -> dict:
     """
     Record a paper fill.  `quantity` defaults to the quantity of the most recent order for the symbol placed on or before the entry date and
     at most ORDER_LOOKBACK_DAYS before it (an old order must not size a new fill).
@@ -98,10 +98,12 @@ def open_position(positions_col, orders_col, symbol: str, entry_date, entry_pric
                order_date=order["order_date"] if order else None, pivot=(order or {}).get("pivot"), klass=(order or {}).get("klass"),
                turn20=(order or {}).get("turn20"), exit_date=None, exit_price=None, exit_reason=None, pnl_pct=None,
                created_at=_now(), updated_at=_now(), **_version_fields())
+    if extra:
+        doc.update(extra)                                       # e.g. auto_filled / fill_model from core.s3_autofill
     positions_col.insert_one(dict(doc))
     if order:
         orders_col.update_one({"order_date": order["order_date"], "symbol": symbol},
-                              {"$set": {"status": "FILLED", "fill_price": float(entry_price), "fill_date": ed, "updated_at": _now()}})
+                              {"$set": dict({"status": "FILLED", "fill_price": float(entry_price), "fill_date": ed, "updated_at": _now()}, **(extra or {}))})
     return doc
 
 
@@ -116,3 +118,9 @@ def close_position(positions_col, symbol: str, exit_date, exit_price: float, rea
     upd = dict(status="CLOSED", exit_date=to_utc_midnight(exit_date), exit_price=float(exit_price), exit_reason=reason, pnl_pct=pnl, updated_at=_now())
     positions_col.update_one({"symbol": symbol, "status": "OPEN"}, {"$set": upd})
     return dict(pos, **upd)
+
+
+def run_already_sent(runs_col, run_date) -> bool:
+    """True when this day's heartbeat says the alert was sent with fresh data (a second dispatch of the same job, e.g. schedule + dispatcher, must not repeat it)."""
+    d = runs_col.find_one({"run_date": to_utc_midnight(run_date)})
+    return bool(d and d.get("sent") and not d.get("stale"))

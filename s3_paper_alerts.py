@@ -30,22 +30,56 @@ import pandas as pd
 PREFIX = "S3 PAPER"
 
 
+_is_holiday = None      # optional predicate(Timestamp) -> bool, set by enable_exchange_holidays(); None = weekends only (pure, used by the tests)
+
+
+def enable_exchange_holidays() -> bool:
+    """
+    Make next_session / previous_session skip NSE trading holidays (utils.get_dynamic_nse_holidays: memory, Mongo, Upstox, static fallback).
+    Before 2026-11-06 only weekends were skipped, so the evening before a holiday (Mon 2026-11-09, Tue 11-10 is closed) produced orders and a
+    freshness check for a day with no session: the orders would never fill, no candle ever arrives for that date, and the data was flagged STALE.
+    Returns False (weekends only) when the holiday source cannot be loaded.
+    """
+    global _is_holiday
+    try:
+        from utils import get_dynamic_nse_holidays
+        get_dynamic_nse_holidays(datetime.now().year)           # fail now, not in the middle of a date loop
+        _is_holiday = lambda d: pd.Timestamp(d).strftime("%Y-%m-%d") in get_dynamic_nse_holidays(pd.Timestamp(d).year)
+        return True
+    except Exception:
+        _is_holiday = None
+        return False
+
+
+def _closed(d: pd.Timestamp) -> bool:
+    if d.weekday() >= 5:
+        return True
+    try:
+        return bool(_is_holiday and _is_holiday(d))
+    except Exception:
+        return False
+
+
 def next_session(today: pd.Timestamp) -> pd.Timestamp:
-    """Next weekday after `today` (exchange holidays are not modelled: a holiday only makes the orders one day early, they are DAY orders)."""
+    """Next trading day after `today`: skips weekends and, after enable_exchange_holidays(), NSE holidays."""
     d = today + pd.Timedelta(days=1)
-    while d.weekday() >= 5:
+    for _ in range(10):
+        if not _closed(d):
+            break
         d += pd.Timedelta(days=1)
     return d
 
 
 def previous_session(day: pd.Timestamp) -> pd.Timestamp:
     d = day - pd.Timedelta(days=1)
-    while d.weekday() >= 5:
+    for _ in range(10):
+        if not _closed(d):
+            break
         d -= pd.Timedelta(days=1)
     return d
 
 
-def build_message(rows: list, entries: list, order_day: pd.Timestamp, data_asof, warnings=None) -> dict:
+def build_message(rows: list, entries: list, order_day: pd.Timestamp, data_asof, warnings=None, settled: dict = None) -> dict:
     """
     Pure message builder.  Returns dict(text, n_alerts, n_orders, n_open, stale, actionable).  `rows` as order_sheet.s3_position_rows,
     `entries` as core.order_sheet.RestingEntry.  Text is plain with minimal HTML (Telegram HTML mode), all dynamic text escaped.
@@ -61,6 +95,11 @@ def build_message(rows: list, entries: list, order_day: pd.Timestamp, data_asof,
     lines = [f"<b>{PREFIX}</b>  (paper only, not P)  orders for {order_day.date()}"]
     lines.append(f"data as of {pd.Timestamp(data_asof).date() if data_asof is not None else 'n/a'}"
                  + ("  <b>STALE: expected " + str(expected.date()) + "; do not trust today's orders</b>" if stale else ""))
+    settled = settled or {}
+    if settled.get("filled"):
+        lines += ["", "<b>PAPER FILLS RECORDED</b> (auto: the resting order would have filled)"] + [f"  {e(x)}" for x in settled["filled"]]
+    if settled.get("expired"):
+        lines += ["", "ORDERS THAT DID NOT FILL:"] + [f"  {e(x)}" for x in settled["expired"]]
     if alerts:
         lines += ["", "<b>STOP ALERT: mark the exit at the next open</b>"]
         for r in alerts:
@@ -82,8 +121,13 @@ def build_message(rows: list, entries: list, order_day: pd.Timestamp, data_asof,
         lines.append(f"  {e(x.symbol)}: BUY {x.quantity} trigger {x.trigger:.2f} limit {x.limit:.2f} (stop alert {x.stop_alert:.2f}, risk {x.risk_pct_of_capital:.2f}% of capital)")
     for w in (warnings or []):
         lines.append(f"  ! {e(w)}")
-    actionable = bool(alerts or exited or entries or errors or stale)
+    actionable = bool(alerts or exited or entries or errors or stale or settled.get("filled"))
     return dict(text="\n".join(lines), n_alerts=len(alerts), n_orders=len(entries), n_open=len(open_rows), stale=stale, actionable=actionable)
+
+
+def rf_report(res: dict) -> dict:
+    """The refresh report of a previous s3_collect result (reused when the collect is repeated on frozen candles)."""
+    return res.get("refresh") or dict(selected=set(), fetched=0, updated=0, failed={}, note=None)
 
 
 def main(argv=None):
@@ -91,6 +135,8 @@ def main(argv=None):
     ap.add_argument("--capital", type=float, default=float(os.getenv("S3_PAPER_CAPITAL", "100000")))
     ap.add_argument("--dry-run", action="store_true", help="print only: send nothing, store nothing")
     ap.add_argument("--today", default=None, help="override the run date (YYYY-MM-DD), for testing")
+    ap.add_argument("--force", action="store_true", help="run even if today's alert was already sent with fresh data")
+    ap.add_argument("--no-autofill", action="store_true", help="do not record automatic paper fills / expiries")
     a = ap.parse_args(argv)
 
     import order_sheet as osh
@@ -102,6 +148,8 @@ def main(argv=None):
     from core import s3_refresh
     from db import get_instrument_key_mapping
 
+    if not enable_exchange_holidays():
+        print("WARNING: NSE holiday list unavailable, only weekends are skipped when picking the order day")
     run_day = pd.Timestamp(a.today) if a.today else pd.Timestamp(datetime.now().date())
     order_day = next_session(run_day)
     cfg = SheetConfig(capital=a.capital)
@@ -110,7 +158,16 @@ def main(argv=None):
 
     def refresh(candles, listing_syms, held):
         # The shared candle cache holds sessions up to D-1 at 18:50 IST on day D; fetch the missing completed bars in memory (nothing is written).
-        return s3_refresh.refresh_candles(candles, listing_syms, held, max_date, os.getenv("UPSTOX_ACCESS_TOKEN"), get_instrument_key_mapping())
+        return s3_refresh.refresh_candles(candles, listing_syms, held, max_date, os.getenv("UPSTOX_ACCESS_TOKEN"), get_instrument_key_mapping(),
+                                          is_holiday=_is_holiday)
+
+    if _closed(run_day) and not a.force:
+        print(f"{run_day.date()} is a weekend or an exchange holiday: no session to report (use --force to run anyway)")
+        return
+    if not a.dry_run and not a.force and s3_store.run_already_sent(s3_paper_runs_col, run_day):
+        # the job is started by both the GitHub schedule and the Cloudflare dispatcher; the second start must not repeat the alert
+        print(f"S3 alert for {run_day.date()} was already sent with fresh data; nothing to do (use --force to run again)")
+        return
 
     res = osh.s3_collect(order_day, cfg, refresh=refresh)
     if res is None:
@@ -118,7 +175,21 @@ def main(argv=None):
     rf = res.get("refresh") or {}
     print(f"[s3_refresh] max_date {max_date.date()}: {len(rf.get('selected', ()))} names near pivot or held, {rf.get('fetched', 0)} fetched, "
           f"{rf.get('updated', 0)} updated, {len(rf.get('failed', {}))} failed")
-    msg = build_message(res["rows"], res["entries"], order_day, res["data_asof"], res["warnings"])
+    # Settle the stored orders against the sessions that have a completed candle: record paper fills / expiries (core/s3_autofill.py).
+    settled = None
+    if not a.no_autofill:
+        from core import s3_autofill
+        if not a.dry_run:
+            s3_store.ensure_indexes(s3_paper_orders_col, s3_paper_positions_col, s3_paper_runs_col)
+        settled = s3_autofill.autofill(s3_paper_orders_col, s3_paper_positions_col, res["candles"], run_day, apply=not a.dry_run)
+        print(f"[s3_autofill] filled {len(settled['filled'])}, expired {len(settled['expired'])}, waiting {len(settled['waiting'])}, skipped {len(settled['skipped'])}"
+              + (" (dry run: nothing written)" if a.dry_run else ""))
+        if not a.dry_run and (settled["filled"] or settled["expired"] or settled["skipped"]):
+            # positions changed: recompute rows, open count and the new orders (a held name must not get a new order); candles are reused, no refetch
+            frozen = res["candles"]
+            res = osh.s3_collect(order_day, cfg, refresh=lambda c, l, h: ({**c, **frozen}, rf_report(res)))
+            rf = res.get("refresh") or rf
+    msg = build_message(res["rows"], res["entries"], order_day, res["data_asof"], res["warnings"], settled)
     print(msg["text"])
     if a.dry_run:
         return

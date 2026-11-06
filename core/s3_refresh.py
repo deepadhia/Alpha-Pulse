@@ -99,6 +99,25 @@ def select_symbols(candles: Dict[str, pd.DataFrame], listing_syms: Iterable[str]
     return sel
 
 
+def _skipped_session_gap(last: pd.Timestamp, max_date: pd.Timestamp, is_holiday: Optional[Callable] = None) -> bool:
+    """
+    True when more than one trading day lies between the cached last bar and max_date: a single 30-minute day cannot close that gap.
+    `is_holiday` (optional predicate on a Timestamp) removes exchange holidays from the count; without it only weekends are skipped, so the first
+    session after a holiday would wrongly look like a two-day gap and never use the 30-minute fallback.
+    """
+    gap = pd.bdate_range(pd.Timestamp(last) + pd.Timedelta(days=1), pd.Timestamp(max_date))
+    if is_holiday is not None:
+        gap = [d for d in gap if not _safe_holiday(is_holiday, d)]
+    return len(gap) > 1
+
+
+def _safe_holiday(is_holiday: Callable, d) -> bool:
+    try:
+        return bool(is_holiday(d))
+    except Exception:
+        return False
+
+
 def fetch_upstox_daily(symbol: str, key: str, token: str, start, end, http_get: Callable = None, sleep: Callable = _time.sleep):
     """(raw candles list, None) or (None, reason).  One retry after a 429."""
     import requests
@@ -117,20 +136,70 @@ def fetch_upstox_daily(symbol: str, key: str, token: str, start, end, http_get: 
         return None, f"{type(e).__name__}"
 
 
+INTRADAY_URL = "https://api.upstox.com/v3/historical-candle/{key}/minutes/30/{day}/{day}"
+EXTRA_BUDGET_S = 240.0            # seconds the optional extra calls may use per refresh (the workflow timeout is 15 minutes)
+MIN_INTRADAY_BARS = 12            # a full session has 13 half-hour bars (09:15 .. 15:15)
+
+
+def fetch_upstox_day_from_30m(symbol: str, key: str, token: str, day, http_get: Callable = None, sleep: Callable = _time.sleep):
+    """
+    One completed session built from Upstox 30-minute candles: (frame with that single daily row, None) or (None, reason).  Used when the daily
+    endpoint does not (yet) return the session: it serves the previous day's bar only some hours after the close, while the 30-minute feed is
+    available at once (checked 2026-11-06: open, high, low and close identical to the daily candle, volume within 0.001%).
+    """
+    import requests
+    http_get = http_get or requests.get
+    day = pd.Timestamp(day).normalize()
+    url = INTRADAY_URL.format(key=key, day=day.strftime("%Y-%m-%d"))
+    headers = {"Accept": "application/json", "Authorization": f"Bearer {token}"}
+    try:
+        r = http_get(url, headers=headers, timeout=15)
+        if r.status_code == 429:
+            sleep(1.0)
+            r = http_get(url, headers=headers, timeout=15)
+        if r.status_code != 200:
+            return None, f"30m http {r.status_code}"
+        raw = (r.json().get("data") or {}).get("candles") or []
+    except Exception as e:
+        return None, f"30m {type(e).__name__}"
+    rows = []
+    for c in raw:
+        try:
+            ts = pd.Timestamp(c[0])
+            ts = ts.tz_localize(None) if ts.tzinfo else ts
+            if ts.normalize() == day:
+                rows.append((ts, float(c[1]), float(c[2]), float(c[3]), float(c[4]), float(c[5])))
+        except (TypeError, ValueError, IndexError):
+            continue
+    rows.sort(key=lambda x: x[0])
+    if len(rows) < MIN_INTRADAY_BARS or rows[0][0].strftime("%H:%M") != "09:15" or rows[-1][0].strftime("%H:%M") < "15:15":
+        return None, f"30m incomplete session ({len(rows)} bars)"
+    frame = pd.DataFrame([dict(DATE=day, OPEN=rows[0][1], HIGH=max(x[2] for x in rows), LOW=min(x[3] for x in rows), CLOSE=rows[-1][4],
+                               VOLUME=sum(x[5] for x in rows))])
+    return frame, None
+
+
+def _newest(frame: pd.DataFrame):
+    return None if frame is None or frame.empty else pd.Timestamp(frame["DATE"].max()).normalize()
+
+
 def refresh_candles(candles: Dict[str, pd.DataFrame], listing_syms: Iterable[str], held: Iterable[str], max_date, token: Optional[str],
-                    mapping: Dict[str, str], http_get: Callable = None, sleep: Callable = _time.sleep) -> Tuple[Dict[str, pd.DataFrame], dict]:
+                    mapping: Dict[str, str], http_get: Callable = None, sleep: Callable = _time.sleep,
+                    extra_budget_s: float = EXTRA_BUDGET_S, clock: Callable = _time.monotonic,
+                    is_holiday: Optional[Callable] = None) -> Tuple[Dict[str, pd.DataFrame], dict]:
     """
     Merge missing completed sessions (<= max_date) into the frames of the selected symbols.  Returns (new candle dict, report) with
     report = dict(selected=set, fetched=int, updated=int, failed={symbol: reason}, note=str|None).  The input dict is not mutated.
     """
     out = dict(candles)
     selected = select_symbols(candles, listing_syms, held)
-    rep = dict(selected=selected, fetched=0, updated=0, failed={}, note=None)
+    rep = dict(selected=selected, fetched=0, updated=0, failed={}, note=None, from_30m=[])
     if not token:
         rep["note"] = "UPSTOX_ACCESS_TOKEN missing: candles NOT refreshed"
         return out, rep
     max_date = pd.Timestamp(max_date).normalize()
-    for s in sorted(selected):
+    t0 = clock()
+    for s in sorted(selected, key=lambda x: (x not in set(held), x)):      # held positions first: their stop alerts depend on the data
         df = candles[s]
         last = pd.Timestamp(df["DATE"].iloc[-1]).normalize()
         if last >= max_date:
@@ -141,10 +210,29 @@ def refresh_candles(candles: Dict[str, pd.DataFrame], listing_syms: Iterable[str
             continue
         rep["fetched"] += 1
         raw, err = fetch_upstox_daily(s, key, token, last, max_date, http_get, sleep)
-        if err:
+        fresh = parse_upstox_candles(raw) if not err else None
+        in_budget = (clock() - t0) <= extra_budget_s or s in set(held)     # the extra calls (range retry, 30-minute bars) stop once the budget is spent
+        if in_budget and not err and (_newest(fresh) is None or _newest(fresh) < max_date):
+            # the daily endpoint can answer one date range with an older newest bar than another range (seen 2026-11-06: from 10-28 ended 11-04,
+            # from 11-02 and from 10-01 included 11-05): ask once more with an earlier start
+            raw2, err2 = fetch_upstox_daily(s, key, token, last - pd.Timedelta(days=7), max_date, http_get, sleep)
+            fresh2 = parse_upstox_candles(raw2) if not err2 else None
+            if fresh2 is not None and (_newest(fresh) is None or (_newest(fresh2) is not None and _newest(fresh2) > _newest(fresh))):
+                fresh = fresh2
+        if in_budget and (fresh is None or _newest(fresh) is None or _newest(fresh) < max_date) and (max_date - last).days <= 4 and not _skipped_session_gap(last, max_date, is_holiday):
+            bar, err3 = fetch_upstox_day_from_30m(s, key, token, max_date, http_get, sleep)
+            if bar is not None:
+                fresh = bar if fresh is None or fresh.empty else pd.concat([fresh, bar], ignore_index=True).drop_duplicates("DATE", keep="last").sort_values("DATE")
+                err = None
+                rep["from_30m"].append(s)
+            elif err is None and fresh is None:
+                err = err3
+        if err and (fresh is None):
             rep["failed"][s] = err
+        elif fresh is None or fresh.empty:
+            rep["failed"][s] = "empty"
         else:
-            merged, status = merge_fresh(df, parse_upstox_candles(raw), max_date)
+            merged, status = merge_fresh(df, fresh.reset_index(drop=True), max_date)
             if status == "ok":
                 out[s] = merged
                 rep["updated"] += 1
@@ -161,6 +249,8 @@ def describe(rep: Optional[dict]) -> List[str]:
     lines = []
     if rep.get("note"):
         lines.append(rep["note"])
+    if rep.get("from_30m"):
+        lines.append(f"last session built from 30-minute candles for {len(rep['from_30m'])} name(s) (daily candle not published yet)")
     if rep.get("failed"):
         f = rep["failed"]
         lines.append(f"candle refresh failed for {len(f)} of {rep['fetched']} fetched: " + ", ".join(f"{k} ({v})" for k, v in sorted(f.items())[:8]))

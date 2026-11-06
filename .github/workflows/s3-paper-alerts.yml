@@ -5,7 +5,10 @@ name: S3 Paper Alerts
 # (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID), own MongoDB collections (s3_paper_*).  It never touches `positions` or `signals`.
 # 13:20 UTC = 18:50 IST.  The shared candle cache only holds sessions up to the previous day at this hour (the 18:30 run refreshes only policy-P
 # holdings), so the job fetches the missing completed bars itself from Upstox, in memory (core/s3_refresh.py, needs UPSTOX_ACCESS_TOKEN).
-# GitHub schedules can start late; the message reports the data date and says STALE when the last completed session could not be loaded.
+# GitHub schedules can start late (the 2026-11-04 run started 7 hours late), so the Cloudflare dispatcher (cloudflare-dispatcher/src/index.js, 13:15 UTC)
+# also starts this workflow; whichever start comes second exits without repeating the alert (s3_store.run_already_sent).  Redeploy the worker
+# (`npx wrangler deploy` in cloudflare-dispatcher/) for the dispatcher entry to take effect.
+# The message reports the data date and says STALE when the last completed session could not be loaded.
 
 on:
   schedule:
@@ -17,6 +20,12 @@ on:
         required: false
         default: false
         type: boolean
+
+# The Cloudflare dispatcher (13:15 UTC) and the cron above (13:20 UTC) can overlap: queue the second start instead of running both at once.
+# It then finds today's heartbeat (s3_store.run_already_sent) and exits without repeating the alert.
+concurrency:
+  group: s3-paper-alerts
+  cancel-in-progress: false
 
 jobs:
   s3-paper-alerts:
