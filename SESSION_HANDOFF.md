@@ -375,3 +375,40 @@ See AGENTS rule 28.
 
 ### 14.6 How to reproduce
 `.venv\Scripts\python.exe research_setup3.py --cache data.pkl --out-dir reports/2026-10-22` (about 3 min), then `research_setup2_x1.py`, `research_w50_deep.py` (with `PYTHONPATH=.`), `research_early_strength.py`, `research_few_quality.py`, `research_s3_validation.py` (with `PYTHONPATH=.`), same arguments. Tests: `python -m pytest` (whole suite).
+
+---
+
+## 15. STATE AS OF 2026-11-06 (audit of the 2026-11-05 alerts and the fixes after it; evidence in CHANGELOG v3.7.1 and v3.7.2)
+
+Resume prompt for a new session: **"Read SESSION_HANDOFF.md section 15, then CHANGELOG.md v3.7.1 and v3.7.2, and continue from 15.4."**
+
+### 15.1 What happened
+The owner pasted the 2026-11-04/05 S3 orders, daily reports and an LGEINDIA re-entry alert and asked for a proper check. The listing-scanner BREAKOUT path was fine (its 60-day age cap dates from commit `b93d8cf`, 2026-10-11; the over-age signals WEWORK / ADVANCE / LGEINDIA of 10-05 predate it). The re-entry path, the daily report and S3 plumbing had real bugs. All were fixed directly on `main` (local `main` was fast-forwarded to `origin/main`). **NOTHING IS COMMITTED OR PUSHED** (the owner pushes). Production behaviour only changes after commit, push and (for S3 timing) a Cloudflare worker redeploy.
+
+### 15.2 Fixed (all with tests; standard suite 348 passed, `test_regression_fixes.py` NOT run)
+* v3.7.1 (re-entry + report): age cap on re-entry (default = breakout cap 60 d, env `LISTING_REENTRY_MAX_DAYS_SINCE_LISTING`), trigger requires LIVE price above the prior peak, upper-50% gate uses the real session low (`get_live_day_low`, filled by `get_live_price`), real IPO age stored, computed winner score, alert limit = stored limit, a re-open no longer inherits the old trade's fields (`db.stale_trade_fields`), report uses IST and /5 (/4 for backfilled rows) plus a legacy tag. The live LGEINDIA document was cleaned by hand (22 fields) and a ledger NOTE appended.
+* v3.7.2 (open items): stale-cache rebuild (`core/cache_refresh.py`, `refresh_stale_caches.py`; 30 of 31 rebuilt on 2026-11-06, ELCIDIN refused because its history really ends 2026-10-29), GNRL key repaired (new dead ISIN key) and its cache rebuilt, `repair_instrument_keys.py --apply` now rebuilds caches, S3 automatic paper fills/expiries (`core/s3_autofill.py`), S3 data fixes (range retry + 30-minute-candle fallback in `core/s3_refresh.py`), S3 alert dedupe + weekend skip + Cloudflare dispatcher entry at 13:15 UTC, IST stamps for `signal_date` / `entry_date`.
+
+### 15.3 Verified vs not verified
+* Verified live (read-only or tested): the Upstox quote carries a session low; the 30-minute aggregation matches the daily candle (GYFTR 2026-11-05: OHLC identical, volume within 0.001%); the S3 autofill dry run on real orders (6 expired, 2 waiting, 0 fills; SWARAJ never reached its trigger, it did not fill); the stale-cache dry run now lists only ELCIDIN.
+* NOT verified: a real evening S3 run with auto fills written; whether Upstox serves the session at 18:45 IST (the daily endpoint was erratic after midnight; the 30-minute fallback should cover it, check the first alert for the line "last session built from 30-minute candles"); the new retry logic's real run time (a dry run of `s3_paper_alerts.py` took over 280 s once; as a guard the optional extra calls now stop after `EXTRA_BUDGET_S` = 240 s in `core/s3_refresh.py`, held positions are refreshed first and always get them; watch the first GitHub run against its 15-minute timeout); a first real re-entry alert after deployment.
+
+### 15.4 Next steps (ordered)
+1. Owner: commit and push the changes (suggested split: re-entry/report fixes v3.7.1; S3 + cache + IST stamps v3.7.2; tests; docs), then `cd cloudflare-dispatcher && npx wrangler deploy` so the 13:15 UTC S3 dispatch exists.
+2. After the first evening S3 run: read the message (fills / did-not-fill sections, STALE flag, "built from 30-minute candles" line) and check `python s3_paper.py list` and `python s3_scorecard.py`. The forward sample can now start; judge only at 40+ closed paper trades (rule 27).
+3. Check run time of `s3_paper_alerts.py` in GitHub Actions (extra-call budget 240 s); names left unrefreshed show up as stale in the alert.
+4. After the first live re-entry alert: confirm the age cap, real score, matching limit and a clean position document.
+5. Rerun `python refresh_stale_caches.py` (dry run) now and then, and `python repair_instrument_keys.py` (dry run) to catch new dead keys.
+6. Known and left: ELCIDIN (and similar halted names) stay out of S3; old rows keep their shifted `signal_date` / `entry_date` times (IST date is right); `test_regression_fixes.py` still hangs without network.
+
+### 15.5 Facts worth remembering
+* `positions` re-entry reuses the symbol's document; `db.upsert_position` now unsets the closed trade's cycle fields on re-open (shadow_*, exit_version, next_day_open, archetype, trap_*, algo_takeaway, winner_traits, peak, run-up, pnl, days_held) unless the new payload sets them.
+* S3 auto fill price convention: max(open, trigger) + 0.3%, capped at the limit; stored on each position (`auto_filled`, `fill_model`). Orders stored after the session opened are never valid. This is a recording convention, not a paper rule (fingerprint unchanged).
+* Upstox daily endpoint can return different newest bars for different `from` dates; the 30-minute feed (`/v3/historical-candle/{key}/minutes/30/{day}/{day}`) is complete at once after the close.
+* Working files of this session (scratch, not in the repo): query and repro scripts in the session scratchpad.
+
+### 15.6 Second review pass, same day (CHANGELOG v3.7.3; all uncommitted)
+* **S3 holidays:** `s3_paper_alerts.enable_exchange_holidays()` (also called by `order_sheet.py`) makes `next_session` / `previous_session` skip NSE holidays (Tue 2026-11-10 is closed: before this, Mon 11-09 would have stored orders for it and flagged STALE); a holiday or weekend run date is skipped; autofill closes an order on a day with no session at once; the 30-minute fallback no longer treats a holiday as a missed session.
+* **Duplicate starts:** the S3 workflow has a `concurrency` group (no cancel), so the 13:15 UTC dispatcher start and the 13:20 UTC cron cannot overlap.
+* **Re-entry volume gates (live behaviour change, re-entry only):** now like for like with the time of day using the measured profile in `core/intraday_volume.py` (typical IPO session: 16% of volume by 09:45, 35% by 10:45, 61% by 12:45). Thresholds unchanged; after 15:30 identical to before; rollback `LISTING_REENTRY_TIME_ADJUST_VOLUME=0`. The main breakout path still has its own partial-day gates (AGENTS rule 21, section 11.8 item 1, owner decision pending).
+* Standard suite passes; `test_regression_fixes.py` still not run (hangs without network).
