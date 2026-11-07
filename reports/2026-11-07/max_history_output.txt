@@ -1,0 +1,54 @@
+﻿Atlas: 878 symbols | panel proxy: 2097 symbols
+
+2022-05-27+ universe check: Atlas 870 listings, panel proxy 747, overlap 708 (proxy precision 95%, share of Atlas covered 81%)
+
+==================================================================================================================================
+POLICY P REPLAY (resting stop-limit, close-based stop sold next open, no volume gate, 1.0% round-trip cost)
+==================================================================================================================================
+ATLAS 2022-05..2026-11 (true IPO list, Upstox) signals-N= 230 (open 4) win=41.2% closed net=+3.35% CI90=[ +0.9, +6.0] med=-1.60% | PF closed=1.87 incl.open=2.14 exTop3=1.38
+   year   N   mean-net%   PF   win%
+   2022   14     -2.54   0.35   35.7
+   2023   37     +9.84   4.88   45.9
+   2024   53     +5.09   2.24   37.7
+   2025   63     -0.37   0.92   38.1
+   2026   63     +6.58   3.01   45.8
+
+PANELPROXY 2022-05..2026-10 (validation of proxy) signals-N= 220 (open 4) win=40.7% closed net=+3.55% CI90=[ +1.0, +6.3] med=-1.74% | PF closed=1.90 incl.open=2.20 exTop3=1.40
+   year   N   mean-net%   PF   win%
+   2022   14     -2.81   0.33   35.7
+   2023   35    +10.09   4.55   42.9
+   2024   51     +5.76   2.50   41.2
+   2025   62     -0.21   0.95   38.7
+   2026   58     +7.24   3.01   42.6
+
+PANELPRE 2006-07..2022-05 (older history)    signals-N= 189 (open 0) win=29.1% closed net=+6.38% CI90=[ +1.7,+11.7] med=-2.81% | PF closed=2.20 incl.open=2.20 exTop3=1.53
+   year   N   mean-net%   PF   win%
+   2006    8    +62.88  23.04   50.0
+   2007   24     -0.86   0.84   33.3
+   2008   14    -10.72   0.02    7.1
+   2009    6    +21.44   5.73   33.3
+   2010   23     -1.04   0.89   21.7
+   2011    5    +17.57   3.36   60.0
+   2013    2     -2.11   0.00    0.0
+   2014    4    +28.43  19.26   50.0
+   2015   12     +3.41   2.03   16.7
+   2016    9     +3.15   1.48   33.3
+   2017   13     -4.38   0.30   15.4
+   2018   14     +6.86   3.68   35.7
+   2019    8     +3.29   2.49   37.5
+   2020    7    +46.42  38.07   71.4
+   2021   24     +5.11   2.80   33.3
+   2022   16     -0.69   0.88   12.5
+
+PANELPRE-A 2006-07..2013                     signals-N=  82 (open 0) win=28.0% closed net=+6.35% CI90=[ -2.2,+16.4] med=-3.36% | PF closed=1.87 incl.open=1.87 exTop3=0.76
+PANELPRE-B 2014..2022-05                     signals-N= 107 (open 0) win=29.9% closed net=+6.40% CI90=[ +1.7,+11.4] med=-2.36% | PF closed=2.68 incl.open=2.68 exTop3=1.67
+
+COMBINED 2006-2026 (panel pre-2022 + Atlas)  N=419 closed net=+4.73% CI90=[+2.3,+7.6] win=35.7% | PF closed=2.05 incl.open=2.17 exTop3=1.69
+
+ACCOUNT LEVEL (Rs 1,00,000, Indian delivery charges + 0.3% exit slippage, 10 x 10% slots, flat sizing)
+   pre-2022 panel 10x10% slots: taken 188/189 total +176.7% CAGR +6.6% maxDD -26.4% Calmar 0.25 PF 2.06 worst -79.7% top3-share 58%
+     by year %: {2006: 56.0, 2007: -0.7, 2008: -19.6, 2009: -0.2, 2010: 16.0, 2011: 4.2, 2012: -1.2, 2013: -0.2, 2014: 15.6, 2015: 1.2, 2016: -2.3, 2017: -0.5, 2018: 7.2, 2019: 3.6, 2020: 6.3, 2021: 41.0, 2022: -4.7}
+   Atlas 2022-26 10x10% slots: taken 177/230 total +116.3% CAGR +19.1% maxDD -25.4% Calmar 0.75 PF 2.18 worst -17.7% top3-share 47%
+     by year %: {2022: -2.7, 2023: 18.8, 2024: 55.4, 2025: -12.7, 2026: 35.1}
+   combined 2006-26 10x10% slots: taken 363/419 total +533.6% CAGR +9.6% maxDD -26.4% Calmar 0.36 PF 2.22 worst -79.7% top3-share 30%
+     by year %: {2006: 56.0, 2007: -0.7, 2008: -19.6, 2009: -0.2, 2010: 16.0, 2011: 4.2, 2012: -1.2, 2013: -0.2, 2014: 15.6, 2015: 1.2, 2016: -2.3, 2017: -0.5, 2018: 7.2, 2019: 3.6, 2020: 6.3, 2021: 41.0, 2022: -6.6, 2023: 21.0, 2024: 58.3, 2025: -12.2, 2026: 36.0}

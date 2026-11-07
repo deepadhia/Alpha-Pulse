@@ -286,3 +286,7 @@ reports/2026-10-21/*.csv
 reports/2026-10-12/data_*.csv
 reports/2026-10-14/data_base_trades.csv
 reports/2026-10-14/data_base_trades_causal_resting.csv
+reports/2026-11-07/*.csv
+
+# max-history research inputs (build_panel_ipo_universe.py output, regenerable)
+data_panel*/

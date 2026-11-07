@@ -1,0 +1,72 @@
+﻿S3 PAPER RULE HISTORY REPLAY (tier REPLAY; flat 1.0% round-trip cost; 90% symbol-cluster intervals)
+
+--- ATLAS 2022-26 (reference; cap chosen on this sample): clean universe 693 symbols
+S3 uncapped (X1 exits) AS RUN                N=286 (open 12, symbols 216) win=40.9% net=+4.35% CI90=[ +1.4, +7.4] median=-4.13% exTop1=+3.65% exTop3=+2.68%
+    PF  incl open 1.73 [1.22, 2.35] | closed only 1.41 [0.99, 1.92] | ex-top3 all 1.44 [0.99, 2.03] | closed ex-top3 1.12 [0.78, 1.59]   (n closed 274)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 38 = 13.3% of trades, 83% of gross profit || median days held 36, median initial risk 12.0%
+S3 PAPER RULE (turnover <= Rs 25 Cr) AS RUN  N=182 (open  6, symbols 153) win=46.7% net=+7.55% CI90=[ +3.7,+11.6] median=-1.76% exTop1=+6.47% exTop3=+4.98%
+    PF  incl open 2.42 [1.66, 3.49] | closed only 2.18 [1.46, 3.20] | ex-top3 all 1.92 [1.28, 2.88] | closed ex-top3 1.68 [1.12, 2.56]   (n closed 176)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 33 = 18.1% of trades, 86% of gross profit || median days held 40, median initial risk 12.0%
+S3 uncapped, up-jump trades removed          N=286 (open 12, symbols 216) win=40.9% net=+4.35% CI90=[ +1.4, +7.4] median=-4.13% exTop1=+3.65% exTop3=+2.68%
+    PF  incl open 1.73 [1.22, 2.35] | closed only 1.41 [0.99, 1.92] | ex-top3 all 1.44 [0.99, 2.03] | closed ex-top3 1.12 [0.78, 1.59]   (n closed 274)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 38 = 13.3% of trades, 83% of gross profit || median days held 36, median initial risk 12.0%
+S3 PAPER RULE, up-jump trades removed        N=182 (open  6, symbols 153) win=46.7% net=+7.55% CI90=[ +3.7,+11.6] median=-1.76% exTop1=+6.47% exTop3=+4.98%
+    PF  incl open 2.42 [1.66, 3.49] | closed only 2.18 [1.46, 3.20] | ex-top3 all 1.92 [1.28, 2.88] | closed ex-top3 1.68 [1.12, 2.56]   (n closed 176)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 33 = 18.1% of trades, 86% of gross profit || median days held 40, median initial risk 12.0%
+   paper rule by year: 2022: N=2 -8.5% | 2023: N=61 +10.7% | 2024: N=56 +2.7% | 2025: N=22 +6.9% | 2026: N=41 +10.6%
+   years with >= 8 trades: 4; positive: 4
+
+--- PANEL PROXY 2022-26 (validation of the proxy): clean universe 615 symbols
+S3 uncapped (X1 exits) AS RUN                N=262 (open 12, symbols 197) win=41.2% net=+9.95% CI90=[ +4.2,+17.0] median=-3.52% exTop1=+7.12% exTop3=+4.31%
+    PF  incl open 2.76 [1.71, 4.09] | closed only 2.40 [1.41, 3.67] | ex-top3 all 1.75 [1.16, 2.75] | closed ex-top3 1.39 [0.90, 2.32]   (n closed 250)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 36 = 13.7% of trades, 90% of gross profit || median days held 36, median initial risk 12.0%
+S3 PAPER RULE (turnover <= Rs 25 Cr) AS RUN  N=162 (open  6, symbols 134) win=49.4% net=+18.24% CI90=[ +9.1,+29.6] median=-0.24% exTop1=+13.71% exTop3=+9.20%
+    PF  incl open 4.75 [2.67, 7.62] | closed only 4.26 [2.26, 7.09] | ex-top3 all 2.86 [1.73, 4.81] | closed ex-top3 2.38 [1.41, 4.25]   (n closed 156)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 33 = 20.4% of trades, 92% of gross profit || median days held 42, median initial risk 12.0%
+   uncapped: 5 up-jump trade(s) (> +60% in one day: cannot be real): AGIIL 749%, BUILDPRO 246%, GENSOL 203%, KMEW 103%, TAALTECH 500%
+   paper: 5 up-jump trade(s) (> +60% in one day: cannot be real): AGIIL 749%, BUILDPRO 246%, GENSOL 203%, KMEW 129%, TAALTECH 500%
+S3 uncapped, up-jump trades removed          N=257 (open 11, symbols 194) win=40.1% net=+3.16% CI90=[ +0.5, +6.1] median=-4.23% exTop1=+2.38% exTop3=+1.29%
+    PF  incl open 1.55 [1.07, 2.12] | closed only 1.32 [0.90, 1.83] | ex-top3 all 1.22 [0.84, 1.74] | closed ex-top3 0.99 [0.67, 1.44]   (n closed 246)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 31 = 12.1% of trades, 82% of gross profit || median days held 35, median initial risk 12.0%
+S3 PAPER RULE, up-jump trades removed        N=157 (open  5, symbols 130) win=47.8% net=+7.22% CI90=[ +3.4,+11.6] median=-1.22% exTop1=+5.97% exTop3=+4.22%
+    PF  incl open 2.44 [1.58, 3.61] | closed only 2.22 [1.41, 3.32] | ex-top3 all 1.82 [1.17, 2.83] | closed ex-top3 1.59 [1.03, 2.54]   (n closed 152)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 28 = 17.8% of trades, 85% of gross profit || median days held 40, median initial risk 12.0%
+   paper rule by year: 2022: N=3 -10.1% | 2023: N=48 +10.0% | 2024: N=46 +3.9% | 2025: N=21 +4.0% | 2026: N=39 +10.8%
+   years with >= 8 trades: 4; positive: 4
+
+pre-2022 clean universe 1347 of 1350; dropped reasons: {'fewer than 40 candles': 3}
+
+--- PANEL PRE-2022 2006-07..2022-05 (OUT OF SAMPLE): clean universe 1347 symbols
+S3 uncapped (X1 exits) AS RUN                N=308 (open  1, symbols 257) win=44.5% net=+16.67% CI90=[ +4.7,+35.4] median=-1.97% exTop1=+7.19% exTop3=+5.60%
+    PF  incl open 3.66 [1.68, 6.88] | closed only 2.14 [1.51, 2.93] | ex-top3 all 1.88 [1.25, 2.81] | closed ex-top3 1.76 [1.20, 2.51]   (n closed 307)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 42 = 13.6% of trades, 92% of gross profit || median days held 32, median initial risk 12.0%
+S3 PAPER RULE (turnover <= Rs 25 Cr) AS RUN  N=254 (open  1, symbols 212) win=44.1% net=+18.37% CI90=[ +3.9,+40.8] median=-1.94% exTop1=+6.87% exTop3=+4.93%
+    PF  incl open 3.85 [1.55, 7.49] | closed only 2.06 [1.37, 2.93] | ex-top3 all 1.76 [1.09, 2.73] | closed ex-top3 1.61 [1.01, 2.43]   (n closed 253)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 34 = 13.4% of trades, 92% of gross profit || median days held 32, median initial risk 12.0%
+   uncapped: 3 up-jump trade(s) (> +60% in one day: cannot be real): CHOICEIN 2929%, COHANCE 245%, TI 256%
+   paper: 3 up-jump trade(s) (> +60% in one day: cannot be real): CHOICEIN 2929%, COHANCE 245%, TI 256%
+S3 uncapped, up-jump trades removed          N=305 (open  0, symbols 255) win=43.9% net=+5.60% CI90=[ +2.3, +9.2] median=-2.27% exTop1=+4.85% exTop3=+3.54%
+    PF  incl open 1.88 [1.35, 2.59] | closed only 1.88 [1.35, 2.59] | ex-top3 all 1.55 [1.08, 2.20] | closed ex-top3 1.55 [1.08, 2.20]   (n closed 305)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 39 = 12.8% of trades, 84% of gross profit || median days held 32, median initial risk 12.0%
+S3 PAPER RULE, up-jump trades removed        N=251 (open  0, symbols 210) win=43.4% net=+4.93% CI90=[ +1.4, +8.6] median=-2.27% exTop1=+4.01% exTop3=+2.44%
+    PF  incl open 1.76 [1.18, 2.48] | closed only 1.76 [1.18, 2.48] | ex-top3 all 1.37 [0.89, 2.02] | closed ex-top3 1.37 [0.89, 2.02]   (n closed 251)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 31 = 12.4% of trades, 83% of gross profit || median days held 32, median initial risk 12.0%
+   paper rule by year: 2007: N=39 -0.1% | 2008: N=9 -13.6% | 2009: N=5 -6.1% | 2010: N=33 -2.0% | 2011: N=7 -7.6% | 2012: N=7 -14.1% | 2014: N=5 +45.2% | 2015: N=19 -3.1% | 2016: N=16 -3.8% | 2017: N=15 +15.5% | 2018: N=7 -8.4% | 2019: N=7 +17.3% | 2020: N=18 +11.7% | 2021: N=35 +20.9% | 2022: N=25 +10.2% | 2023: N=4 +3.2%
+   years with >= 8 trades: 9; positive: 4
+paper rule 2010-2022                         N=194 (open  0, symbols 166) win=44.3% net=+7.11% CI90=[ +2.6,+11.9] median=-1.85% exTop1=+5.94% exTop3=+3.91%
+    PF  incl open 2.11 [1.36, 3.11] | closed only 2.11 [1.36, 3.11] | ex-top3 all 1.60 [0.99, 2.51] | closed ex-top3 1.60 [0.99, 2.51]   (n closed 194)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 28 = 14.4% of trades, 86% of gross profit || median days held 34, median initial risk 12.0%
+paper rule 2014-2022                         N=147 (open  0, symbols 124) win=48.3% net=+10.86% CI90=[ +5.3,+16.7] median=-0.58% exTop1=+9.33% exTop3=+6.69%
+    PF  incl open 3.01 [1.89, 4.58] | closed only 3.01 [1.89, 4.58] | ex-top3 all 2.21 [1.30, 3.61] | closed ex-top3 2.21 [1.30, 3.61]   (n closed 147)
+    dead money: 0 trades = 0% | capital-days 0% | mean +nan% || outliers (net >= +25%): 25 = 17.0% of trades, 87% of gross profit || median days held 37, median initial risk 12.0%
+
+CONTROLS (random eligible S3-state day per symbol, no breakout trigger, same X1 exits)
+   pre-2022 uncapped state: 463 symbols x 10 draws; 103 up-jump control trades removed
+   control pre-2022 uncapped state           N=4527 (open  0, symbols 456) win=35.5% net=+3.21% CI90=[ +1.1, +5.6] median=-5.65% exTop1=+3.11% exTop3=+2.91%
+   pre-2022 capped state (turnover <= 25 Cr): 427 symbols x 10 draws; 98 up-jump control trades removed
+   control pre-2022 capped state (turnover <= 25 Cr) N=4172 (open  0, symbols 422) win=36.5% net=+3.68% CI90=[ +1.3, +6.2] median=-5.57% exTop1=+3.57% exTop3=+3.36%
+   paper rule minus capped control (pre-2022): +1.25pp CI90 [-2.4,+4.9]
+   S3 uncapped minus uncapped control (pre-2022): +2.39pp CI90 [-0.9,+5.7]
+   Atlas capped state: 272 symbols x 10 draws; 0 up-jump control trades removed
+   control Atlas capped state                N=2720 (open 123, symbols 272) win=36.3% net=+3.73% CI90=[ +1.3, +6.2] median=-4.55% exTop1=+3.65% exTop3=+3.51%
+   paper rule minus capped control (Atlas 2022-26): +3.82pp CI90 [+0.7,+7.1]

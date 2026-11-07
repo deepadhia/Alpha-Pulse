@@ -1,0 +1,22 @@
+﻿SLIPPAGE / FILL SENSITIVITY (closed-trade net after 1.0% costs; PF closed / incl.open / closed ex-top3)
+resting +0.3% cap 2.5    pre-2022 panel   N=189 net=+6.38% CI90=[ +1.7,+11.7] PF 2.20/2.20/1.53
+resting +0.3% cap 2.5    Atlas 2022-26    N=230 net=+3.35% CI90=[ +0.9, +6.0] PF 1.87/2.14/1.38
+resting +1.0% cap 2.5    pre-2022 panel   N=183 net=+4.92% CI90=[ +0.3, +9.8] PF 1.83/1.83/1.21
+resting +1.0% cap 2.5    Atlas 2022-26    N=229 net=+2.67% CI90=[ +0.2, +5.4] PF 1.63/1.87/1.19
+chase +1.7% no cap       pre-2022 panel   N=188 net=+4.98% CI90=[ +0.4,+10.2] PF 1.79/1.79/1.20
+chase +1.7% no cap       Atlas 2022-26    N=236 net=+2.38% CI90=[ +0.0, +5.0] PF 1.55/1.69/1.13
+chase +2.5% no cap       pre-2022 panel   N=187 net=+3.57% CI90=[ -1.0, +8.7] PF 1.54/1.54/0.98
+chase +2.5% no cap       Atlas 2022-26    N=235 net=+1.73% CI90=[ -0.6, +4.4] PF 1.37/1.49/0.99
+
+REPLAY entries since 2026-07-05 (clean cohort): N=37 (open 3) closed net -1.03% win 44% PF closed 0.73 incl.open 1.87
+
+REPLAY entries since 2026-09-29 (native v3.5+ cohort): N=8 (open 0) closed net -4.43% win 50% PF closed 0.16 incl.open 0.16
+        symbol  entry_date   exit_date  entry_price  exit_price        net                   exit_reason   open
+217    AUGMONT  2026-09-29  2026-10-27  1038.202291     1070.00   2.062766         Stop Loss (EOD alert)  False
+219  SYMBIOTEC  2026-10-01  2026-10-22  1201.293100     1197.50  -1.315751  Time Stop - Dead Money (14-D  False
+228     MANIKA  2026-10-06  2026-10-22    44.284957       45.94   2.737257         Stop Loss (EOD alert)  False
+218       HTEL  2026-10-07  2026-10-21    80.171044       82.30   1.655518         Stop Loss (EOD alert)  False
+220      DEEPA  2026-10-07  2026-10-26   226.005990      228.90   0.280501         Stop Loss (EOD alert)  False
+209     FREDUN  2026-10-08  2026-10-22  1618.691550     1353.20 -17.401615         Stop Loss (EOD alert)  False
+229   SSRETAIL  2026-10-15  2026-10-26   763.182700      642.80 -16.773772         Stop Loss (EOD alert)  False
+221  GLASSWALL  2026-10-22  2026-10-23   233.132305      219.80  -6.718772         Stop Loss (EOD alert)  False

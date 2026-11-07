@@ -1,0 +1,17 @@
+﻿
+2006-07..2022-05
+ live exits: trades 189 (open 0), closed net +6.38% CI90 [+1.7,+11.7], median days held 10, mean days held 32, PF closed 2.20 incl.open 2.20
+  live exits, 10 slots           taken 188/189 total  +176.7% CAGR  +6.6% maxDD  -26.4% Calmar 0.25 PF 2.06 avg invested  nan%  worst -79.7%
+   equity columns: ['nav']
+  live exits, 15 slots           taken 189/189 total   +98.0% CAGR  +4.4% maxDD  -19.7% Calmar 0.22 PF 2.02 avg invested  nan%  worst -80.0%
+ X1 (no time exits): trades 189 (open 0), closed net +7.61% CI90 [+2.9,+13.0], median days held 24, mean days held 52, PF closed 2.18 incl.open 2.18
+  X1 (no time exits), 10 slots   taken 179/189 total  +275.0% CAGR  +8.7% maxDD  -27.3% Calmar 0.32 PF 2.24 avg invested  nan%  worst -79.7%
+  X1 (no time exits), 15 slots   taken 189/189 total  +127.3% CAGR  +5.3% maxDD  -19.3% Calmar 0.27 PF 1.98 avg invested  nan%  worst -80.0%
+
+2022-05..2026-11
+ live exits: trades 230 (open 4), closed net +3.35% CI90 [+0.9,+6.0], median days held 10, mean days held 28, PF closed 1.87 incl.open 2.14
+  live exits, 10 slots           taken 178/230 total  +112.4% CAGR +18.6% maxDD  -25.5% Calmar 0.73 PF 2.14 avg invested  nan%  worst -17.7%
+  live exits, 15 slots           taken 211/230 total   +72.4% CAGR +13.2% maxDD  -20.0% Calmar 0.66 PF 2.00 avg invested  nan%  worst -18.1%
+ X1 (no time exits): trades 230 (open 8), closed net +7.14% CI90 [+3.6,+10.9], median days held 22, mean days held 49, PF closed 2.52 incl.open 2.99
+  X1 (no time exits), 10 slots   taken 138/230 total  +252.8% CAGR +33.1% maxDD  -19.0% Calmar 1.74 PF 3.14 avg invested  nan%  worst -18.4%
+  X1 (no time exits), 15 slots   taken 169/230 total  +155.0% CAGR +23.7% maxDD  -16.6% Calmar 1.43 PF 2.82 avg invested  nan%  worst -19.6%

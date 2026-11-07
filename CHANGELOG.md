@@ -4,6 +4,16 @@ All notable changes, quantitative safeguards, and alerting architecture updates 
 
 ---
 
+## [v3.7.4] - 2026-11-07 (patch, no milestone bump, uncommitted): X1 shadow, a PAPER_ONLY forward test of policy P without its time-based exits
+
+* **Why.** The 2006-2022 holdout test (LEARNINGS 22.1) found one exit idea with the same sign in both eras: switching P's time-based exits off (dead-money 14 d / 10-session velocity gate, stagnant, volume exhaustion, long-underwater; the stop and the trailing ratchet stay). Paired gain +3.17pp per trade pooled (CI +1.55..+4.98), but the pre-registered holdout bar was missed (+1.23pp, CI -0.14..+2.79), so it is NOT live.
+* **What was added (additive, read-only).** `core/px1_shadow.py` (rules, fixed verdict thresholds, `PX1_SHADOW_VERSION = "1.0.0"`, `PX1_START_DATE = "2026-11-09"`, rules fingerprint), `px1_shadow.py` (CLI: reads the candle cache from MongoDB or a research pickle, writes nothing, sends nothing), `test_px1_shadow.py` (13 tests). Method: a deterministic forward replay; every entry of the live-rules engine on or after the start date is re-run with X1 exits (same procedure as `research_alpha_lab.rerun_exits`; parity run on the 2022-26 replay: 230 of 230 entries identical to 0.0pp) and the paired gain is judged by the rules in the module docstring (INSUFFICIENT below 40 pairs; then SUPPORTED / CONTINUE / REJECTED).
+* **Not touched:** every scanner, `positions`, `signals`, the S3 book, `db.py`, `SCANNER_VERSION`, alerts. No new collection. Rollback: delete the three files.
+* **Limits (also in the module docstring):** entries are the replay's idealised ones; slot competition is ignored (longer holds occupy slots; only the replay accounts for that); an IPO older than 60 days is only kept fresh by `refresh_stale_caches.py`, the CLI warns when a held name is stale.
+* **First read (2026-11-07, research view from 2026-07-05, NOT the registered sample):** 34 pairs, mean gain -0.02pp (CI -0.89..+0.96): no help and no harm in the last four months. The registered sample starts 2026-11-09.
+
+---
+
 ## [v3.7.3] - 2026-11-06 (patch, no milestone bump, uncommitted): S3 exchange holidays and duplicate-start guard
 
 * **Exchange holidays in the S3 job.** `next_session` / `previous_session` (`s3_paper_alerts.py`) skipped only weekends, so on Mon 2026-11-09 the evening job would have stored orders for Tue 11-10 (NSE closed), flagged the data STALE (it expected a 11-10 candle) and left the order "waiting" for ten days. `enable_exchange_holidays()` (called by `s3_paper_alerts.py` and `order_sheet.py`) now uses `utils.get_dynamic_nse_holidays`; a holiday or weekend run date is skipped; without a holiday source it falls back to weekends only and says so. Default (no call) is unchanged, so the unit tests stay offline.

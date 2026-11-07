@@ -1,0 +1,29 @@
+﻿A 2007-09..2022-05: 163 trades; outliers (net >= +25%): live 17 (10%), X1 21
+B 2022-05..2026-11: 230 trades; outliers (net >= +25%): live 20 (9%), X1 32
+
+RANK AUC for 'outlier' (0.50 = no information); candidate = same side and >= 0.60 / <= 0.40 in BOTH eras
+feature         A live  B live    A X1    B X1  candidate
+age               0.54    0.54    0.51    0.48  
+ext               0.53    0.41    0.59    0.46  
+vol_ratio         0.45    0.51    0.48    0.47  
+rr                0.45    0.40    0.44    0.37  
+risk              0.51    0.55    0.48    0.59  
+ld_range          0.48    0.52    0.46    0.51  
+ld_close_loc      0.59    0.41    0.62    0.43  
+gap               0.49    0.63    0.51    0.57  
+ret5              0.38    0.46    0.38    0.49  
+ret10             0.48    0.47    0.53    0.49  
+atr10             0.46    0.45    0.45    0.46  
+range10           0.44    0.40    0.43    0.39  
+dist_prev         0.65    0.43    0.65    0.45  
+turn_decay        0.44    0.41    0.45    0.42  
+supply30          0.46    0.53    0.44    0.43  
+n_ret63           0.48    0.46    0.48    0.52  
+n_above200        0.53    0.51    0.52    0.54  
+n_vol21           0.54    0.61    0.54    0.58  
+n_dd252           0.48    0.51    0.49    0.56  
+
+candidate markers: NONE
+
+ACCOUNT-LEVEL FILTER TEST on the X1 book (10 slots; threshold fixed on the other era; reference = unfiltered X1)
+  n_above200   high  thr from other era | A: kept 164/189 CAGR +8.7->+8.0 DD -27.3->-25.2 Calmar 0.32->0.32 | B: kept 155/230 CAGR +33.1->+33.0 DD -19.0->-12.4 Calmar 1.74->2.66 -> not adopted

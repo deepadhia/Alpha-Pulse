@@ -1,0 +1,37 @@
+﻿A 2007-09..2022-05: live book 163 trades, X1 book 163 trades
+B 2022-05..2026-11: live book 230 trades, X1 book 230 trades
+
+=== R0 Nifty50 > 200DMA ===
+  live  A: ON 138/163 net +5.0 vs OFF -0.1 diff +5.1[-3.3,+12.6] | CAGR +3.9->+4.1 DD -22.6->-20.3 Calmar 0.17->0.20
+        B: ON 155/230 net +4.4 vs OFF +4.2 diff +0.2[-5.7,+5.8] | CAGR +18.6->+12.7 DD -25.5->-18.2 Calmar 0.73->0.70  -> no
+  X1    A: ON 138/163 net +5.1 vs OFF +4.1 diff +1.0[-8.7,+9.9] | CAGR +5.3->+4.6 DD -25.6->-23.3 Calmar 0.21->0.20
+        B: ON 155/230 net +11.0 vs OFF +5.0 diff +6.0[-1.2,+13.2] | CAGR +33.1->+33.0 DD -19.0->-12.4 Calmar 1.74->2.66  -> no
+  not adopted
+
+=== R1 >=50% above 200DMA ===
+  live  A: ON 128/163 net +4.1 vs OFF +4.4 diff -0.3[-9.4,+8.1] | CAGR +3.9->+3.0 DD -22.6->-18.1 Calmar 0.17->0.17
+        B: ON 167/230 net +5.0 vs OFF +2.4 diff +2.7[-3.7,+8.2] | CAGR +18.6->+16.7 DD -25.5->-15.7 Calmar 0.73->1.07  -> no
+  X1    A: ON 128/163 net +5.0 vs OFF +4.7 diff +0.3[-9.1,+9.1] | CAGR +5.3->+4.3 DD -25.6->-20.9 Calmar 0.21->0.21
+        B: ON 167/230 net +8.0 vs OFF +11.8 diff -3.8[-13.0,+5.1] | CAGR +33.1->+21.2 DD -19.0->-14.3 Calmar 1.74->1.49  -> no
+  not adopted
+
+=== R2 >=50% above 50DMA ===
+  live  A: ON 103/163 net +2.8 vs OFF +6.5 diff -3.7[-13.1,+4.9] | CAGR +3.9->+1.6 DD -22.6->-15.1 Calmar 0.17->0.11
+        B: ON 110/230 net +4.8 vs OFF +3.9 diff +0.9[-4.3,+6.3] | CAGR +18.6->+10.8 DD -25.5->-19.9 Calmar 0.73->0.54  -> no
+  X1    A: ON 103/163 net +3.1 vs OFF +8.1 diff -5.0[-14.8,+4.0] | CAGR +5.3->+2.0 DD -25.6->-17.8 Calmar 0.21->0.11
+        B: ON 110/230 net +7.9 vs OFF +10.1 diff -2.2[-9.8,+5.3] | CAGR +33.1->+16.8 DD -19.0->-11.2 Calmar 1.74->1.50  -> no
+  not adopted
+
+=== R3 median 63d return > 0 ===
+  live  A: ON 112/163 net +4.4 vs OFF +3.7 diff +0.8[-7.2,+8.6] | CAGR +3.9->+2.8 DD -22.6->-20.2 Calmar 0.17->0.14
+        B: ON 128/230 net +4.6 vs OFF +4.0 diff +0.6[-4.9,+5.9] | CAGR +18.6->+10.9 DD -25.5->-18.5 Calmar 0.73->0.59  -> no
+  X1    A: ON 112/163 net +5.5 vs OFF +3.9 diff +1.5[-6.8,+9.5] | CAGR +5.3->+3.7 DD -25.6->-23.7 Calmar 0.21->0.16
+        B: ON 128/230 net +10.8 vs OFF +6.9 diff +3.9[-3.4,+11.3] | CAGR +33.1->+27.8 DD -19.0->-11.4 Calmar 1.74->2.44  -> no
+  not adopted
+
+=== R4 >=2% at 252d high ===
+  live  A: ON 124/163 net +5.0 vs OFF +1.7 diff +3.3[-5.5,+11.5] | CAGR +3.9->+3.6 DD -22.6->-21.0 Calmar 0.17->0.17
+        B: ON 182/230 net +4.3 vs OFF +4.2 diff +0.1[-7.9,+6.9] | CAGR +18.6->+16.5 DD -25.5->-18.3 Calmar 0.73->0.90  -> no
+  X1    A: ON 124/163 net +5.5 vs OFF +3.2 diff +2.3[-6.7,+10.9] | CAGR +5.3->+4.4 DD -25.6->-24.6 Calmar 0.21->0.18
+        B: ON 182/230 net +10.0 vs OFF +5.5 diff +4.5[-4.5,+12.7] | CAGR +33.1->+30.1 DD -19.0->-18.2 Calmar 1.74->1.65  -> no
+  not adopted

@@ -1,0 +1,47 @@
+﻿P live exits: 393 signals from 2007-09-17, equity columns ['nav']
+P + X1 exits: 393 signals from 2007-09-17, equity columns ['nav']
+
+== 2007-09 .. 2026-10 (19 yrs)
+   P live exits     CAGR   +7.6%  maxDD  -24.9%  Calmar 0.31  growth x4.07
+   P + X1 exits     CAGR  +11.5%  maxDD  -25.6%  Calmar 0.45  growth x7.94
+   Nifty 50 price   CAGR   +9.0%  maxDD  -59.9%  Calmar 0.15  growth x5.15
+== 2007-09 .. 2022-05 (14.7 yrs, holdout era)
+   P live exits     CAGR   +4.1%  maxDD  -22.6%  Calmar 0.18  growth x1.80
+   P + X1 exits     CAGR   +5.5%  maxDD  -25.6%  Calmar 0.22  growth x2.21
+   Nifty 50 price   CAGR   +9.1%  maxDD  -59.9%  Calmar 0.15  growth x3.60
+== 2022-05 .. 2026-10 (4.4 yrs)
+   P live exits     CAGR  +20.4%  maxDD  -24.9%  Calmar 0.82  growth x2.26
+   P + X1 exits     CAGR  +33.8%  maxDD  -18.9%  Calmar 1.79  growth x3.59
+   Nifty 50 price   CAGR   +8.2%  maxDD  -15.8%  Calmar 0.52  growth x1.42
+
+calendar-year returns %:
+      P live exits  P + X1 exits  Nifty 50 price
+Date                                            
+2007           0.6           2.6            36.6
+2008         -18.3         -20.7           -51.8
+2009          -0.9          -0.9            75.8
+2010          15.7          11.6            17.9
+2011           4.1           3.9           -24.6
+2012          -1.2          -1.2            27.7
+2013          -0.4          -1.0             6.8
+2014          15.2          14.8            31.4
+2015           1.0          19.1            -4.1
+2016          -2.1          -4.1             3.0
+2017          -0.5           8.4            28.6
+2018           7.4           2.1             3.2
+2019           3.8           5.9            12.0
+2020           6.4           6.5            14.9
+2021          43.0          53.2            24.1
+2022          -6.9          -9.0             4.3
+2023          19.8          51.2            20.0
+2024          59.1          61.6             8.8
+2025         -15.3          -0.1            10.5
+2026          45.9          55.7           -11.4
+
+years P live beat Nifty price: 7 of 20; P + X1: 7 of 20
+
+correlation of yearly returns:
+                P live exits  P + X1 exits  Nifty 50 price
+P live exits            1.00          0.93            0.09
+P + X1 exits            0.93          1.00            0.10
+Nifty 50 price          0.09          0.10            1.00

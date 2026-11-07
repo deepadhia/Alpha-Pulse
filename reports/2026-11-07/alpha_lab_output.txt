@@ -1,0 +1,140 @@
+﻿universe: 878 symbols with candles, 892 listing records; costs 1.0% round trip; CI = 90% symbol-cluster bootstrap
+
+==============================================================================================================
+0. BASELINE and EXECUTION (listing breakouts, age >= 5d, intraday-crossing fills, open trades kept at MTM)
+==============================================================================================================
+B0 baseline (slip +0.3%, all trades)                       N=230 win=42.2% net=+4.30% CI90=[ +1.8, +7.1] med=-1.49% PF=2.14 exTop3=+2.47% open=4
+B0 closed trades only                                      N=226 win=41.2% net=+3.35% CI90=[ +0.9, +6.0] med=-1.60% PF=1.87 exTop3=+1.48% 
+   by year (n, mean net): {2022: (14, -2.54), 2023: (37, 9.84), 2024: (53, 5.09), 2025: (63, -0.37), 2026: (63, 6.58)}
+
+X1 execution: what the fill discipline is worth (same signals, age >= 5)
+fill at trigger, no slip (ideal)                           N=237 win=43.9% net=+4.49% CI90=[ +2.0, +7.2] med=-1.14% PF=2.30 exTop3=+2.71% open=3
+resting stop-limit: slip 0.3%, no fill > LH+2.5%           N=230 win=42.2% net=+4.30% CI90=[ +1.8, +7.1] med=-1.49% PF=2.14 exTop3=+2.47% open=4
+resting stop-limit: slip 0.3%, no fill > LH+3.5%           N=237 win=43.0% net=+4.18% CI90=[ +1.7, +6.9] med=-1.44% PF=2.15 exTop3=+2.40% open=3
+slip +1.0%                                                 N=236 win=39.8% net=+3.49% CI90=[ +1.1, +6.2] med=-1.76% PF=1.87 exTop3=+1.72% open=3
+slip +1.7%  (today's measured native fill)  [B0]           N=236 win=37.7% net=+2.95% CI90=[ +0.6, +5.6] med=-2.15% PF=1.69 exTop3=+1.19% open=3
+slip +2.5%                                                 N=235 win=35.3% net=+2.30% CI90=[ -0.1, +5.0] med=-2.54% PF=1.49 exTop3=+0.55% open=3
+slip +3.5%                                                 N=235 win=31.1% net=+0.97% CI90=[ -1.3, +3.4] med=-3.50% PF=1.19 exTop3=-0.66% open=3
+   -> resting order vs chase: +1.35pp per trade, N 230 vs 236 (the gap cap skips gap-ups that a chase would still have bought)
+
+==============================================================================================================
+F. ENTRY / SELECTION FILTERS - walk-forward (threshold chosen on earlier years, applied to the next year)
+==============================================================================================================
+
+F1 low IPO supply (supply30 <= t)
+   test 2024: threshold 15 chosen on earlier years | kept N= 48 mean  +5.94 | dropped N=  5 mean  -3.03 | all  +5.09
+   test 2025: threshold 15 chosen on earlier years | kept N= 16 mean  -3.89 | dropped N= 47 mean  +0.83 | all  -0.37
+   test 2026: threshold 15 chosen on earlier years | kept N= 23 mean  +2.88 | dropped N= 40 mean  +8.71 | all  +6.58
+   pooled OOS: kept                                           N= 87 win=39.1% net=+3.32% CI90=[ -0.4, +7.6] med=-1.64% PF=1.82 exTop3=-0.17% 
+   pooled OOS: DROPPED (must be negative to adopt)            N= 92 win=44.6% net=+4.04% CI90=[ +0.2, +8.4] med=-1.82% PF=2.02 exTop3=+0.44% 
+   pooled OOS: all (no filter)                                N=179 win=41.9% net=+3.69% CI90=[ +0.9, +6.8] med=-1.64% PF=1.92 exTop3=+1.47% 
+   kept-minus-all by year: [(2024, 0.85), (2025, -3.52), (2026, -3.7)]  years better: 1/3   kept share 49%
+   fixed rule supply30 <= 12 (full sample, descriptive only): kept N=83 mean +3.94 | dropped N=147 mean +4.51
+
+F2 cohort breadth (share of active IPOs above own listing high >= t)
+   test 2024: threshold 0.4 chosen on earlier years | kept N= 19 mean  -0.36 | dropped N= 34 mean  +8.14 | all  +5.09
+   test 2025: threshold 0.4 chosen on earlier years | kept N=  5 mean  -8.76 | dropped N= 58 mean  +0.35 | all  -0.37
+   test 2026: threshold 0.3 chosen on earlier years | kept N= 43 mean  +1.28 | dropped N= 20 mean +17.97 | all  +6.58
+   pooled OOS: kept                                           N= 67 win=43.3% net=+0.06% CI90=[ -2.4, +2.8] med=-1.35% PF=1.02 exTop3=-1.92% 
+   pooled OOS: DROPPED (must be negative to adopt)            N=112 win=41.1% net=+5.86% CI90=[ +1.8,+10.5] med=-1.96% PF=2.52 exTop3=+2.33% 
+   pooled OOS: all (no filter)                                N=179 win=41.9% net=+3.69% CI90=[ +1.0, +6.7] med=-1.64% PF=1.92 exTop3=+1.47% 
+   kept-minus-all by year: [(2024, -5.46), (2025, -8.39), (2026, -5.3)]  years better: 0/3   kept share 37%
+   fixed rule frac_above >= 0.3 (full sample, descriptive only): kept N=144 mean +2.27 | dropped N=86 mean +7.70
+
+F3 no gap-up chase (open gap <= t %)
+   test 2024: threshold 1 chosen on earlier years | kept N= 33 mean  +2.09 | dropped N= 20 mean +10.05 | all  +5.09
+   test 2025: threshold 2 chosen on earlier years | kept N= 58 mean  -0.04 | dropped N=  5 mean  -4.18 | all  -0.37
+   test 2026: threshold 2 chosen on earlier years | kept N= 57 mean  +2.87 | dropped N=  6 mean +41.84 | all  +6.58
+   pooled OOS: kept                                           N=148 win=39.9% net=+1.55% CI90=[ -0.8, +4.1] med=-2.06% PF=1.39 exTop3=-0.59% 
+   pooled OOS: DROPPED (must be negative to adopt)            N= 31 win=51.6% net=+13.91% CI90=[ +3.3,+26.2] med=+1.23% PF=4.19 exTop3=+3.05% 
+   pooled OOS: all (no filter)                                N=179 win=41.9% net=+3.69% CI90=[ +0.9, +6.8] med=-1.64% PF=1.92 exTop3=+1.47% 
+   kept-minus-all by year: [(2024, -3.0), (2025, 0.33), (2026, -3.71)]  years better: 1/3   kept share 83%
+   fixed rule gap <= 2 (full sample, descriptive only): kept N=204 mean +3.55 | dropped N=26 mean +10.23
+
+F4 liquidity floor (20d turnover Rs Cr >= t)
+   test 2024: threshold 8 chosen on earlier years | kept N= 50 mean  +5.83 | dropped N=  3 mean  -7.25 | all  +5.09
+   test 2025: threshold 8 chosen on earlier years | kept N= 57 mean  -1.90 | dropped N=  6 mean +14.17 | all  -0.37
+   test 2026: threshold 8 chosen on earlier years | kept N= 52 mean  +6.35 | dropped N= 11 mean  +7.69 | all  +6.58
+   pooled OOS: kept                                           N=159 win=40.9% net=+3.23% CI90=[ +0.4, +6.3] med=-1.83% PF=1.79 exTop3=+0.71% 
+   pooled OOS: DROPPED (must be negative to adopt)            N= 20 win=50.0% net=+7.39% CI90=[ -2.0,+18.5] med=-0.04% PF=3.23 exTop3=-2.76% 
+   pooled OOS: all (no filter)                                N=179 win=41.9% net=+3.69% CI90=[ +1.0, +6.7] med=-1.64% PF=1.92 exTop3=+1.47% 
+   kept-minus-all by year: [(2024, 0.74), (2025, -1.53), (2026, -0.23)]  years better: 1/3   kept share 89%
+   fixed rule turn20 >= 2 (full sample, descriptive only): kept N=223 mean +4.48 | dropped N=7 mean -1.47
+
+F5 drop the volume gate (adds trades; judged on the whole book, same slip +1.7%)
+   with volume gate (B0)                                      N=230 win=42.2% net=+4.30% CI90=[ +1.8, +7.1] med=-1.49% PF=2.14 exTop3=+2.47% 
+   without volume gate                                        N=230 win=42.2% net=+4.30% CI90=[ +1.8, +7.1] med=-1.49% PF=2.14 exTop3=+2.47% 
+      trades ONLY present without the gate                    no trades
+
+==============================================================================================================
+E. EXIT / STRUCTURE VARIANTS - paired on the same entries (diff = variant minus live exits, pp per trade)
+==============================================================================================================
+control: re-run of live exits reproduces baseline pnl, max abs diff 0.00e+00pp
+E1 trail 8%                          diff=+0.12pp CI90=[-0.20,+0.39] | net +4.42% win 45.7% PF 2.24 med -0.99 | years better 4/5 {2022: 0.39, 2023: 0.39, 2024: -0.77, 2025: 0.38, 2026: 0.39}
+E2 trail 13%                         diff=-0.11pp CI90=[-0.25,+0.03] | net +4.19% win 40.9% PF 2.07 med -1.84 | years better 1/5 {2022: -0.12, 2023: -0.16, 2024: -0.24, 2025: -0.15, 2026: 0.07}
+E3 winner cushion 0.85 of peak       diff=+0.62pp CI90=[-0.10,+1.20] | net +4.92% win 42.2% PF 2.31 med -1.49 | years better 4/5 {2022: 1.36, 2023: -0.73, 2024: 1.16, 2025: 0.64, 2026: 0.77}
+E4 winner cushion 0.75 of peak       diff=+0.75pp CI90=[-0.63,+2.92] | net +5.06% win 42.2% PF 2.34 med -1.49 | years better 2/5 {2022: -0.58, 2023: -0.88, 2024: -1.27, 2025: 3.87, 2026: 0.59}
+E5 breakeven stop after +8% peak     diff=+0.04pp CI90=[+0.01,+0.08] | net +4.34% win 42.6% PF 2.16 med -1.41 | years better 4/5 {2022: 0.07, 2023: -0.02, 2024: 0.01, 2025: 0.06, 2026: 0.07}
+E6 dead-money 10 days                diff=-0.48pp CI90=[-1.29,+0.19] | net +3.82% win 40.9% PF 2.07 med -1.74 | years better 3/5 {2022: 0.06, 2023: -1.85, 2024: 0.36, 2025: 0.07, 2026: -1.06}
+E7 dead-money 21 days                diff=+1.17pp CI90=[-0.13,+3.07] | net +5.47% win 40.4% PF 2.42 med -1.92 | years better 2/5 {2022: 0.0, 2023: 5.82, 2024: 1.36, 2025: -0.26, 2026: -0.03}
+E8 trail starts at +5% (not +3%)     diff=-0.02pp CI90=[-0.06,+0.02] | net +4.28% win 42.2% PF 2.13 med -1.49 | years better 1/5 {2022: 0.0, 2023: 0.0, 2024: -0.07, 2025: -0.06, 2026: 0.05}
+E9 initial stop cap 10% (not 12%)    diff=+0.05pp CI90=[-0.13,+0.22] | net +4.35% win 41.7% PF 2.17 med -1.53 | years better 4/5 {2022: 0.04, 2023: 0.03, 2024: -0.19, 2025: 0.22, 2026: 0.09}
+E10 sell 1/3 at +20%                 diff=-0.35pp CI90=[-1.10,+0.35] | net +3.95% win 43.9% PF 2.06 med -1.44 | years better 2/5 {2022: 1.39, 2023: -1.81, 2024: -0.59, 2025: 0.37, 2026: -0.4}
+
+==============================================================================================================
+X2. EXECUTION ROBUSTNESS - resting stop-limit (slip 0.3%, cap LH+2.5%) vs chase (+1.7%), same signals
+==============================================================================================================
+paired on 223 common signals: resting minus chase = +1.19pp per trade, CI90=[+1.00,+1.38]
+   by year (n, resting minus chase): {2022: (14, 0.73), 2023: (37, 1.34), 2024: (52, 1.72), 2025: (59, 0.78), 2026: (61, 1.16)}
+   resting  by year (n, net): {2022: (14, -2.54), 2023: (37, 9.84), 2024: (53, 5.09), 2025: (63, -0.37), 2026: (63, 6.58)}
+   chase    by year (n, net): {2022: (14, -3.27), 2023: (38, 9.35), 2024: (56, 3.75), 2025: (64, -1.37), 2026: (64, 4.13)}
+   resting order with 0.3% adverse fill (jump-through allowance) N=230 win=42.2% net=+4.30% CI90=[ +1.8, +7.1] med=-1.49% PF=2.14 exTop3=+2.47% 
+   resting order with 0.8% adverse fill (jump-through allowance) N=229 win=39.3% net=+3.81% CI90=[ +1.2, +6.7] med=-1.84% PF=1.94 exTop3=+1.98% 
+   resting order with 1.2% adverse fill (jump-through allowance) N=229 win=38.0% net=+3.47% CI90=[ +0.9, +6.4] med=-2.05% PF=1.82 exTop3=+1.65% 
+   NOTE: daily bars cannot see price jumping through the limit intraday; the true value of a resting order
+   sits between the +0.8% and +0.3% rows above and the chase row, i.e. roughly +0.8 to +2.6pp per trade.
+
+==============================================================================================================
+G. EXPLORATORY (NOT pre-registered, NOT adoptable): trigger level and feature screens, discovery 2022-24 / holdout 2025-26
+==============================================================================================================
+G1 trigger level above the listing high (resting order, slip 0.3%, cap = trigger + 1.0%)
+   trigger LH+0.5%                                            N=171 win=33.9% net=+3.83% CI90=[ +0.9, +6.9] med=-2.36% PF=1.89 exTop3=+1.76% yrs {2022: -5.4, 2023: 9.5, 2024: 2.5, 2025: 0.2, 2026: 6.8}
+   trigger LH+1.0%                                            N=235 win=40.4% net=+4.60% CI90=[ +1.9, +7.7] med=-1.89% PF=2.16 exTop3=+2.71% yrs {2022: 7.4, 2023: 9.8, 2024: 3.9, 2025: -0.5, 2026: 6.8}
+   trigger LH+1.5%                                            N=230 win=42.2% net=+4.30% CI90=[ +1.8, +7.1] med=-1.49% PF=2.14 exTop3=+2.47% yrs {2022: -2.5, 2023: 9.8, 2024: 5.1, 2025: -0.4, 2026: 6.6}
+   trigger LH+2.0%                                            N=226 win=42.5% net=+3.96% CI90=[ +1.4, +6.8] med=-1.32% PF=2.06 exTop3=+2.11% yrs {2022: -1.9, 2023: 9.4, 2024: 5.1, 2025: -0.2, 2026: 4.9}
+   trigger LH+3.0%                                            N=148 win=37.8% net=+3.25% CI90=[ +0.3, +6.7] med=-2.06% PF=1.82 exTop3=+0.94% yrs {2022: 1.5, 2023: 14.8, 2024: 5.2, 2025: -3.5, 2026: 0.9}
+
+G2 feature screens (direction fixed on 2022-24 discovery, shown on the 2025-26 holdout)
+   age        median(disc)=   14.50 | discovery hi-lo  +2.09 | holdout hi-lo  -4.37 (n 61/65) flip
+   vr         median(disc)=    0.86 | discovery hi-lo  +3.35 | holdout hi-lo  -0.75 (n 62/64) flip
+   ext        median(disc)=    1.50 | discovery hi-lo  -0.94 | holdout hi-lo  -4.86 (n 70/56) AGREE
+   risk_pct   median(disc)=   12.00 | discovery hi-lo  +1.85 | holdout hi-lo  +4.66 (n 58/68) AGREE
+   rr         median(disc)=    1.67 | discovery hi-lo  -0.56 | holdout hi-lo  -4.56 (n 52/74) AGREE
+   turn20     median(disc)=   76.60 | discovery hi-lo  -0.50 | holdout hi-lo  -7.11 (n 71/55) AGREE
+   ld_range   median(disc)=    9.66 | discovery hi-lo  -3.94 | holdout hi-lo  +5.97 (n 54/72) flip
+   gap        median(disc)=    0.59 | discovery hi-lo  +4.23 | holdout hi-lo  +1.79 (n 51/75) AGREE
+   ret5       median(disc)=    1.14 | discovery hi-lo  -4.22 | holdout hi-lo  -1.27 (n 64/23) AGREE
+   ret10      median(disc)=    3.33 | discovery hi-lo  -8.59 | holdout hi-lo  +6.26 (n 36/22) flip
+   atr10      median(disc)=    5.55 | discovery hi-lo  -8.02 | holdout hi-lo  +2.10 (n 75/51) flip
+   range10    median(disc)=   17.03 | discovery hi-lo  -9.95 | holdout hi-lo  -1.42 (n 68/58) AGREE
+   dist_prev  median(disc)=   -2.20 | discovery hi-lo  -4.63 | holdout hi-lo  +5.97 (n 74/52) flip
+   supply30   median(disc)=   11.50 | discovery hi-lo  -1.18 | holdout hi-lo  +4.33 (n 109/17) flip
+   n_active   median(disc)=   23.50 | discovery hi-lo  +3.16 | holdout hi-lo  +5.73 (n 109/17) AGREE
+   frac_above median(disc)=    0.38 | discovery hi-lo  -2.48 | holdout hi-lo  -5.54 (n 20/106) AGREE
+   med_ret20  median(disc)=    0.02 | discovery hi-lo -10.43 | holdout hi-lo  +3.38 (n 29/97) flip
+   ld_sent60  median(disc)=    0.00 | discovery hi-lo  +2.55 | holdout hi-lo -10.33 (n 18/108) flip
+
+==============================================================================================================
+S. ACCOUNT LEVEL (Rs 1,00,000; Indian delivery charges + 0.3% exit slippage; entry slip is in the fill; 5/7 slots)
+==============================================================================================================
+chase (+1.7% fill) flat 1/7 sizing             taken 154/229 ret   +58.4% CAGR  +11.0% maxDD  -33.0% Calmar  0.33 PF 1.49 by year {2022: -6.0, 2023: 7.9, 2024: 45.7, 2025: -22.4, 2026: 33.0}
+resting order (0.3% fill, cap +2.5%) flat 1/7  taken 144/230 ret  +117.1% CAGR  +19.2% maxDD  -32.0% Calmar  0.60 PF 2.09 by year {2022: -3.5, 2023: 11.7, 2024: 60.3, 2025: -14.3, 2026: 42.9}
+resting order, risk-sized 0.5% per trade       taken 152/230 ret   +20.0% CAGR   +4.2% maxDD  -13.0% Calmar  0.33 PF 1.64 by year {2022: -1.2, 2023: 1.3, 2024: 16.0, 2025: -7.2, 2026: 10.4}
+resting order, risk-sized 0.75% per trade      taken 152/230 ret   +38.0% CAGR   +7.6% maxDD  -17.9% Calmar  0.42 PF 1.80 by year {2022: -1.4, 2023: 3.4, 2024: 25.2, 2025: -9.1, 2026: 17.3}
+resting order, risk-sized 1.0% per trade       taken 152/230 ret   +59.0% CAGR  +11.1% maxDD  -22.1% Calmar  0.50 PF 1.92 by year {2022: -1.7, 2023: 5.3, 2024: 35.3, 2025: -10.4, 2026: 24.3}
+
+==============================================================================================================
+VERDICT against the pre-registered adoption bar
+==============================================================================================================
+F1 supply30    dropped N= 92 mean  +4.04 CI90=[  +0.2,  +8.4] kept share 49% -> not adopted
+F2 breadth     dropped N=112 mean  +5.86 CI90=[  +1.8, +10.5] kept share 37% -> not adopted

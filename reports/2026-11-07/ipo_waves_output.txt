@@ -1,0 +1,25 @@
+﻿IPO-days 38256; months with >= 20 IPO-days: 212 of 237; overall hit rate 12.8%
+wave strength by month (%): quantiles {0.1: 1.0, 0.25: 5.0, 0.5: 10.4, 0.75: 18.1, 0.9: 25.0}; max 62% (2008-12), months above 25%: 21, below 5%: 53
+by year (mean monthly wave %): 2006:16 2007:17 2008:18 2009:7 2010:8 2011:11 2012:5 2013:7 2014:20 2015:12 2016:10 2017:9 2018:10 2019:12 2020:11 2021:13 2022:13 2023:15 2024:15 2025:11 2026:17
+
+STEP 0: are 'waves' more than chance?  Between-month variance of IPO hit shares (1092 IPOs in 145 listing months with >= 3 IPOs): observed 0.0053 vs 0.0038 when IPOs are shuffled across months (permutation p = 0.001)
+
+STEP 1: persistence (Spearman rho of month t with earlier months)
+  2007-2022  month t vs t-1: rho +0.16 (n=143) | vs mean(t-1..t-3): rho +0.02 (n=139)
+  2022-26    month t vs t-1: rho +0.19 (n=52) | vs mean(t-1..t-3): rho +0.05 (n=52)
+
+STEP 2: is the wave visible at the start of the month?  Spearman rho with this month's wave strength
+  predictor      2007-22   2022-26  visible (same sign, |rho| >= 0.30 in both)
+  wave_lag1        +0.16     +0.19  
+  wave_lag3        +0.02     +0.05  
+  nifty_ret63      -0.02     -0.35  
+  breadth200       -0.02     -0.06  
+  supply60         +0.10     -0.01  
+  ld_body60        -0.06     -0.10  
+
+STEP 3: rule 'ON when mean wave of the previous two months >= 15%' (no data = ON); share of months ON: 40% (2007-22 38%, 2022-26 48%)
+  live  A: ON 56/163 net +5.9 vs OFF +3.3 diff +2.5[-6.2,+12.4] | CAGR +3.9->+1.8 DD -22.6->-21.4 Calmar 0.17->0.09
+  live  B: ON 108/230 net +5.0 vs OFF +3.7 diff +1.4[-4.1,+7.0] | CAGR +18.6->+11.0 DD -25.5->-15.0 Calmar 0.73->0.73
+  X1    A: ON 56/163 net +8.8 vs OFF +3.0 diff +5.9[-3.4,+16.2] | CAGR +5.3->+3.0 DD -25.6->-24.8 Calmar 0.21->0.12
+  X1    B: ON 108/230 net +7.9 vs OFF +10.1 diff -2.1[-9.7,+5.5] | CAGR +33.1->+15.2 DD -19.0->-17.1 Calmar 1.74->0.89
+  -> not adopted

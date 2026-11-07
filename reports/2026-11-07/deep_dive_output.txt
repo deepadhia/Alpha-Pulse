@@ -1,0 +1,44 @@
+﻿A 2006-07..2022-05: 189 trades, time-stop exits 85 (45%), mean live net +6.38%
+B 2022-05..2026-11: 230 trades, time-stop exits 82 (36%), mean live net +4.30%
+
+=== A. CONDITIONAL TIME STOP: what is known at the decision day among time-stopped trades, versus the X1 gain ===
+  A 2006-07..2022-05: 85 time-stopped trades; mean X1 gain +2.73pp, share rescued (gain > +5pp) 22%, share hurt (gain < -2pp) 56%, median -2.78pp
+  B 2022-05..2026-11: 82 time-stopped trades; mean X1 gain +13.36pp, share rescued (gain > +5pp) 29%, share hurt (gain < -2pp) 55%, median -2.83pp
+  feature        rho A   rho B  candidate
+  pnl_dec        +0.07   +0.18  
+  peak_dec       +0.04   +0.12  
+  days           -0.19   +0.10  
+  c_vs_ldhigh    +0.06   +0.17  
+  vol_trend      -0.06   -0.09  
+  range5         +0.18   -0.00  
+  up_share       -0.04   +0.22  
+  mae            +0.03   +0.24  
+  n_above200     -0.28   +0.07  
+  n_ret63        -0.07   -0.08  
+  n_dd252        -0.25   -0.04  
+  candidates: NONE
+
+=== B. COHORT / SERIAL STATE at the order date versus the trade outcome (net, X1 net) ===
+  feature       rho A net  rho B net  rho A X1  rho B X1  candidate
+  supply30          -0.05      +0.05     -0.10     -0.03  
+  n_active          -0.12      +0.12     -0.14     +0.06  
+  frac_above        -0.02      -0.06     -0.03     -0.07  
+  med_ret20         +0.07      -0.10     +0.00     -0.03  
+  ld_sent60         -0.18      -0.12     -0.18     -0.08  
+  prev10_net        +0.25      -0.18     +0.30     -0.08  
+  outliers90        +0.08      -0.10     +0.09     -0.12  
+  signals90         -0.14      +0.06     -0.24     -0.00  
+
+=== C. OUTLIER ANATOMY (descriptive): outliers = live net >= +25% versus all other trades ===
+  A 2006-07..2022-05: outliers 20 of 189
+          age  ext   held  days_to_peak  mae_before_peak   ft3   ft5   ft10  repeat
+    outlier                                                                            
+    False    13.0  1.5   10.0           2.0            -5.94 -0.93 -1.64  -1.77    0.01
+    True     12.0  1.5  132.0          82.5            -4.81  5.68  9.88  17.83    0.00
+    outliers: share that dipped below -5% before the run 45%, below -8% 25%; share up at session 5 95% (others 41%); entered at age <= 15 d 55% (others 56%)
+  B 2022-05..2026-11: outliers 20 of 230
+          age  ext  held  days_to_peak  mae_before_peak   ft3    ft5   ft10  repeat
+    outlier                                                                            
+    False    14.0  1.5  10.0           4.0            -5.15  0.39   0.02   0.47     0.0
+    True     13.5  1.5  95.5          78.5            -4.20  4.26  10.48  14.73     0.0
+    outliers: share that dipped below -5% before the run 45%, below -8% 25%; share up at session 5 95% (others 50%); entered at age <= 15 d 55% (others 55%)
