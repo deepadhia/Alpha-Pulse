@@ -14,11 +14,11 @@ Pure constants and two functions: no DB, no network.
 """
 
 NATIVE_FORWARD_CUTOFF = "2026-09-29"
-NATIVE_FORWARD_VERSIONS = ("3.5.0", "3.6.0", "3.7.0")
-# v3.7.0 (2026-11-04, trusted-records release) changed record keeping only (entry guard, append-only ledger), not entry or exit rules, so it stays in the
-# forward cohort above.  TRUSTED_RECORD_VERSIONS marks rows written by the guarded code path (core/trade_guard.py); older tags were stored without it
+NATIVE_FORWARD_VERSIONS = ("3.5.0", "3.6.0", "3.7.0", "3.8.0")
+# v3.8.0 changes entry timing (partial-day gates off), unlike 3.6.0/3.7.0: it is listed here for record-keeping only; scorecards must report 3.8.0 as its own cohort.
+# v3.7.0 / v3.8.0: TRUSTED_RECORD_VERSIONS marks rows written by the guarded code path (core/trade_guard.py); older tags were stored without it
 # and 24 of 28 stored positions failed reconcile_trades.py (LEARNINGS 21).
-TRUSTED_RECORD_VERSIONS = ("3.7.0",)
+TRUSTED_RECORD_VERSIONS = ("3.7.0", "3.8.0")
 
 
 def is_native_forward(version, backfilled, entry_date_str) -> bool:

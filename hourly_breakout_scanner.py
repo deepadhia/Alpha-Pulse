@@ -64,7 +64,7 @@ if send_holiday_notification_once is None:
     from utils import send_holiday_notification_once
 write_daily_log = scanner_module.write_daily_log  # Use shared writer — prevents version drift
 
-SCANNER_VERSION = "3.7.0"  # v3.7.0: Trusted-records release (entry guard, append-only trade ledger, reconciler); entry and exit rules unchanged from v3.5.0/v3.6.0
+SCANNER_VERSION = "3.8.0"  # v3.8.0: Live partial-day gate elimination (resting-order alignment; AGENTS rule 21)
 
 def _now_ist():
     return (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).replace(tzinfo=None)

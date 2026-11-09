@@ -41,6 +41,7 @@ class TestNativeForward(unittest.TestCase):
         self.assertFalse(is_native_forward("3.6.0", True, "2026-11-01"))      # backfilled
         self.assertFalse(is_native_forward("3.5.0", False, "2026-09-28"))     # before the cutoff
         self.assertTrue(is_native_forward("3.7.0", False, "2026-11-05"))      # entry rules unchanged in 3.7.0: same forward cohort
+        self.assertTrue(is_native_forward("3.8.0", False, "2026-11-09"))      # v3.8.0: partial-day gate elimination
         self.assertFalse(is_native_forward("3.3.0", False, "2026-11-01"))     # other version
         self.assertFalse(is_native_forward(None, False, "2026-11-01"))
 
@@ -48,6 +49,7 @@ class TestNativeForward(unittest.TestCase):
 class TestTrustedRecords(unittest.TestCase):
     def test_only_guarded_native_rows_are_trusted(self):
         self.assertTrue(is_trusted_record("3.7.0", False))
+        self.assertTrue(is_trusted_record("3.8.0", False))
         self.assertFalse(is_trusted_record("3.7.0", True))        # backfilled
         self.assertFalse(is_trusted_record("3.6.0", False))       # stored before the entry guard existed
         self.assertFalse(is_trusted_record(None, False))

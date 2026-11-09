@@ -50,7 +50,7 @@ spec.loader.exec_module(scanner_module)
 from core.portfolio_caps import DEFAULT_MAX_ACTIVE_POSITIONS, DEFAULT_HARD_ACTIVE_POSITIONS
 
 # Import version and logging utilities from main scanner
-SCANNER_VERSION = "3.7.0"  # v3.7.0: Trusted-records release (entry guard, append-only trade ledger, reconciler); entry and exit rules unchanged from v3.5.0/v3.6.0
+SCANNER_VERSION = "3.8.0"  # v3.8.0: Live partial-day gate elimination (resting-order alignment; AGENTS rule 21)
 write_daily_log = getattr(scanner_module, 'write_daily_log', lambda *a, **k: None)
 
 fetch_data = scanner_module.fetch_data
@@ -133,14 +133,16 @@ LISTING_SHELF_MIN_TURNOVER_CR = _env_float("LISTING_SHELF_MIN_TURNOVER_CR", 10.0
 LISTING_SHELF_LIVE_CAPITAL_ENABLED = _env_bool("LISTING_SHELF_LIVE_CAPITAL_ENABLED", False)
 ALERT_ON_PAPER_ONLY = _env_bool("ALERT_ON_PAPER_ONLY", False)
 
-# Intraday (partial-day) volume gates on the live breakout decision.  Default ON = behaviour unchanged.  The replay evidence (LEARNINGS 17, AGENTS rule 21,
-# SESSION_HANDOFF 11.8) is that gates reading volume-so-far reject about 40% of trades including 46% of the winners (rejected mean +7.7%), and the replayed
-# policy P has no same-day volume gate.  Set a flag to 0 to switch that gate off; set it back to 1 to roll back.  Both gates must be off for a breakout
-# to pass on low morning volume: with only the floor off, the strict relative-volume check still rejects it.
+# Intraday (partial-day) volume gates on the live breakout decision (v3.8.0: disabled by default per AGENTS rule 21).
+# The replay evidence (LEARNINGS 17, AGENTS rule 21, SESSION_HANDOFF 11.8) is that gates reading volume-so-far reject
+# about 40% of trades including 46% of the winners (rejected mean +7.7%), and the validated policy P has no same-day volume gate.
+# Set a flag to 1 to roll back to legacy behaviour.
 #   LISTING_INTRADAY_VOLUME_FLOOR_ENABLED       the hard 150,000-share floor on today's volume so far (rejection BREAKOUT_VOLUME_BELOW_FLOOR)
 #   LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED  strict mode's "today's volume so far >= LISTING_MIN_VOLUME_MULT x average" rejection (volume_spike_failed)
-LISTING_INTRADAY_VOLUME_FLOOR_ENABLED = _env_bool("LISTING_INTRADAY_VOLUME_FLOOR_ENABLED", True)
-LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED = _env_bool("LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED", True)
+#   LISTING_INTRADAY_CANDLE_BODY_GATE_ENABLED   intraday upper 50% candle body check on the forming candle (rejected mean +4.9%)
+LISTING_INTRADAY_VOLUME_FLOOR_ENABLED = _env_bool("LISTING_INTRADAY_VOLUME_FLOOR_ENABLED", False)
+LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED = _env_bool("LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED", False)
+LISTING_INTRADAY_CANDLE_BODY_GATE_ENABLED = _env_bool("LISTING_INTRADAY_CANDLE_BODY_GATE_ENABLED", False)
 LISTING_CONFIRMATION_MAX_MINUTES = _env_int("LISTING_CONFIRMATION_MAX_MINUTES", 120)
 LISTING_PENDING_CUTOFF_HOUR = _env_int("LISTING_PENDING_CUTOFF_HOUR", 14)
 LISTING_PENDING_CUTOFF_MINUTE = _env_int("LISTING_PENDING_CUTOFF_MINUTE", 30)
@@ -164,8 +166,9 @@ MAX_DAYS_SINCE_LISTING_FOR_BREAKOUT = _env_int(
 MIN_VOL_MULT_WHEN_NO_LISTING_VOL = _env_float(
     "LISTING_MIN_VOL_MULT_WHEN_NO_LISTING_VOL", 2.0 if LISTING_STRICT_QUALITY else 1.5
 )
+# Intraday confirmation delay: 0 = immediate execution (aligned with resting orders; v3.8.0 default)
 LISTING_CONFIRMATION_MINUTES = _env_int(
-    "LISTING_CONFIRMATION_MINUTES", 60
+    "LISTING_CONFIRMATION_MINUTES", 0
 )
 LISTING_MIN_LEADER_SCORE = _env_int(
     "LISTING_MIN_LEADER_SCORE", 5
@@ -1771,27 +1774,28 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
                         )
                         logger.info(f"Skipping {symbol}: {rejection_reason}")
                         return None
-                # --- Upper 50% Candle Body Gate (v3.5.0 Anti-Rejection / Anti-Trap Rule) ---
-                # Breakout candle must close in the upper half of its range ((CLOSE - LOW) / (HIGH - LOW) >= 0.50).
-                # This eliminates long shooting stars / heavy upper rejection wicks (e.g. KUSUMGAR).
-                current_low = float(latest['LOW']) if 'LOW' in latest else current_price
-                candle_range = current_high - current_low
-                if candle_range > 0 and signal_type in ('BREAKOUT', 'BASE_BREAKOUT', 'SHELF_BREAKOUT'):
-                    close_location = (current_price - current_low) / candle_range
-                    if close_location < 0.50:
-                        rejection_reason = (
-                            f"Upper wick exhaustion / selling rejection: candle close location {close_location*100:.1f}% "
-                            f"< 50.0% of daily range (High: {current_high:.2f}, Low: {current_low:.2f}, Close: {current_price:.2f})"
-                        )
-                        logger.info(f"⏭️ Skipping {symbol}: {rejection_reason}")
-                        _log_listing_rejection(
-                            reason="upper_wick_rejection",
-                            value=round(close_location * 100, 1),
-                            threshold=50.0,
-                            metrics={"close_location_pct": round(close_location * 100, 1)}
-                        )
-                        _eject_pending("upper_wick_rejection")
-                        return None
+                # --- Upper 50% Candle Body Gate ---
+                # Replay evidence (LEARNINGS 17, Q2): mid-day check on the forming candle rejects 13% of winners; rejected mean +4.93% vs kept +5.41% (no benefit).
+                # Disabled by default in v3.8.0 per AGENTS rule 21; set LISTING_INTRADAY_CANDLE_BODY_GATE_ENABLED=1 to re-enable.
+                if LISTING_INTRADAY_CANDLE_BODY_GATE_ENABLED:
+                    current_low = float(latest['LOW']) if 'LOW' in latest else current_price
+                    candle_range = current_high - current_low
+                    if candle_range > 0 and signal_type in ('BREAKOUT', 'BASE_BREAKOUT', 'SHELF_BREAKOUT'):
+                        close_location = (current_price - current_low) / candle_range
+                        if close_location < 0.50:
+                            rejection_reason = (
+                                f"Upper wick exhaustion / selling rejection: candle close location {close_location*100:.1f}% "
+                                f"< 50.0% of daily range (High: {current_high:.2f}, Low: {current_low:.2f}, Close: {current_price:.2f})"
+                            )
+                            logger.info(f"⏭️ Skipping {symbol}: {rejection_reason}")
+                            _log_listing_rejection(
+                                reason="upper_wick_rejection",
+                                value=round(close_location * 100, 1),
+                                threshold=50.0,
+                                metrics={"close_location_pct": round(close_location * 100, 1)}
+                            )
+                            _eject_pending("upper_wick_rejection")
+                            return None
 
                 # Passed strict checks — treat as high-quality (no LOW_VOL grade)
                 volume_warnings = []

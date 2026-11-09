@@ -16,7 +16,7 @@ This file defines the core engineering standards, domain knowledge, and operatio
    - Targets newly listed IPOs up to 60 calendar days post-listing (<= 60d), eliminating stale secondary-market lag.
    - Enforces a mandatory listing-day volatility cushion (Listing Day Range >= 5.0%) to ensure institutional price discovery.
    - Validates initial breaks of Day-1 listing high or tight local bases.
-   - Enforces 60-minute holding observation (`PENDING` state) to reject intraday wick traps.
+   - Since v3.8.0 there is NO 60-minute hold (`LISTING_CONFIRMATION_MINUTES=0`) and no volume-so-far or forming-candle gate (rule 21); each is env-restorable.
    - Hard 12% risk stop-loss cap dynamically buffered by 3% below the 15-day swing low.
 2. **Consolidation Breakout Engine (`streamlined_ipo_scanner.py`):**
    - Targets IPOs 10–200 days post-listing breaking out of tight multi-day bases.
@@ -30,7 +30,7 @@ This file defines the core engineering standards, domain knowledge, and operatio
 5. **IPO High Shelf Breakout Engine (`SHELF_BREAKOUT` - Inculcated in Main Listing Logic):**
    - Eliminates the historical coverage dead zone on Days 3–30 (<= 30d post-listing) between the standard listing breakout (<= 3.5% extension cap) and consolidation scanner (>= 10-day history requirement).
    - Automatically detects 3–8 bar consolidation shelves formed above/near listing high (`PRNG ≤ 18%`).
-   - Breakouts within ≤5% of shelf pivot qualify as `SHELF_BREAKOUT` with stops anchored at the shelf floor (12% hard cap) and Upper 50% Body Gate protection.
+   - Breakouts within ≤5% of shelf pivot qualify as `SHELF_BREAKOUT` with stops anchored at the shelf floor (12% hard cap). The intraday Upper 50% Body Gate is off since v3.8.0.
    - Reuses single-writer exit ownership, 2-stage trailing stop, and 14-day velocity speed gate. The 2026-10-05 figure "62.8% win rate, +18.04% avg peak runup (N=145)" counts a trade as a win when its PEAK run-up reached 10%; it is not a realized result. Under live exits in the honest backtest the shelf engine is -2.36% net per trade (N=43, PF 0.56, 28% win rate), which is why it stays PAPER_ONLY.
 
 ---
@@ -50,7 +50,7 @@ This file defines the core engineering standards, domain knowledge, and operatio
 > Because they were backfilled during research, their documents carried `"version": "3.5.0"`, even though they entered under legacy flawed conditions (e.g. fatal 42–46% upper-wick supply traps or sub-1.0x volume spikes) that current v3.5.0 rules actively reject!
 > 
 > **Cohort Isolation Rule for Analytics, Performance & Audits:**
-> 1. **Pure Native Forward Scorecard:** ONLY includes trades where `entry_date >= '2026-09-29'`, `version in core.versioning.NATIVE_FORWARD_VERSIONS` (`3.5.0`, `3.6.0`, `3.7.0`), and `_backfilled != True` (or `is_native_v350: True`; the field name is kept for stored documents). v3.6.0 (2026-10-21) is the hardened execution release (10 x 10% slots, close-based stop alerts, atomic commit lock); its entry rules equal v3.5.0, so the two tags are one cohort, reported separately when comparing slot-cap regimes.
+> 1. **Pure Native Forward Scorecard:** ONLY includes trades where `entry_date >= '2026-09-29'`, `version in core.versioning.NATIVE_FORWARD_VERSIONS` (`3.5.0`, `3.6.0`, `3.7.0`, `3.8.0`), and `_backfilled != True` (or `is_native_v350: True`; the field name is kept for stored documents). v3.6.0 (2026-10-21) is the hardened execution release (10 x 10% slots, close-based stop alerts, atomic commit lock); its entry rules equal v3.5.0, so the two tags are one cohort, reported separately when comparing slot-cap regimes. v3.8.0 (2026-11-09) DOES change entry timing (partial-day gates off), so it is kept in the tuple for record-keeping but MUST be reported as its own cohort, never pooled into a 3.5.0-3.7.0 headline number.
 > 2. **Historical Backfilled Benchmark:** Trades marked `_backfilled: True` or entered pre-September-29 must be reported in their own isolated cohort for backtest validation and research post-mortems. They MUST NEVER be conflated with the live production algorithm scorecard.
 
 ### Rules for All Analytics & Audit Scripts
@@ -129,8 +129,8 @@ python manage_db.py diagnose --symbols KUSUMGAR CMRGREEN --vs-winners
 
 ## 🚦 5. Quantitative & Risk Management Rules (v3.5.0 Standards)
 
-1. **Upper 50% Candle Body Confirmation Rule:**
-   - Any breakout attempt must close in the upper 50% of its total daily range: `(CLOSE - LOW) / (HIGH - LOW) >= 0.50`.
+1. **Upper 50% Candle Body Confirmation Rule (OFF for the live intraday decision since v3.8.0; `LISTING_INTRADAY_CANDLE_BODY_GATE_ENABLED=1` restores it):**
+   - Historical rule: a breakout candle had to close in the upper 50% of its daily range: `(CLOSE - LOW) / (HIGH - LOW) >= 0.50`. Replay of the mid-session check showed no benefit (rejected trades +4.93% mean vs kept +5.41%).
    - Rejects long shooting stars and upper supply traps (e.g. `KUSUMGAR`) structurally without curve-fitting narrow wick thresholds.
 2. **14-Day / 10-Trading-Session Velocity Speed Gate (Industry-Standard Momentum Rule):**
    - Any position held `≥ 14 calendar days` OR `≥ 10 NSE trading sessions` (calculated dynamically using the NSE holiday calendar via `utils.count_trading_days`) that remains flat or underwater (`PnL <= 0.0%`) is exited immediately (`Time Stop - Dead Money`).
@@ -144,7 +144,7 @@ python manage_db.py diagnose --symbols KUSUMGAR CMRGREEN --vs-winners
    - **Institutional Volume Floor:** Requires `volume_spike >= 1.50x` on re-entries, ensuring positions are only taken on genuine institutional accumulation rather than low-volume noise.
 5. **Volume Surge Multiplier:**
    - High-conviction Tier A setups require `≥ 3.0x` volume surge over the 20-day average.
-   - Setups with volume spike `< 1.5x` or volume `< 150,000` shares are automatically rejected.
+   - Setups with volume spike `< 1.5x` or volume `< 150,000` shares were rejected on volume-so-far; since v3.8.0 the same-day floor and spike gates are OFF for the listing scanner (rule 21). Re-entry and hourly volume checks are unchanged.
 6. **Base Tightness (PRNG):**
    - 10-day price range (PRNG) must be `≤ 15%` to ensure coiled volatility and tight risk stops.
 7. **Day-0 Chronology Safeguard:**

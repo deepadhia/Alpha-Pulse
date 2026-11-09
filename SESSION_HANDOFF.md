@@ -4,7 +4,9 @@ Give this file to a new session and say: **"Read SESSION_HANDOFF.md, then LEARNI
 It is self-contained: goals, what exists, what was proven, what was rejected, what changed in the repo, how to reproduce everything,
 and what is still open.  Nothing here depends on the chat that produced it.
 
-> **Updated 2026-10-22: read section 14 (end of file) first** (S3 paper book, the proof tests, what is stored in MongoDB), then section 13, sections 11-12 and LEARNINGS.md sections 17-20.5.
+> **Updated 2026-11-09: read section 17 (end of file) first** (operational DB wipe and archival, clean cohort reset, milestone v3.8.0 release dropping live partial-day gates per AGENTS Rule 21), then section 16, 15, and LEARNINGS.md sections 22-22.9.
+>
+> **Earlier update 2026-10-22: read section 14 first** (S3 paper book, the proof tests, what is stored in MongoDB), then section 13, sections 11-12 and LEARNINGS.md sections 17-20.5.
 >
 > **Earlier update 2026-10-21: read section 13 (end of file) first, then sections 11-12 and LEARNINGS.md sections 17-19.**  Section 13 holds the current repo state, the v3.6.0 bump, the failed second setup and the open decisions.
 >
@@ -451,3 +453,44 @@ Research scripts (all read-only, pre-registered in their docstrings, outputs in 
 8. Low value: 78 V2 signals with sector Unknown (`backfill_v2_from_v1.py`); `order_sheet.py --help` crash (literal `%`); untested universes (BSE-only listings; SME board is impractical at Rs 1 lakh).
 ### 16.4 Do-not-retest list (each failed a pre-registered test; see AGENTS rule 38)
 Exit variants E1-E10 and the tail levers of 22.3; follow-through / progress exits (22.7); conditional time stops; any entry-time feature hunt on price, volume, listing shape, IPO supply, subscription, Nifty or breadth regime (22.5-22.6); market-state, breadth or wave ON/OFF switches (22.8-22.9); cohort and serial-result state (22.7); shelf and S2 variants; S3 stacked on P's slots before its forward verdict.  New information (grey-market premium, anchor investors, sector or fundamentals, news) is the only thing that would reopen the outlier question.
+
+---
+
+## 17. STATE AS OF 2026-11-09 (Operational Database Reset, Clean-Cohort Reset, and Milestone v3.8.0 Release - Eliminating Live Partial-Day Gates)
+
+Resume prompt: **"Read SESSION_HANDOFF.md section 17, then CHANGELOG.md v3.8.0, and continue from 17.3."**
+
+### 17.1 What happened
+1. **Edge & Breadth Investigation:** Evaluated Policy P long-horizon performance and correlation with Nifty index and IPO breadth (>50% listed IPO breadth or >15% wave size) using `research_vs_index.py`, `research_regime_lever.py`, and `research_ipo_waves.py`. Policy P acts as an uncorrelated alpha generator (yearly correlation with Nifty 0.09). Market breadth switches and IPO wave gating consistently reduced annualized returns and Calmar ratios because month-to-month IPO wave persistence is low (decaying to 0 by lag 3) and gating misses the sharpest initial breakout moves of large winners. Policy P must remain "always on" with pre-placed resting orders.
+2. **Strategy Evidence Forensics:** Inspected all 38 records in `strategy_evidence`:
+   - Top failure modes: `UPPER_WICK_SUPPLY_TRAP` (11), `STAGNANT_DEAD_MONEY_BLEED` (7), `EARLY_FALSE_BREAKOUT` (4).
+   - Top winners: 100% were `TIGHT_BASE_COMPOUNDER` (PRNG 8.3%–13.6%).
+3. **Operational Database Reset & Archival (`scripts/reset_operational_db.py`):**
+   - Full disaster backup saved to `backups/20261109_191940/` (24 collections, ~130 MB JSON).
+   - Server-side MongoDB archive collections created: `positions_archive_20261109` (29 docs, safely archiving the anomalous LGEINDIA row), `signals_archive_20261109` (40), `signals_v2_archive_20261109` (350), `signal_outcomes_archive_20261109` (65), `signal_updates_archive_20261109` (2,726), `strategy_evidence_archive_20261109` (38), `pending_states_archive_20261109` (1), `watchlist_archive_20261109` (12).
+   - Cleared operational collections to 0 documents.
+   - Core persistent collections untouched: `daily_candles_cache` (895), `instrument_keys` (895), `ipos` (895), `listing_data` (895), `market_holidays` (1), `trade_ledger` (14), `s3_paper_*` (21 across 3 collections), `logs` & `system_audits` (57k), legacy archives.
+4. **Milestone v3.8.0 Release (Live Partial-Day Gate Elimination):**
+   - Aligned live scanner with pre-market resting-order model (`order_sheet.py`) per AGENTS Rule 21 and the 1-minute tick replay evidence (`reports/2026-10-17/minute_q1_q4_output.txt`).
+   - The 1-minute tick replay showed partial-day mid-session gates (volume floor 150k, 60-minute holding delay, forming-candle close location) rejected 46% of winning breakout runners (+7.7% mean net) and cost -5.49pp per signal.
+   - Disarmed partial-day gates in `listing_day_breakout_scanner.py`:
+     - `LISTING_INTRADAY_VOLUME_FLOOR_ENABLED = False`
+     - `LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED = False`
+     - `LISTING_CONFIRMATION_MINUTES = 0`
+     - `LISTING_INTRADAY_CANDLE_BODY_GATE_ENABLED = False`
+   - Synchronized all 6 milestone touchpoints to `3.8.0`: `master_audit.py`, `streamlined_ipo_scanner.py`, `listing_day_breakout_scanner.py`, `hourly_breakout_scanner.py`, `db.py`, `README.md`.
+   - Updated `core/versioning.py` (`NATIVE_FORWARD_VERSIONS`, `TRUSTED_RECORD_VERSIONS`).
+   - Unit tests updated (`test_instrument_keys.py`, `test_versioning.py`).
+   - Preserved instant rollback via environment variables (`LISTING_INTRADAY_VOLUME_FLOOR_ENABLED=1`, etc.).
+
+### 17.2 Verified vs Not Verified
+- **Verified:** Database wipe and archive verified via `scripts/reset_operational_db.py` (0 operational docs, archives populated, core data intact).
+- **Verified:** `master_audit.py --section 3` passes with 0 errors and 0 warnings (synchronized versioning invariant upheld).
+- **Verified:** Unit test suite passes.
+- **NOT verified:** Live forward order fills under v3.8.0 (next trading session is Wednesday 2026-11-11; Tuesday 11-10 is Guru Nanak Jayanti market holiday).
+
+### 17.3 Next Steps (ordered)
+1. **Mon 2026-11-09 evening S3 run:** S3 paper alert execution schedules orders for Wed 11-11 (skipping holiday 11-10).
+2. **Wed 2026-11-11 morning (09:00 IST):** Run `python order_sheet.py --capital <Rs>` to output clean pre-market resting orders for any eligible IPOs.
+3. **Weekly tracking:** Run `python s3_scorecard.py` and `python px1_shadow.py`.
+4. **Clean cohort forward testing:** All forward signals and positions in MongoDB are now pristine v3.8.0 entries.

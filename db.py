@@ -43,7 +43,7 @@ db_metrics = {
 }
 
 # Versioning and Safeguards
-SCANNER_VERSION = "3.7.0"  # v3.7.0: Trusted-records release (entry guard, append-only trade ledger, reconciler); entry and exit rules unchanged from v3.5.0/v3.6.0
+SCANNER_VERSION = "3.8.0"  # v3.8.0: Live partial-day gate elimination (resting-order alignment; AGENTS rule 21)
 MAX_DAILY_REJECTIONS = 500
 _rejection_guard_warned = False
 

@@ -4,6 +4,26 @@ All notable changes, quantitative safeguards, and alerting architecture updates 
 
 ---
 
+## [v3.8.0] - 2026-11-09 (milestone bump): Live partial-day gate elimination (resting-order alignment; AGENTS rule 21)
+
+* **Why.** Replay (evidence tier: REPLAY, not live) from 1-minute historical tick bars (LEARNINGS 17, `reports/2026-10-17/minute_q1_q4_output.txt`) showed that partial-day intraday gates (150k volume floor on volume-so-far, 60-minute confirmation hold, forming-candle upper 50% check) rejected winners: the 150k volume floor rejected 46% of good trades (+7.7% mean net); the 60-minute hold plus 3.5% cap cost -5.49pp per signal (paired CI -8.56..-2.64) versus pre-placed resting stop-limit entries; the forming-candle check rejected 13% of good trades with no measurable benefit (+4.93% rejected vs +5.41% kept). Pre-placed resting orders (`order_sheet.py`) have no same-day volume gate because orders are placed before open.
+* **What changed in `listing_day_breakout_scanner.py`.**
+  1. `LISTING_INTRADAY_VOLUME_FLOOR_ENABLED = False` (was True; eliminates morning rejection before 150k shares trade).
+  2. `LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED = False` (was True; relative volume surge is not enforced on partial-day bars).
+  3. `LISTING_CONFIRMATION_MINUTES = 0` (was 60; signals trigger directly on crossing the listing high instead of waiting 60 minutes in PENDING observation).
+  4. `LISTING_INTRADAY_CANDLE_BODY_GATE_ENABLED = False` (mid-session close-location check on unclosed forming candles disabled; EOD close-based exits at 18:30 IST continue to protect against completed supply traps).
+* **CI.** `.github/workflows/listing-day-breakout.yml` and `.env.template` defaults changed to match (confirmation 0, three gate flags 0); previously the workflow forced the old values and overrode the code defaults.
+* **Cohort.** 3.8.0 changes entry timing, so it is a separate cohort for scorecards (AGENTS section 2).
+* **Rollbacks (env-reversible).**
+  - Re-enable volume floor: `LISTING_INTRADAY_VOLUME_FLOOR_ENABLED=1`
+  - Re-enable volume surge check: `LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED=1`
+  - Re-enable 60m confirmation hold: `LISTING_CONFIRMATION_MINUTES=60`
+  - Re-enable intraday candle body check: `LISTING_INTRADAY_CANDLE_BODY_GATE_ENABLED=1`
+* **Version sync across all 6 touchpoints:** `master_audit.EXPECTED_VERSION`, `streamlined_ipo_scanner.py`, `listing_day_breakout_scanner.py`, `hourly_breakout_scanner.py`, `db.py`, and `README.md` all bumped atomically to `3.8.0`. `core/versioning.py` updated with `3.8.0` in `NATIVE_FORWARD_VERSIONS` and `TRUSTED_RECORD_VERSIONS`.
+* **Database operational reset:** Full JSON disaster backup to `backups/20261109_191940/`, server-side archival to `*_archive_20261109`, and operational tables cleared (`positions`, `signals`, `signals_v2`, `strategy_evidence`, etc.) to launch a pristine native v3.8.0 forward cohort.
+
+---
+
 ## [v3.7.4] - 2026-11-07 (patch, no milestone bump, uncommitted): X1 shadow, a PAPER_ONLY forward test of policy P without its time-based exits
 
 * **Why.** The 2006-2022 holdout test (LEARNINGS 22.1) found one exit idea with the same sign in both eras: switching P's time-based exits off (dead-money 14 d / 10-session velocity gate, stagnant, volume exhaustion, long-underwater; the stop and the trailing ratchet stay). Paired gain +3.17pp per trade pooled (CI +1.55..+4.98), but the pre-registered holdout bar was missed (+1.23pp, CI -0.14..+2.79), so it is NOT live.

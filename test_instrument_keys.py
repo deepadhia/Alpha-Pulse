@@ -93,17 +93,25 @@ class TestListingScannerFlags(unittest.TestCase):
         out = subprocess.run([sys.executable, "-c", code], cwd=ROOT, env=e, capture_output=True, text=True, timeout=120)
         return [l for l in out.stdout.splitlines() if l.startswith("RESULT")]
 
-    def test_defaults_keep_current_behaviour(self):
-        r = self.run_py("import listing_day_breakout_scanner as m; print('RESULT', m.LISTING_INTRADAY_VOLUME_FLOOR_ENABLED, m.LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED)")
-        self.assertEqual(r, ["RESULT True True"])
+    def test_defaults_gates_off_v380(self):
+        r = self.run_py("import listing_day_breakout_scanner as m; print('RESULT', m.LISTING_INTRADAY_VOLUME_FLOOR_ENABLED, m.LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED, m.LISTING_INTRADAY_CANDLE_BODY_GATE_ENABLED, m.LISTING_CONFIRMATION_MINUTES)")
+        self.assertEqual(r, ["RESULT False False False 0"])
 
-    def test_env_zero_switches_each_gate_off(self):
-        r = self.run_py("import listing_day_breakout_scanner as m; print('RESULT', m.LISTING_INTRADAY_VOLUME_FLOOR_ENABLED, m.LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED)",
-                        LISTING_INTRADAY_VOLUME_FLOOR_ENABLED="0")
-        self.assertEqual(r, ["RESULT False True"])
-        r = self.run_py("import listing_day_breakout_scanner as m; print('RESULT', m.LISTING_INTRADAY_VOLUME_FLOOR_ENABLED, m.LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED)",
-                        LISTING_INTRADAY_VOLUME_FLOOR_ENABLED="0", LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED="0")
-        self.assertEqual(r, ["RESULT False False"])
+    def test_env_confirmation_and_body_gate_switch(self):
+        r = self.run_py(
+            "import listing_day_breakout_scanner as m; print('RESULT', m.LISTING_CONFIRMATION_MINUTES, m.LISTING_INTRADAY_CANDLE_BODY_GATE_ENABLED)",
+            LISTING_CONFIRMATION_MINUTES="60",
+            LISTING_INTRADAY_CANDLE_BODY_GATE_ENABLED="1",
+        )
+        self.assertEqual(r, ["RESULT 60 True"])
+
+    def test_zero_confirmation_bypasses_pending_logic(self):
+        """When LISTING_CONFIRMATION_MINUTES == 0, the scanner must not require pending observation."""
+        code = (
+            "import listing_day_breakout_scanner as m; "
+            "print('RESULT', m.LISTING_CONFIRMATION_MINUTES == 0)"
+        )
+        self.assertEqual(self.run_py(code), ["RESULT True"])
 
     def test_would_have_triggered_v2(self):
         code = ("import listing_day_breakout_scanner as m; f = m._would_have_triggered; "
