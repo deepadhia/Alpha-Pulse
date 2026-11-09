@@ -92,35 +92,75 @@ def build_message(rows: list, entries: list, order_day: pd.Timestamp, data_asof,
     open_rows = [r for r in rows if not r.get("error") and r.get("status") == "OPEN"]
     expected = previous_session(order_day)
     stale = data_asof is None or pd.Timestamp(data_asof) < expected
-    lines = [f"<b>{PREFIX}</b>  (paper only, not P)  orders for {order_day.date()}"]
-    lines.append(f"data as of {pd.Timestamp(data_asof).date() if data_asof is not None else 'n/a'}"
-                 + ("  <b>STALE: expected " + str(expected.date()) + "; do not trust today's orders</b>" if stale else ""))
+
+    lines = [
+        f"📋 <b>{PREFIX}</b>  (paper only, not P)",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"📅 <b>Target Session:</b> {order_day.date()}  •  <b>Data:</b> {pd.Timestamp(data_asof).date() if data_asof is not None else 'n/a'}"
+        + ("  ⚠️ <b>STALE: expected " + str(expected.date()) + "; do not trust today's orders</b>" if stale else "  (✅ Fresh)"),
+        "ℹ️ <i>Automated Stage-2 (61–400d) paper test. No real capital allocated.</i>",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    ]
+
     settled = settled or {}
     if settled.get("filled"):
-        lines += ["", "<b>PAPER FILLS RECORDED</b> (auto: the resting order would have filled)"] + [f"  {e(x)}" for x in settled["filled"]]
+        lines += ["", "🟢 <b>PAPER FILLS RECORDED</b> (auto: the resting order would have filled):"]
+        for x in settled["filled"]:
+            lines.append(f"  • {e(x)}")
+
     if settled.get("expired"):
-        lines += ["", "ORDERS THAT DID NOT FILL:"] + [f"  {e(x)}" for x in settled["expired"]]
+        lines += ["", "⏳ <b>ORDERS THAT DID NOT FILL</b> (expired at market close):"]
+        for x in settled["expired"]:
+            lines.append(f"  • {e(x)}")
+
     if alerts:
-        lines += ["", "<b>STOP ALERT: mark the exit at the next open</b>"]
+        lines += ["", "🛑 <b>STOP ALERT: mark the exit at the next open</b>"]
         for r in alerts:
-            lines.append(f"  {e(r['symbol'])}: close {r['last_close']:.2f} at/below alert {r['trailing']:.2f} ({r['pnl_pct']:+.1f}%)  -> python s3_paper.py exit {e(r['symbol'])} PRICE")
+            pnl_str = f"{r['pnl_pct']:+.1f}%"
+            lines.append(
+                f"  • <b>{e(r['symbol'])}</b>: Close ₹{r['last_close']:.2f} at/below alert ₹{r['trailing']:.2f} ({pnl_str})\n"
+                f"    Action: Sell at tomorrow's open -> <code>python s3_paper.py exit {e(r['symbol'])} PRICE</code>"
+            )
+
     if exited:
-        lines += ["", "ENGINE SAYS EXITED (record it):"]
+        lines += ["", "🚪 <b>ENGINE SAYS EXITED (record it):</b>"]
         for r in exited:
-            lines.append(f"  {e(r['symbol'])}: {str(r['exit_date'])[:10]} @ {r['exit_price']:.2f} ({e(r['exit_reason'])}) {r['pnl_pct']:+.1f}%")
+            pnl_str = f"{r['pnl_pct']:+.1f}%"
+            lines.append(f"  • <b>{e(r['symbol'])}</b>: {str(r['exit_date'])[:10]} @ ₹{r['exit_price']:.2f} ({e(r['exit_reason'])}) {pnl_str}")
+
     if open_rows:
-        lines += ["", "OPEN POSITIONS (alert level = trailing stop)"]
+        lines += ["", "📈 <b>OPEN POSITIONS (alert level = trailing stop)</b>"]
         for r in open_rows:
-            lines.append(f"  {e(r['symbol'])}: close {r['last_close']:.2f} ({r['pnl_pct']:+.1f}%, peak {r['max_runup']:+.1f}%), alert level {r['trailing']:.2f}")
+            pnl_color = "🟢" if r.get('pnl_pct', 0) >= 0 else "🔴"
+            pnl_str = f"{r.get('pnl_pct', 0):+.1f}%"
+            peak_str = f"{r.get('max_runup', 0):+.1f}%"
+            lines.append(
+                f"  • <b>{e(r['symbol'])}</b>: Close ₹{r['last_close']:.2f} · {pnl_color} <b>{pnl_str}</b> (Peak: {peak_str}) · Trailing Stop: ₹{r['trailing']:.2f}"
+            )
+
     if pending:
-        lines += ["", "FILLED TODAY, WAITING FOR THE CANDLE CACHE: " + ", ".join(e(r["symbol"]) for r in pending)]
+        lines += ["", "⏳ <b>FILLED TODAY, WAITING FOR THE CANDLE CACHE:</b> " + ", ".join(e(r["symbol"]) for r in pending)]
+
     if errors:
-        lines += ["", "CANNOT EVALUATE:"] + [f"  {e(r['symbol'])}: {e(r['error'])}" for r in errors]
-    lines += ["", "<b>RESTING BUY ORDERS</b> (stop-limit, DAY)" if entries else "No S3 orders for the next session."]
-    for x in entries:
-        lines.append(f"  {e(x.symbol)}: BUY {x.quantity} trigger {x.trigger:.2f} limit {x.limit:.2f} (stop alert {x.stop_alert:.2f}, risk {x.risk_pct_of_capital:.2f}% of capital)")
+        lines += ["", "⚠️ <b>CANNOT EVALUATE:</b>"]
+        for r in errors:
+            lines.append(f"  • <b>{e(r['symbol'])}</b>: {e(r['error'])}")
+
+    if entries:
+        lines += ["", "🎯 <b>RESTING BUY ORDERS</b> (stop-limit, DAY)"]
+        for x in entries:
+            lines.append(
+                f"  • <b>{e(x.symbol)}</b>: BUY {x.quantity} qty · Trigger: ₹{x.trigger:.2f} · Limit: ₹{x.limit:.2f}\n"
+                f"    Initial Stop: ₹{x.stop_alert:.2f} (Risk: {x.risk_pct_of_capital:.2f}% of capital)"
+            )
+    else:
+        lines += ["", "💤 <i>No S3 orders for the next session.</i>"]
+
     for w in (warnings or []):
         lines.append(f"  ! {e(w)}")
+
+    lines += ["", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
+
     actionable = bool(alerts or exited or entries or errors or stale or settled.get("filled"))
     return dict(text="\n".join(lines), n_alerts=len(alerts), n_orders=len(entries), n_open=len(open_rows), stale=stale, actionable=actionable)
 

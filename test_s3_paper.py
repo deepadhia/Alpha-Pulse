@@ -353,7 +353,7 @@ class TestVersioning(unittest.TestCase):
         self.assertIn(f"S3_PAPER_VERSION", self.read("AGENTS.md"))
         import re
         expected = re.search(r'EXPECTED_VERSION\s*=\s*"([^"]+)"', self.read("master_audit.py")).group(1)
-        self.assertEqual(expected, "3.7.0")                       # milestone bump 2026-11-04 (trusted-records release); S3 itself is still PAPER_ONLY with its own S3_PAPER_VERSION
+        self.assertEqual(expected, "3.8.0")                       # milestone bump 2026-11-09 (live partial-day gates off); S3 itself is still PAPER_ONLY with its own S3_PAPER_VERSION
 
     def test_default_quantity_ignores_an_old_order(self):
         orders, pos = FakeCol(), FakeCol()
