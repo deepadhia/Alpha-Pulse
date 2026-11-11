@@ -1,0 +1,58 @@
+name: Resting Order Alerts
+
+# Policy P's pre-market resting entry orders (AGENTS rules 13 and 21), sent automatically every evening for the NEXT NSE session.
+# Before this workflow the sheet only existed when `python order_sheet.py --capital N --log` was run by hand.  Same Telegram bot and chat as the rest
+# of the system; one message a day; the orders are also recorded as ORDER_GENERATED events in the trade ledger (source resting_order_alerts.py).
+# 13:50 UTC = 19:20 IST, after the S3 job (13:15 / 13:20 UTC) so the two messages do not interleave.  GitHub schedules can start late, so the
+# Cloudflare dispatcher (cloudflare-dispatcher/src/index.js, 13:45 UTC) also starts this workflow; whichever start comes second exits without
+# repeating the alert (resting_order_alerts.already_sent).  Redeploy the worker (`npx wrangler deploy` in cloudflare-dispatcher/) for that to apply.
+# You still place the stop-limit buys at the broker and record fills with `python trade_ledger.py fill SYMBOL PRICE`.
+# Account value for sizing: repository variable RESTING_ORDER_CAPITAL (default 100000).
+
+on:
+  schedule:
+    - cron: '50 13 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Print only: send nothing, record nothing'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: resting-order-alerts
+  cancel-in-progress: false
+
+jobs:
+  resting-order-alerts:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --retries 10 --timeout 120 -r requirements.txt
+
+      - name: Run resting order alerts
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          UPSTOX_ACCESS_TOKEN: ${{ secrets.UPSTOX_ACCESS_TOKEN }}
+          RESTING_ORDER_CAPITAL: ${{ vars.RESTING_ORDER_CAPITAL || '100000' }}
+        run: |
+          if [ -z "$MONGO_URI" ]; then echo "MONGO_URI is missing"; exit 1; fi
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            python resting_order_alerts.py --dry-run
+          else
+            python resting_order_alerts.py
+          fi

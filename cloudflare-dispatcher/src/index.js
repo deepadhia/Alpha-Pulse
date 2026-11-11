@@ -74,6 +74,9 @@ const SCHEDULE = {
   // ── 6:45 PM IST — PAPER_ONLY S3 evening alert (GitHub's own schedule started it up to 7 hours late) ──
   // s3-paper-alerts.yml keeps its cron as a backup; the job skips itself when today's alert was already sent with fresh data.
   "13:15": ["s3-paper-alerts.yml"],
+  // ── 7:15 PM IST — policy P resting entry orders for the next session (automatic order sheet) ──
+  // resting-order-alerts.yml keeps its cron (13:50 UTC) as a backup; the job skips itself when today's alert was already sent with fresh data.
+  "13:45": ["resting-order-alerts.yml"],
   // ── 6:30 PM IST — post-close stop loss update scan ────────────────────────
   "13:00": [
     { workflow: "ipo-scanner-v2.yml", inputs: { mode: "stop_loss_update" } },
@@ -88,6 +91,7 @@ const WORKFLOW_INPUTS = {
   "listing-day-breakout.yml":     {},
   "watchlist-hourly-scanner.yml": {},
   "s3-paper-alerts.yml":          {},
+  "resting-order-alerts.yml":     {},
 };
 
 // ─── Core dispatch function ────────────────────────────────────────────────────
