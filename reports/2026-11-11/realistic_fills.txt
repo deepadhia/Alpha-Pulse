@@ -1,0 +1,27 @@
+policy-P replay trades: 230 (open at data end: 4), 878 symbols; CI = 90% symbol-cluster bootstrap; tier REPLAY; spread/impact/lock numbers are ASSUMPTIONS
+
+==============================================================================================================
+PRIMARY: capital Rs 1,00,000, mult 1.0, Rs 20/order brokerage
+replay net (flat 1.0%), all trades           N=230 net= +4.30% CI90=[ +1.8, +7.1] med= -1.49% win=42.2% PF closed/inclOpen/exTop3 = 1.87/2.14/1.38
+replay net, trades that survive              N=228 net= +4.32% CI90=[ +1.7, +7.2] med= -1.53% win=41.7% PF closed/inclOpen/exTop3 = 1.87/2.14/1.37
+REALISTIC net, trades taken                  N=228 net= +4.47% CI90=[ +1.8, +7.4] med= -1.35% win=42.1% PF closed/inclOpen/exTop3 = 1.93/2.21/1.42
+REALISTIC incl. missed trades as 0 (per signal) N=230 net= +4.43%
+paired diff (realistic - replay), taken      mean= +0.15pp CI90=[+0.13,+0.17]
+not taken: 2 of 230  {'ABOVE_LIMIT': 2} | exits deferred by a lower-circuit lock: 0
+mean entry slip 13 bps, exit slip 12 bps, charges 0.87% of position, median shares 30
+by year (n, replay net, realistic net): {2022: (14, -2.54, -2.37), 2023: (37, 9.84, 9.92), 2024: (53, 5.09, 5.29), 2025: (61, -0.47, -0.3), 2026: (63, 6.58, 6.71)}
+
+==============================================================================================================
+STRESS GRID (taken trades, realistic net per trade; replay net on the same trades in brackets)
+cap 100,000 brokerage   20 mult 1.0: taken 228/230 net  +4.47% (replay  +4.32%) PF closed/inclOpen/exTop3 1.93/2.21/1.42
+cap 100,000 brokerage   20 mult 1.5: taken 224/230 net  +4.07% (replay  +4.04%) PF closed/inclOpen/exTop3 1.81/2.08/1.30
+cap 100,000 brokerage   20 mult 2.0: taken 221/230 net  +4.00% (replay  +4.09%) PF closed/inclOpen/exTop3 1.77/2.04/1.27
+cap 100,000 brokerage    0 mult 1.0: taken 228/230 net  +4.95% (replay  +4.32%) PF closed/inclOpen/exTop3 2.15/2.45/1.59
+cap 100,000 brokerage    0 mult 1.5: taken 224/230 net  +4.55% (replay  +4.04%) PF closed/inclOpen/exTop3 2.01/2.31/1.46
+cap 100,000 brokerage    0 mult 2.0: taken 221/230 net  +4.49% (replay  +4.09%) PF closed/inclOpen/exTop3 1.96/2.25/1.42
+cap  50,000 brokerage   20 mult 1.0: taken 228/230 net  +3.80% (replay  +4.32%) PF closed/inclOpen/exTop3 1.68/1.93/1.23
+cap  50,000 brokerage   20 mult 1.5: taken 224/230 net  +3.41% (replay  +4.04%) PF closed/inclOpen/exTop3 1.57/1.82/1.12
+cap  50,000 brokerage   20 mult 2.0: taken 224/230 net  +3.29% (replay  +4.04%) PF closed/inclOpen/exTop3 1.54/1.78/1.09
+cap  50,000 brokerage    0 mult 1.0: taken 228/230 net  +4.79% (replay  +4.32%) PF closed/inclOpen/exTop3 2.07/2.36/1.54
+cap  50,000 brokerage    0 mult 1.5: taken 224/230 net  +4.40% (replay  +4.04%) PF closed/inclOpen/exTop3 1.94/2.23/1.40
+cap  50,000 brokerage    0 mult 2.0: taken 224/230 net  +4.28% (replay  +4.04%) PF closed/inclOpen/exTop3 1.89/2.18/1.37
