@@ -689,6 +689,12 @@ class TestRegressionFixes(unittest.TestCase):
             self.assertEqual(sig['position_size_pct'], 40)
 
 
+    # v3.8.0 turned the pending-confirmation gates off by default; this test covers the env-reversible legacy path.
+    @patch.multiple('listing_day_breakout_scanner',
+                    LISTING_CONFIRMATION_MINUTES=60,
+                    LISTING_INTRADAY_VOLUME_FLOOR_ENABLED=True,
+                    LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED=True,
+                    LISTING_INTRADAY_CANDLE_BODY_GATE_ENABLED=True)
     def test_high_shelf_breakout_pending_confirmation_and_limit_corridor(self):
         """Test SHELF_BREAKOUT 60-min PENDING confirmation hold, rejection of below-pivot wicks, and 2% limit corridor."""
         from datetime import datetime, timedelta
@@ -774,6 +780,12 @@ class TestRegressionFixes(unittest.TestCase):
             pos = captured_positions[0]
             self.assertGreaterEqual(pos['limit_buy_price'], round(pos['entry_price'] * 1.02, 2))
 
+    # v3.8.0 turned the pending-confirmation gates off by default; this test covers the env-reversible legacy path.
+    @patch.multiple('listing_day_breakout_scanner',
+                    LISTING_CONFIRMATION_MINUTES=60,
+                    LISTING_INTRADAY_VOLUME_FLOOR_ENABLED=True,
+                    LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED=True,
+                    LISTING_INTRADAY_CANDLE_BODY_GATE_ENABLED=True)
     def test_volume_conjunction_and_session_scoped_pending_engine(self):
         """
         Regression Test Suite for Volume Gate Conjunction, Session Scoping, and Telegram Suppression:
@@ -901,6 +913,12 @@ class TestRegressionFixes(unittest.TestCase):
             self.assertIsNone(res_wick)
             self.assertNotIn('DEEPA_MOCK', test_pending)  # Verified: Ejected from pending state!
 
+    # v3.8.0 turned the pending-confirmation gates off by default; this test covers the env-reversible legacy path.
+    @patch.multiple('listing_day_breakout_scanner',
+                    LISTING_CONFIRMATION_MINUTES=60,
+                    LISTING_INTRADAY_VOLUME_FLOOR_ENABLED=True,
+                    LISTING_INTRADAY_VOLUME_SPIKE_GATE_ENABLED=True,
+                    LISTING_INTRADAY_CANDLE_BODY_GATE_ENABLED=True)
     def test_approach_a_pending_engine_and_cutoff_guards(self):
         """
         Regression Test Suite for Approach A (Intraday Cutoff, Closed Market Protection, Universal Eviction):

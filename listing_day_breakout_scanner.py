@@ -173,6 +173,11 @@ LISTING_CONFIRMATION_MINUTES = _env_int(
 LISTING_MIN_LEADER_SCORE = _env_int(
     "LISTING_MIN_LEADER_SCORE", 5
 )
+# Leader-score volume term (0-2 points). Default OFF = legacy behaviour: volume SO FAR today / baseline, a
+# partial-day value (AGENTS rule 21). ON = the replay's causal rule (core/honest_backtest.cross_signal_at,
+# causal=True): last COMPLETED session's volume / baseline before it, the information a resting order has.
+LISTING_LEADER_SCORE_CAUSAL_VOLUME = _env_bool("LISTING_LEADER_SCORE_CAUSAL_VOLUME", False)
+# The same flag also makes the breakout-strength term (+2 at >= listing high +1%) replay-style: see _resting_score_price.
 # Watchlist = attention layer only; in strict mode use same strategy lens as breakouts (fresh IPO + real volume).
 LISTING_WATCHLIST_MAX_DAYS_SINCE_LISTING = _env_int(
     "LISTING_WATCHLIST_MAX_DAYS_SINCE_LISTING", 730
@@ -860,6 +865,47 @@ def _get_intraday_bars(symbol, interval="5m", period="1d"):
         return out[cols]
     except Exception:
         return pd.DataFrame()
+
+
+def _causal_volume_ratio(df):
+    """
+    Volume ratio for the leader score that uses no same-day data (same rule as the replay with causal=True):
+    last COMPLETED session's volume divided by the baseline of the sessions before it (Day 2 onwards, up to 10
+    bars; Day 1 alone when only two exist; the ratio is 1.0 when fewer exist). df's last row is today's forming
+    bar and is ignored. Returns None when df has fewer than 2 rows (caller keeps the legacy ratio).
+    """
+    try:
+        if df is None or len(df) < 2:
+            return None
+        v = float(df['VOLUME'].iloc[-2])
+        ref = df.iloc[:-2]
+        if len(ref) > 2:
+            avg = float(ref['VOLUME'].iloc[2:].tail(10).mean())
+        elif len(ref) == 2:
+            avg = float(ref['VOLUME'].iloc[1])
+        else:
+            avg = v
+        avg = avg if avg > 0 else v
+        return (v / avg) if avg > 0 else None
+    except Exception:
+        return None
+
+
+def _resting_score_price(current_price, current_high, listing_high, trigger_pct):
+    """
+    Price the leader score's breakout-strength term should see under the causal flag (replay rule: the score is
+    computed at the resting order's entry, max(open, trigger), never at the scan-moment price). When the day's
+    high has reached the trigger (listing high + trigger_pct%), a resting order would have filled at or above the
+    trigger, so the score sees at least the trigger. Below the trigger no order fills and the scan price is kept
+    unchanged, so no signal is created that the replay would not take.
+    """
+    try:
+        trig = float(listing_high) * (1.0 + float(trigger_pct) / 100.0)
+        if listing_high > 0 and float(current_high) >= trig:
+            return max(float(current_price), trig)
+    except Exception:
+        pass
+    return current_price
 
 
 def _leader_score(entry_above_high_pct, volume_spike, risk_reward, current_price, listing_high, listing_range_pct):
@@ -1865,11 +1911,22 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
             # which is a boolean (True/False). bool(True) == 1, which is always < 2.0,
             # so volume was always scored 0 regardless of the actual spike size.
             # Use vol_vs_avg (float) which is already computed above.
+            # Volume term: legacy = volume so far today (partial-day); with the causal flag = last completed session.
+            leader_vol_ratio = vol_vs_avg
+            leader_price = current_price
+            if LISTING_LEADER_SCORE_CAUSAL_VOLUME:
+                _causal_vr = _causal_volume_ratio(df)
+                if _causal_vr is not None:
+                    leader_vol_ratio = _causal_vr
+                if signal_type == 'BREAKOUT':
+                    leader_price = _resting_score_price(
+                        current_price, current_high, listing_day_high, LISTING_MIN_POST_CONFIRM_MOVE_PCT
+                    )
             leader_score = _leader_score(
                 entry_above_high_pct=entry_above_high_pct,
-                volume_spike=vol_vs_avg,  # float ratio — was incorrectly boolean
+                volume_spike=leader_vol_ratio,  # float ratio — was incorrectly boolean
                 risk_reward=risk_reward,
-                current_price=current_price,
+                current_price=leader_price,
                 listing_high=listing_day_high,
                 listing_range_pct=listing_range_pct
             )
@@ -1883,7 +1940,12 @@ def check_listing_day_breakout(symbol, listing_info, pending_breakouts=None, bul
                     f"⏭️ Skipping {symbol}: Leader score {leader_score} < {min_leader_for_signal} "
                     f"({'breakout' if signal_type == 'BREAKOUT' else 'watchlist'})"
                 )
-                _log_listing_rejection("low_leader_score", leader_score, min_leader_for_signal, {"leader_score": leader_score})
+                # vol_ratio = the ratio the score used; score = the leader score (stored in details.metrics) so the
+                # next rejection shows whether the volume term was the cause.
+                _log_listing_rejection(
+                    "low_leader_score", leader_score, min_leader_for_signal,
+                    {"leader_score": leader_score, "vol_ratio": round(float(leader_vol_ratio), 2), "score": leader_score}
+                )
                 return None
 
             # --- Detect perfect base for BREAKOUT signals (used for A+ tier eligibility) ---
