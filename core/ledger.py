@@ -36,6 +36,7 @@ EVENT_TYPES = {
     "STOP_MOVED",          # the trailing stop was raised
     "POSITION_CLOSED",     # exit recorded by the scanner (exit price, reason)
     "MANUAL_SELL",         # the owner's real sell, recorded with trade_ledger.py sell
+    "EXIT_SETTLED",        # an automatic exit settlement: the realised sell (next-open bid or modelled) replacing the decision-day close (core/resting_exec.py)
     "NOTE",
 }
 

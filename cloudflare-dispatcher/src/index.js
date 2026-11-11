@@ -44,7 +44,8 @@ const GITHUB_DISPATCH_URL = (workflow) =>
  */
 const SCHEDULE = {
   // ── 9:15 AM IST — market open ─────────────────────────────────────────────
-  "03:45": ["listing-day-breakout.yml", "watchlist-hourly-scanner.yml"],
+  // resting-morning-exec.yml: open-time fills / exits of the automatic forward test (real best ask / bid); its own cron (03:50 UTC) is only a backup.
+  "03:45": ["listing-day-breakout.yml", "watchlist-hourly-scanner.yml", "resting-morning-exec.yml"],
   // ── 9:45 AM IST ───────────────────────────────────────────────────────────
   "04:15": ["listing-day-breakout.yml", "watchlist-hourly-scanner.yml"],
   "04:45": ["listing-day-breakout.yml", "watchlist-hourly-scanner.yml"],
@@ -92,6 +93,7 @@ const WORKFLOW_INPUTS = {
   "watchlist-hourly-scanner.yml": {},
   "s3-paper-alerts.yml":          {},
   "resting-order-alerts.yml":     {},
+  "resting-morning-exec.yml":     {},
 };
 
 // ─── Core dispatch function ────────────────────────────────────────────────────

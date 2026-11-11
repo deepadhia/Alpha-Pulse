@@ -44,7 +44,7 @@ def session_lag(data_asof, expected, is_trading_day) -> int:
 
 
 def build_message(entries: list, skipped: list, order_day: pd.Timestamp, data_asof, expected: pd.Timestamp, lag: int,
-                  warnings=None, n_held: int = 0, capital: float = 0.0, refresh_note: str = None) -> dict:
+                  warnings=None, n_held: int = 0, capital: float = 0.0, refresh_note: str = None, extra_lines: list = None) -> dict:
     """
     Pure message builder (Telegram HTML, all dynamic text escaped).  Returns dict(text, n_orders, withheld, actionable).
     withheld = the data is 2 or more sessions old: no order is listed and the run is not recorded as sent.
@@ -60,6 +60,7 @@ def build_message(entries: list, skipped: list, order_day: pd.Timestamp, data_as
         f"💼 Capital Rs {capital:,.0f}  •  Slots used {n_held}",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
     ]
+    lines += list(extra_lines or [])           # today's automatic forward-test fills / exits / expiries (core.resting_runtime.format_exec_lines)
     if withheld:
         lines += ["", f"🚫 <b>ORDERS WITHHELD</b>: the candle data is {('many' if lag >= 99 else lag)} session(s) older than {expected.date()}. "
                       f"Orders built on stale data can name the wrong levels. Nothing was recorded; the job will retry."]
@@ -70,7 +71,8 @@ def build_message(entries: list, skipped: list, order_day: pd.Timestamp, data_as
                 f"  • <b>{e(x.symbol)}</b>: BUY {x.quantity} qty · Trigger ₹{x.trigger:.2f} · Limit ₹{x.limit:.2f}\n"
                 f"    Initial stop alert ₹{x.stop_alert:.2f} (risk {x.risk_pct_of_capital:.2f}% of capital) · age {x.age}d · R:R {x.rr:.2f}"
             )
-        lines += ["", "ℹ️ <i>After a fill: python trade_ledger.py fill SYMBOL PRICE. Pass mark of the forward test: fills within +0.5% of the trigger.</i>"]
+        lines += ["", "ℹ️ <i>Fills and exits are recorded automatically from the real book (open-time bid/ask quotes, 1-minute bars). Use trade_ledger.py fill / sell only "
+                      "to record a REAL broker fill or sale that differs. Pass mark: fills within +0.5% of the trigger.</i>"]
     else:
         lines += ["", "💤 <i>No eligible resting orders for the next session.</i>"]
     if skipped and not withheld:
@@ -113,6 +115,28 @@ def record_run(audits_col, order_day: pd.Timestamp, **fields) -> None:
     audits_col.update_one({"audit_id": f"resting_orders_{order_day.date()}"}, {"$set": doc}, upsert=True)
 
 
+def evening_execution(run_day: pd.Timestamp, capital: float, dry_run: bool) -> dict:
+    """
+    The automatic forward test, evening half (core/resting_jobs.run_evening): price the orders that did not fill at the open from the day's 1-minute
+    bars, check the fill day's close against the initial stop, settle exits the open-time job could not.  Candles of the names involved are refreshed in
+    memory so the run day's bar is there.
+    """
+    import s3_paper_alerts as S3A
+    from core import resting_runtime as rt, s3_refresh
+    from core.resting_jobs import run_evening
+    from db import get_instrument_key_mapping
+    token = os.getenv("UPSTOX_ACCESS_TOKEN")
+    now_ist = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=5, minutes=30)))
+    deps0 = rt.build_deps(SOURCE, token, capital, dry_run=dry_run, now_ist=now_ist)
+    needed = rt.symbols_needed(deps0, run_day.date())
+    candles = {s: df for s in needed for df in [rt.daily_from_cache(s)] if df is not None}
+    if candles:
+        candles, _frep = s3_refresh.refresh_candles(candles, set(), needed, s3_refresh.last_complete_date(now_ist, run_day), token,
+                                                     get_instrument_key_mapping(), is_holiday=S3A._is_holiday)
+    deps = rt.build_deps(SOURCE, token, capital, dry_run=dry_run, now_ist=now_ist, candles=candles)
+    return run_evening(deps, run_day.date())
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--capital", type=float, default=float(os.getenv("RESTING_ORDER_CAPITAL", "100000")))
@@ -147,6 +171,15 @@ def main(argv=None):
         print(f"Resting-order alert for {order_day.date()} was already sent with fresh data; nothing to do (use --force to run again)")
         return
 
+    # automatic forward test first: fills and exits settled today change which names are held, so they must precede tomorrow's order list
+    from core import resting_runtime as rt
+    exec_exc, exec_lines = None, []
+    try:
+        exec_rep = evening_execution(run_day, a.capital, a.dry_run)
+        exec_lines = rt.format_exec_lines(exec_rep, "after the close")
+    except Exception as e:
+        exec_exc = e
+        exec_lines = ["", "⚠️ <b>Forward-test settlement FAILED</b>: " + html.escape(f"{type(e).__name__}: {e}") + " (orders below are still listed; the run will fail)"]
     cfg = SheetConfig(capital=a.capital)
     held = {d["symbol"] for d in positions_col.find({"status": {"$in": ["ACTIVE", "PAPER_ONLY"]}}, {"_id": 0, "symbol": 1})}
     cands, notes, data_asof, rep = osh.resting_candidates(order_day, Params(), with_asof=True, refresh=True)
@@ -158,9 +191,11 @@ def main(argv=None):
                         f"{rep['updated']} updated, {len(rep['failed'])} failed" + (f"; {rep['note']}" if rep.get("note") else ""))
         print(f"[{refresh_note}]")
     entries, skipped, warnings = ([], [], []) if lag >= 2 else build_resting_entries(cands, slots_used=len(held), cfg=cfg)
-    msg = build_message(entries, skipped, order_day, data_asof, expected, lag, warnings, len(held), a.capital, refresh_note)
+    msg = build_message(entries, skipped, order_day, data_asof, expected, lag, warnings, len(held), a.capital, refresh_note, extra_lines=exec_lines)
     print(msg["text"])
     if a.dry_run:
+        if exec_exc is not None:
+            raise exec_exc
         return
 
     ledger_error = None
@@ -190,7 +225,10 @@ def main(argv=None):
     sent = send_telegram_msg(msg["text"], disable_notification=not msg["actionable"])
     record_run(system_audits_col, order_day, sent=bool(sent), withheld=msg["withheld"], n_orders=msg["n_orders"], n_held=len(held),
                capital=a.capital, data_asof=(pd.Timestamp(data_asof).to_pydatetime() if data_asof is not None else None), lag=lag,
-               ledger_ok=ledger_error is None, ledger_error=ledger_error)
+               ledger_ok=ledger_error is None, ledger_error=ledger_error,
+               exec_ok=exec_exc is None, exec_error=(f"{type(exec_exc).__name__}: {exec_exc}" if exec_exc is not None else None))
+    if exec_exc is not None:
+        raise exec_exc                          # fail the workflow run so the failure is visible; the alert above was still sent
 
 
 if __name__ == "__main__":

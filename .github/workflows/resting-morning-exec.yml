@@ -1,0 +1,60 @@
+name: Resting Morning Execution
+
+# Open-time half of the automatic forward test of policy P's resting orders (core/resting_exec.py, resting_morning_exec.py):
+#   * gap-up entries fill at the real best ASK of the first quote after the open (within the order's limit),
+#   * exits whose stop fired on the previous close sell at the real best BID (lower circuit / no bid defers the sale),
+#   * every quote (bid, ask, circuit limits) is audited so the measured spread replaces the assumed tiers.
+# Orders that open below their trigger are priced after the close by the evening job (resting-order-alerts.yml) from the 1-minute bars.
+# Started by the Cloudflare dispatcher at 03:45 UTC (09:15 IST, cloudflare-dispatcher/src/index.js); the cron below is only a backup.  GitHub start and
+# the install take a few minutes, so the quote is the first one after the open, not 09:16 exactly: the exact time is stored on every fill's audit row.
+# A quote taken after 09:45 IST is NOT treated as the open-time book (those orders are priced in the evening).  The flow is idempotent: a second start
+# changes nothing.  Fails loudly (non-zero exit) on a quote or database error instead of guessing a fill.  Places NO broker order.
+
+on:
+  schedule:
+    - cron: '50 3 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Decide and print only: write nothing, send nothing'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: resting-morning-exec
+  cancel-in-progress: false
+
+jobs:
+  resting-morning-exec:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --retries 10 --timeout 120 -r requirements.txt
+
+      - name: Run resting morning execution
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          UPSTOX_ACCESS_TOKEN: ${{ secrets.UPSTOX_ACCESS_TOKEN }}
+          RESTING_ORDER_CAPITAL: ${{ vars.RESTING_ORDER_CAPITAL || '100000' }}
+        run: |
+          if [ -z "$MONGO_URI" ]; then echo "MONGO_URI is missing"; exit 1; fi
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            python resting_morning_exec.py --dry-run
+          else
+            python resting_morning_exec.py
+          fi
