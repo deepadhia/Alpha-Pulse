@@ -146,13 +146,21 @@ def build_message(rows: list, entries: list, order_day: pd.Timestamp, data_asof,
         for r in errors:
             lines.append(f"  • <b>{e(r['symbol'])}</b>: {e(r['error'])}")
 
-    if entries:
+    if stale:
+        # Orders computed on stale candles can name the wrong levels, and none is stored on a stale run: listing them under a "do not trust" banner
+        # invites placing them anyway (2026-11-11).  Same rule as the policy P alert.
+        entries = []
+        lines += ["", "🚫 <b>ORDERS WITHHELD</b>: the candle data is behind the last completed session. Nothing was stored; the next run retries."]
+    elif entries:
         lines += ["", "🎯 <b>RESTING BUY ORDERS</b> (stop-limit, DAY)"]
-        for x in entries:
-            lines.append(
-                f"  • <b>{e(x.symbol)}</b>: BUY {x.quantity} qty · Trigger: ₹{x.trigger:.2f} · Limit: ₹{x.limit:.2f}\n"
-                f"    Initial Stop: ₹{x.stop_alert:.2f} (Risk: {x.risk_pct_of_capital:.2f}% of capital)"
-            )
+        for i, x in enumerate(entries, 1):
+            lines += [
+                "",
+                f"<b>{i}. {e(x.symbol)}</b>  ·  BUY {x.quantity} qty",
+                f"      Trigger  ₹{x.trigger:.2f}",
+                f"      Limit      ₹{x.limit:.2f}",
+                f"      Initial stop  ₹{x.stop_alert:.2f}   (risk {x.risk_pct_of_capital:.2f}% of capital)",
+            ]
     else:
         lines += ["", "💤 <i>No S3 orders for the next session.</i>"]
 

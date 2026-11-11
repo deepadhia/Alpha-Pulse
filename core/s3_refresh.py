@@ -16,6 +16,7 @@ Failures leave the symbol at its cached date, so the freshness check keeps repor
 """
 
 import time as _time
+from datetime import datetime, timedelta, timezone
 from datetime import time as dtime
 from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple
 
@@ -137,20 +138,20 @@ def fetch_upstox_daily(symbol: str, key: str, token: str, start, end, http_get: 
 
 
 INTRADAY_URL = "https://api.upstox.com/v3/historical-candle/{key}/minutes/30/{day}/{day}"
-EXTRA_BUDGET_S = 240.0            # seconds the optional extra calls may use per refresh (the workflow timeout is 15 minutes)
+# The historical endpoint above has NO bars for the current session (checked 2026-11-11 22:04 IST: 0 bars for the day, while this endpoint returned
+# the full 13 half-hour bars with the same open, high, low and close as the live quote).  Evening jobs (18:30 to 19:30 IST) always ask for today.
+INTRADAY_TODAY_URL = "https://api.upstox.com/v3/historical-candle/intraday/{key}/minutes/30"
+EXTRA_BUDGET_S = 480.0            # seconds the optional extra calls may use per refresh (the workflow timeout is 15 minutes; a full S3 refresh of 217 names took 260 s on 2026-11-11)
 MIN_INTRADAY_BARS = 12            # a full session has 13 half-hour bars (09:15 .. 15:15)
+IST = timezone(timedelta(hours=5, minutes=30))
 
 
-def fetch_upstox_day_from_30m(symbol: str, key: str, token: str, day, http_get: Callable = None, sleep: Callable = _time.sleep):
-    """
-    One completed session built from Upstox 30-minute candles: (frame with that single daily row, None) or (None, reason).  Used when the daily
-    endpoint does not (yet) return the session: it serves the previous day's bar only some hours after the close, while the 30-minute feed is
-    available at once (checked 2026-11-06: open, high, low and close identical to the daily candle, volume within 0.001%).
-    """
-    import requests
-    http_get = http_get or requests.get
-    day = pd.Timestamp(day).normalize()
-    url = INTRADAY_URL.format(key=key, day=day.strftime("%Y-%m-%d"))
+def ist_today() -> pd.Timestamp:
+    return pd.Timestamp(datetime.now(IST).date())
+
+
+def _get_candles(url: str, token: str, http_get: Callable, sleep: Callable):
+    """(raw rows, None) or (None, reason).  One retry after a 429."""
     headers = {"Accept": "application/json", "Authorization": f"Bearer {token}"}
     try:
         r = http_get(url, headers=headers, timeout=15)
@@ -159,11 +160,15 @@ def fetch_upstox_day_from_30m(symbol: str, key: str, token: str, day, http_get: 
             r = http_get(url, headers=headers, timeout=15)
         if r.status_code != 200:
             return None, f"30m http {r.status_code}"
-        raw = (r.json().get("data") or {}).get("candles") or []
+        return (r.json().get("data") or {}).get("candles") or [], None
     except Exception as e:
         return None, f"30m {type(e).__name__}"
+
+
+def _session_from_30m_rows(raw, day: pd.Timestamp):
+    """(daily frame, None) or (None, reason) from raw 30-minute rows of `day`; refuses an incomplete session (never a guessed bar)."""
     rows = []
-    for c in raw:
+    for c in raw or []:
         try:
             ts = pd.Timestamp(c[0])
             ts = ts.tz_localize(None) if ts.tzinfo else ts
@@ -177,6 +182,35 @@ def fetch_upstox_day_from_30m(symbol: str, key: str, token: str, day, http_get: 
     frame = pd.DataFrame([dict(DATE=day, OPEN=rows[0][1], HIGH=max(x[2] for x in rows), LOW=min(x[3] for x in rows), CLOSE=rows[-1][4],
                                VOLUME=sum(x[5] for x in rows))])
     return frame, None
+
+
+def fetch_upstox_day_from_30m(symbol: str, key: str, token: str, day, http_get: Callable = None, sleep: Callable = _time.sleep, today=None):
+    """
+    One completed session built from Upstox 30-minute candles: (frame with that single daily row, None) or (None, reason).  Used when the daily
+    endpoint does not (yet) return the session: it serves the previous day's bar only some hours after the close, while the 30-minute feed is
+    available at once (checked 2026-11-06: open, high, low and close identical to the daily candle, volume within 0.001%).
+    For the CURRENT session (day == today in IST) the historical 30-minute endpoint is empty, so the intraday endpoint is asked next (2026-11-11 fix);
+    callers only ask for today after the close (last_complete_date), and a session not complete up to the 15:15 bar is refused either way.
+    """
+    import requests
+    http_get = http_get or requests.get
+    day = pd.Timestamp(day).normalize()
+    today = pd.Timestamp(today).normalize() if today is not None else ist_today()
+    if day == today:
+        urls = [INTRADAY_TODAY_URL.format(key=key)]          # the historical URL is known to be empty for the current session: do not spend a call on it
+    else:
+        urls = [INTRADAY_URL.format(key=key, day=day.strftime("%Y-%m-%d"))]
+    reason = "30m no data"
+    for url in urls:
+        raw, err = _get_candles(url, token, http_get, sleep)
+        if err:
+            reason = err
+            continue
+        frame, why = _session_from_30m_rows(raw, day)
+        if frame is not None:
+            return frame, None
+        reason = why
+    return None, reason
 
 
 def _newest(frame: pd.DataFrame):
@@ -193,7 +227,7 @@ def refresh_candles(candles: Dict[str, pd.DataFrame], listing_syms: Iterable[str
     """
     out = dict(candles)
     selected = select_symbols(candles, listing_syms, held)
-    rep = dict(selected=selected, fetched=0, updated=0, failed={}, note=None, from_30m=[])
+    rep = dict(selected=selected, fetched=0, updated=0, failed={}, note=None, from_30m=[], still_old=[])
     if not token:
         rep["note"] = "UPSTOX_ACCESS_TOKEN missing: candles NOT refreshed"
         return out, rep
@@ -212,7 +246,9 @@ def refresh_candles(candles: Dict[str, pd.DataFrame], listing_syms: Iterable[str
         raw, err = fetch_upstox_daily(s, key, token, last, max_date, http_get, sleep)
         fresh = parse_upstox_candles(raw) if not err else None
         in_budget = (clock() - t0) <= extra_budget_s or s in set(held)     # the extra calls (range retry, 30-minute bars) stop once the budget is spent
-        if in_budget and not err and (_newest(fresh) is None or _newest(fresh) < max_date):
+        # The earlier-start retry exists for the quirk where a daily range ends one session short; it cannot help for the CURRENT session, which the
+        # daily endpoint does not have yet, so it is skipped then (it doubled the calls per name and exhausted the budget before every name was done).
+        if in_budget and not err and max_date != ist_today() and (_newest(fresh) is None or _newest(fresh) < max_date):
             # the daily endpoint can answer one date range with an older newest bar than another range (seen 2026-11-06: from 10-28 ended 11-04,
             # from 11-02 and from 10-01 included 11-05): ask once more with an earlier start
             raw2, err2 = fetch_upstox_daily(s, key, token, last - pd.Timedelta(days=7), max_date, http_get, sleep)
@@ -238,6 +274,10 @@ def refresh_candles(candles: Dict[str, pd.DataFrame], listing_syms: Iterable[str
                 rep["updated"] += 1
             elif status != "nothing_new":
                 rep["failed"][s] = status
+        # Whatever the path, a selected name that ends below max_date is reported (2026-11-11: about 23 of 217 S3 names stayed on the earlier bar
+        # without a word because the 30-minute session was incomplete and the daily endpoint had returned older bars, i.e. no error was recorded).
+        if s not in rep["failed"] and _newest(out[s]) < max_date:
+            rep["still_old"].append(s)
         sleep(MIN_REQUEST_GAP_S)
     return out, rep
 
@@ -251,6 +291,9 @@ def describe(rep: Optional[dict]) -> List[str]:
         lines.append(rep["note"])
     if rep.get("from_30m"):
         lines.append(f"last session built from 30-minute candles for {len(rep['from_30m'])} name(s) (daily candle not published yet)")
+    if rep.get("still_old"):
+        so = sorted(rep["still_old"])
+        lines.append(f"{len(so)} name(s) still on an older bar (no complete session available): " + ", ".join(so[:8]) + (" ..." if len(so) > 8 else ""))
     if rep.get("failed"):
         f = rep["failed"]
         lines.append(f"candle refresh failed for {len(f)} of {rep['fetched']} fetched: " + ", ".join(f"{k} ({v})" for k, v in sorted(f.items())[:8]))

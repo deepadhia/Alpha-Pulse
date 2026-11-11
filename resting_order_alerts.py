@@ -35,6 +35,28 @@ AUDIT_TYPE = "RESTING_ORDERS_ALERT"
 SOURCE = "resting_order_alerts.py"
 
 
+REFRESH_RETRIES = 2             # extra refresh attempts when the data is still a session behind
+REFRESH_RETRY_WAIT_S = 60
+
+
+def compute_with_retry(compute, lag_of, retries: int = REFRESH_RETRIES, wait_s: float = REFRESH_RETRY_WAIT_S, sleep=None, log=print):
+    """
+    compute() -> result; lag_of(result) -> sessions behind.  Re-runs compute while the data is behind (lag of 1 or more), at most `retries` more times,
+    and returns the last result.  A transient Upstox failure then does not decide the day's order list.
+    """
+    import time
+    sleep = sleep or time.sleep
+    res = compute()
+    for attempt in range(1, retries + 1):
+        lag = lag_of(res)
+        if lag == 0:
+            break
+        log(f"[data is {lag} session(s) behind: retry {attempt} of {retries} in {wait_s:.0f}s]")
+        sleep(wait_s)
+        res = compute()
+    return res
+
+
 def session_lag(data_asof, expected, is_trading_day) -> int:
     """Completed sessions between the median candle date (data_asof) and the last completed session (expected); 99 when unknown."""
     if data_asof is None:
@@ -43,13 +65,34 @@ def session_lag(data_asof, expected, is_trading_day) -> int:
                       if is_trading_day(d.date())))
 
 
+def _slot_cap() -> int:
+    """The policy P slot cap, read from the single source of truth (core/portfolio_caps via SheetConfig; AGENTS rule 18), never hard-coded here."""
+    from core.order_sheet import SheetConfig
+    return int(SheetConfig().hard_cap)
+
+
+NEAR_TRIGGER_PCT = 5.0         # an order whose trigger is within this distance of the last close can plausibly fill in one session
+
+
+def distance_pct(trigger: float, last_close) -> "float | None":
+    """Percent the last close must rise to reach the trigger (negative when the close is already above it); None when unknown."""
+    try:
+        lc = float(last_close)
+    except (TypeError, ValueError):
+        return None
+    return (float(trigger) / lc - 1.0) * 100.0 if lc > 0 else None
+
+
 def build_message(entries: list, skipped: list, order_day: pd.Timestamp, data_asof, expected: pd.Timestamp, lag: int,
-                  warnings=None, n_held: int = 0, capital: float = 0.0, refresh_note: str = None, extra_lines: list = None) -> dict:
+                  warnings=None, n_held: int = 0, capital: float = 0.0, refresh_note: str = None, extra_lines: list = None,
+                  last_closes: dict = None, n_paper: int = 0) -> dict:
     """
     Pure message builder (Telegram HTML, all dynamic text escaped).  Returns dict(text, n_orders, withheld, actionable).
     withheld = the data is 2 or more sessions old: no order is listed and the run is not recorded as sent.
+    last_closes (symbol -> last completed close) adds the distance to each trigger and a one-line summary; no order is dropped or reordered by it.
     """
     e = html.escape
+    last_closes = last_closes or {}
     withheld = lag >= 2
     asof_s = str(pd.Timestamp(data_asof).date()) if data_asof is not None else "n/a"
     lines = [
@@ -57,7 +100,7 @@ def build_message(entries: list, skipped: list, order_day: pd.Timestamp, data_as
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
         f"📅 <b>Order session:</b> {order_day.date()}  •  <b>Data:</b> {asof_s}"
         + (f"  ⚠️ <b>STALE: expected {expected.date()}</b>" if withheld else ("  (1 session behind, see note)" if lag == 1 else "  (✅ Fresh)")),
-        f"💼 Capital Rs {capital:,.0f}  •  Slots used {n_held}",
+        f"💼 Capital Rs {capital:,.0f}  •  Slots used {n_held} of {_slot_cap()}" + (f"  (+{n_paper} paper-only, no slot)" if n_paper else ""),
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
     ]
     lines += list(extra_lines or [])           # today's automatic forward-test fills / exits / expiries (core.resting_runtime.format_exec_lines)
@@ -65,14 +108,30 @@ def build_message(entries: list, skipped: list, order_day: pd.Timestamp, data_as
         lines += ["", f"🚫 <b>ORDERS WITHHELD</b>: the candle data is {('many' if lag >= 99 else lag)} session(s) older than {expected.date()}. "
                       f"Orders built on stale data can name the wrong levels. Nothing was recorded; the job will retry."]
     elif entries:
-        lines += ["", "🛒 <b>PLACE BEFORE THE OPEN</b> (stop-limit BUY, validity DAY):"]
-        for x in entries:
-            lines.append(
-                f"  • <b>{e(x.symbol)}</b>: BUY {x.quantity} qty · Trigger ₹{x.trigger:.2f} · Limit ₹{x.limit:.2f}\n"
-                f"    Initial stop alert ₹{x.stop_alert:.2f} (risk {x.risk_pct_of_capital:.2f}% of capital) · age {x.age}d · R:R {x.rr:.2f}"
-            )
-        lines += ["", "ℹ️ <i>Fills and exits are recorded automatically from the real book (open-time bid/ask quotes, 1-minute bars). Use trade_ledger.py fill / sell only "
-                      "to record a REAL broker fill or sale that differs. Pass mark: fills within +0.5% of the trigger.</i>"]
+        dists = {x.symbol: distance_pct(x.trigger, last_closes.get(x.symbol)) for x in entries}
+        known = [d for d in dists.values() if d is not None]
+        if known:
+            near = sum(1 for d in known if d <= NEAR_TRIGGER_PCT)
+            nearest = min(dists, key=lambda s: dists[s] if dists[s] is not None else 1e9)
+            lines += ["", f"📏 <b>{near} of {len(entries)}</b> trigger within {NEAR_TRIGGER_PCT:.0f}% of the last close · nearest: "
+                          f"<b>{e(nearest)}</b> ({dists[nearest]:+.1f}%). A far order needs a rally of that size to trigger; the list is "
+                          f"sorted nearest first."]
+        lines += ["", "🛒 <b>PLACE BEFORE THE OPEN</b> (stop-limit BUY, validity DAY, re-place each session):"]
+        for i, x in enumerate(entries, 1):
+            d = dists.get(x.symbol)
+            far = f"   ({d:+.1f}% from last close)" if d is not None else ""
+            # one short line per fact and a blank line between orders: a Telegram phone screen reads this as separate cards, not one block
+            lines += [
+                "",
+                f"<b>{i}. {e(x.symbol)}</b>  ·  BUY {x.quantity} qty{far}",
+                f"      Trigger  ₹{x.trigger:.2f}",
+                f"      Limit      ₹{x.limit:.2f}",
+                f"      Stop alert  ₹{x.stop_alert:.2f}   (risk {x.risk_pct_of_capital:.2f}% of capital)",
+                f"      Age {x.age}d  ·  R:R {x.rr:.2f}",
+            ]
+        lines += ["", "ℹ️ <i>Expect few fills: the replay averaged about one new entry a week across the whole list (about 50 a year), so most of these "
+                      "will not trigger tomorrow. Fills and exits are recorded automatically from the real book (open-time bid/ask quotes, 1-minute bars). "
+                      "Use trade_ledger.py fill / sell only to record a REAL broker fill or sale that differs. Pass mark: fills within +0.5% of the trigger.</i>"]
     else:
         lines += ["", "💤 <i>No eligible resting orders for the next session.</i>"]
     if skipped and not withheld:
@@ -181,17 +240,28 @@ def main(argv=None):
         exec_exc = e
         exec_lines = ["", "⚠️ <b>Forward-test settlement FAILED</b>: " + html.escape(f"{type(e).__name__}: {e}") + " (orders below are still listed; the run will fail)"]
     cfg = SheetConfig(capital=a.capital)
-    held = {d["symbol"] for d in positions_col.find({"status": {"$in": ["ACTIVE", "PAPER_ONLY"]}}, {"_id": 0, "symbol": 1})}
-    cands, notes, data_asof, rep = osh.resting_candidates(order_day, Params(), with_asof=True, refresh=True)
+    from core.order_sheet import policy_p_slots_used
+    held_docs = list(positions_col.find({"status": {"$in": ["ACTIVE", "PAPER_ONLY"]}}, {"_id": 0, "symbol": 1, "status": 1}))
+    slots_used = policy_p_slots_used(held_docs)                    # policy P slots only: a PAPER_ONLY row (shelf, overflow) is not a P trade
+    n_paper = len({d["symbol"] for d in held_docs if d.get("status") == "PAPER_ONLY"})
     expected = pd.Timestamp(previous_trading_day(order_day.date()))
+    # A run that is still a session behind after the refresh is retried BEFORE anything is sent or recorded: re-sending later would leave the first
+    # list's ORDER_GENERATED events in the insert-only ledger as phantom orders if the lists differ (2026-11-11 audit).
+    cands, notes, data_asof, rep = compute_with_retry(
+        lambda: osh.resting_candidates(order_day, Params(), with_asof=True, refresh=True),
+        lambda r: session_lag(r[2], expected, default_is_trading_day), retries=0 if a.dry_run else REFRESH_RETRIES)
     lag = session_lag(data_asof, expected, default_is_trading_day)
     refresh_note = None
     if rep is not None:
         refresh_note = (f"candle refresh: {len(rep['selected'])} name(s) near their listing high, {rep['fetched']} fetched, "
-                        f"{rep['updated']} updated, {len(rep['failed'])} failed" + (f"; {rep['note']}" if rep.get("note") else ""))
+                        f"{rep['updated']} updated, {len(rep['failed'])} failed"
+                        + (f", {len(rep['still_old'])} still on an older bar" if rep.get("still_old") else "")
+                        + (f"; {rep['note']}" if rep.get("note") else ""))
         print(f"[{refresh_note}]")
-    entries, skipped, warnings = ([], [], []) if lag >= 2 else build_resting_entries(cands, slots_used=len(held), cfg=cfg)
-    msg = build_message(entries, skipped, order_day, data_asof, expected, lag, warnings, len(held), a.capital, refresh_note, extra_lines=exec_lines)
+    entries, skipped, warnings = ([], [], []) if lag >= 2 else build_resting_entries(cands, slots_used=slots_used, cfg=cfg)
+    last_closes = {c["symbol"]: c.get("last_close") for c in cands}
+    msg = build_message(entries, skipped, order_day, data_asof, expected, lag, warnings, slots_used, a.capital, refresh_note, extra_lines=exec_lines,
+                        last_closes=last_closes, n_paper=n_paper)
     print(msg["text"])
     if a.dry_run:
         if exec_exc is not None:

@@ -3982,6 +3982,13 @@ def format_alphapulse_portfolio_report():
             return f"Grade {g}"
         return g
 
+    def grade_label(p):
+        """Setup label of a position.  A shelf breakout is stored with grade LISTING_BREAKOUT (so the stop job treats it like one) but its signal_id
+        starts with SHELF_: it is a different, paper-only setup (negative in the honest replay) and must not be reported as a listing breakout."""
+        if str(p.get('signal_id') or '').upper().startswith('SHELF_'):
+            return "Shelf BO (paper-only setup)"
+        return format_grade(p.get('grade'))
+
     def clean_exit_reason(raw_reason: str) -> str:
         if not raw_reason:
             return "Exit"
@@ -4013,7 +4020,7 @@ def format_alphapulse_portfolio_report():
     live_lines = []
     for p in active_live:
         sym = escape_html_text(p.get('symbol'))
-        grd = format_grade(p.get('grade'))
+        grd = grade_label(p)
         entry = float(p.get('entry_price') or 0.0)
         curr = float(p.get('current_price') or entry)
         sl = float(p.get('trailing_stop') or p.get('stop_loss') or (entry * 0.90))
@@ -4049,7 +4056,7 @@ def format_alphapulse_portfolio_report():
     total_paper_pnl = 0.0
     for p in active_paper:
         sym = escape_html_text(p.get('symbol'))
-        grd = format_grade(p.get('grade'))
+        grd = grade_label(p)
         entry = float(p.get('entry_price') or 0.0)
         curr = float(p.get('current_price') or entry)
         sl = float(p.get('trailing_stop') or p.get('stop_loss') or (entry * 0.90))

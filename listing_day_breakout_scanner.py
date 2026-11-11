@@ -2675,10 +2675,12 @@ def format_shelf_breakout_alert(breakout_data):
     reward_pct = ((target - entry) / entry * 100) if entry > 0 else 0
     dna_section = _format_dna_section(breakout_data)
 
+    # A shelf breakout has no live capital unless LISTING_SHELF_LIVE_CAPITAL_ENABLED=1, so a tier size (60%) would mislead; policy P slots are 10%.
+    size_txt = f"Size <b>{pos_size}%</b>" if LISTING_SHELF_LIVE_CAPITAL_ENABLED else "<b>PAPER only</b> (shelf setup has no live capital)"
     return f"""🚀 <b>AlphaPulse | HIGH SHELF BREAKOUT (Wave 2)</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📊 <b>{symbol}</b>  •  Tier <b>{tier}</b>  •  Size <b>{pos_size}%</b>
+📊 <b>{symbol}</b>  •  Tier <b>{tier}</b>  •  {size_txt}
 📋 <i>High Shelf Consolidation Breakout ({days_since_listing}d post-IPO)</i>
 
 • <b>Trigger / Entry:</b> ₹{entry:,.2f}  <i>(Limit Max: ≤ ₹{limit_buy_price:,.2f})</i>
@@ -2993,7 +2995,9 @@ def scan_listing_day_breakouts():
                         else:
                             alert_msg = format_shelf_breakout_alert(breakout)
                             if portfolio_full:
-                                alert_msg = f"⚠️ <b>[PORTFOLIO FULL - PAPER ONLY]</b>\n" + alert_msg
+                                # the reason is the shelf policy, not a full portfolio (commit_trade_to_db forces PAPER_ONLY for every shelf trade)
+                                _tag = "[PORTFOLIO FULL - PAPER ONLY]" if LISTING_SHELF_LIVE_CAPITAL_ENABLED else "[SHELF SETUP - PAPER ONLY, NOT POLICY P]"
+                                alert_msg = f"⚠️ <b>{_tag}</b>\n" + alert_msg
                             send_telegram(alert_msg)
                         breakouts_found += 1
 

@@ -256,6 +256,15 @@ def format_sheet(res: SheetResult, cfg: SheetConfig = SheetConfig()) -> str:
     return "\n".join(lines)
 
 
+def policy_p_slots_used(position_docs) -> int:
+    """
+    Policy P slots in use = distinct symbols with an ACTIVE position.  PAPER_ONLY rows (shelf breakouts, slot-overflow paper trades) are not policy-P
+    trades and take no P slot: on 2026-11-11 the paper shelf entry PARASHLTH cut the P order list from 10 to 9 (it was counted as 'held').  The symbol
+    of a PAPER_ONLY row is still excluded from new orders (load_watchlist: 'already held'), because `positions` holds one row per symbol.
+    """
+    return len({d.get("symbol") for d in position_docs if d.get("symbol") and d.get("status") == "ACTIVE"})
+
+
 def build_resting_entries(candidates: List[dict], slots_used: int, cfg: SheetConfig = SheetConfig(),
                           guard=None, available_cash: Optional[float] = None):
     """

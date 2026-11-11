@@ -13,6 +13,7 @@ import pandas as pd
 API_BASE = "https://api.upstox.com"
 QUOTE_URL = API_BASE + "/v2/market-quote/quotes"
 MINUTE_URL = API_BASE + "/v3/historical-candle/{key}/minutes/1/{to_date}/{from_date}"
+MINUTE_TODAY_URL = API_BASE + "/v3/historical-candle/intraday/{key}/minutes/1"     # the current session only; the historical URL above is empty for it
 MAX_QUOTE_KEYS = 100
 USER_AGENT = "alphapulse/1.0 (personal research client for the authorised Upstox API)"
 
@@ -84,21 +85,41 @@ def parse_minute_candles(raw: Iterable) -> pd.DataFrame:
     return df.sort_values("TS").reset_index(drop=True)
 
 
-def fetch_minute_bars(key: str, day, token: Optional[str], http_get: Callable = None, retries: int = 3, sleep: Callable = time.sleep) -> pd.DataFrame:
-    """1-minute candles of one completed session.  Empty frame when Upstox has none; raises after repeated failures (no guessed bars)."""
+def _get_minute_rows(url: str, token: str, get: Callable, retries: int, sleep: Callable, label: str):
+    """Raw candle rows of one URL; [] on 400/404; raises after repeated failures."""
+    last = None
+    for attempt in range(retries):
+        r = get(url, headers=_headers(token), timeout=30)
+        if r.status_code == 200:
+            return (r.json().get("data") or {}).get("candles") or []
+        if r.status_code in (400, 404):
+            return []
+        last = f"HTTP {r.status_code}"
+        sleep(1.0 * (attempt + 1))
+    raise RuntimeError(f"Upstox minute candles failed for {label}: {last}")
+
+
+def fetch_minute_bars(key: str, day, token: Optional[str], http_get: Callable = None, retries: int = 3, sleep: Callable = time.sleep,
+                      today=None) -> pd.DataFrame:
+    """
+    1-minute candles of one completed session.  Empty frame when Upstox has none; raises after repeated failures (no guessed bars).
+    The historical endpoint has no bars for the CURRENT session (checked 2026-11-11 22:04 IST), so for day == today (IST) the intraday endpoint is
+    asked when the historical one is empty; its bars count only when the session is complete (last bar 15:25 or later), otherwise the frame is empty.
+    """
     if not token:
         raise RuntimeError("UPSTOX_ACCESS_TOKEN missing: no minute bars")
     import requests
     get = http_get or requests.get
     d = pd.Timestamp(day).strftime("%Y-%m-%d")
-    url = MINUTE_URL.format(key=requests.utils.quote(key, safe=""), to_date=d, from_date=d)
-    last = None
-    for attempt in range(retries):
-        r = get(url, headers=_headers(token), timeout=30)
-        if r.status_code == 200:
-            return parse_minute_candles((r.json().get("data") or {}).get("candles"))
-        if r.status_code in (400, 404):
+    qkey = requests.utils.quote(key, safe="")
+    rows = _get_minute_rows(MINUTE_URL.format(key=qkey, to_date=d, from_date=d), token, get, retries, sleep, f"{key} {d}")
+    if not rows:
+        from datetime import datetime, timedelta, timezone
+        t = pd.Timestamp(today).normalize() if today is not None else pd.Timestamp(datetime.now(timezone(timedelta(hours=5, minutes=30))).date())
+        if pd.Timestamp(day).normalize() == t:
+            df = parse_minute_candles(_get_minute_rows(MINUTE_TODAY_URL.format(key=qkey), token, get, retries, sleep, f"{key} {d} (intraday)"))
+            df = df[df["TS"].dt.normalize() == t] if len(df) else df
+            if len(df) and df["TS"].iloc[-1].strftime("%H:%M") >= "15:25":
+                return df.reset_index(drop=True)
             return parse_minute_candles([])
-        last = f"HTTP {r.status_code}"
-        sleep(1.0 * (attempt + 1))
-    raise RuntimeError(f"Upstox minute candles failed for {key} {d}: {last}")
+    return parse_minute_candles(rows)

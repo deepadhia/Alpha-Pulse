@@ -132,7 +132,13 @@ def refresh_p_candles(candles: dict, listings: dict, today: pd.Timestamp):
         from db import get_instrument_key_mapping
         now_ist = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=5, minutes=30))).replace(tzinfo=None)
         max_date = min(s3_refresh.last_complete_date(now_ist), today - pd.Timedelta(days=1))
-        return s3_refresh.refresh_candles(candles, set(listings), set(), max_date, os.getenv("UPSTOX_ACCESS_TOKEN"), get_instrument_key_mapping())
+        # Exchange holidays must reach the refresh: after a holiday (cache ends Mon 11-09, target Wed 11-11) the closed Tuesday would look like a
+        # skipped session and the 30-minute fallback would be skipped (2026-11-11).  Without a holiday source it stays weekends-only, as before.
+        import s3_paper_alerts as S3A
+        if S3A._is_holiday is None:
+            S3A.enable_exchange_holidays()
+        return s3_refresh.refresh_candles(candles, set(listings), set(), max_date, os.getenv("UPSTOX_ACCESS_TOKEN"), get_instrument_key_mapping(),
+                                          is_holiday=S3A._is_holiday)
     except Exception as e:
         return candles, dict(selected=set(), fetched=0, updated=0, failed={}, note=f"refresh error: {type(e).__name__}: {e}")
 

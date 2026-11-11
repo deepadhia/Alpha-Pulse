@@ -494,3 +494,103 @@ Resume prompt: **"Read SESSION_HANDOFF.md section 17, then CHANGELOG.md v3.8.0, 
 2. **Wed 2026-11-11 morning (09:00 IST):** Run `python order_sheet.py --capital <Rs>` to output clean pre-market resting orders for any eligible IPOs.
 3. **Weekly tracking:** Run `python s3_scorecard.py` and `python px1_shadow.py`.
 4. **Clean cohort forward testing:** All forward signals and positions in MongoDB are now pristine v3.8.0 entries.
+
+
+---
+
+## 18. STATE AS OF 2026-11-11 (first v3.8.0 session audit, leader-score finding, automatic evening alert, realistic-fill overlay, AUTOMATIC REALISTIC FORWARD TEST; evidence in CHANGELOG v3.8.1 to v3.8.4; COMMITTED and PUSHED, repo head d697aa4 in sync with origin/main; Cloudflare worker redeployed by the owner)
+
+Resume prompt: **"Read SESSION_HANDOFF.md section 18, then CHANGELOG.md v3.8.4 and AGENTS rules 39 to 41, then do 18.4 (verify the first real evening and morning runs)."**
+
+### 18.1 What happened
+1. **First v3.8.0 session audited (2026-11-11, scans 09:15 to 11:15 IST: 5 of 5 slots, 0 database failures, 0 signals).** PARASHLTH (09:37), SONA (10:53) and SFCTECH (10:54) crossed their listing highs and were rejected as `low_leader_score` (4 vs 5; SFCTECH and SONA later 3). On 2026-11-09 PARASHLTH and SONA were rejected all afternoon by the OLD 150k volume-so-far floor (89k to 148k so far; the full day ended 181k and 190k): v3.8.0 was committed that evening, after those scans. The causal volume ratio of the three is 0.29 / 0.92 / 0.37 (0 points either way), so the volume term is NOT the explanation first given; the breakout-strength term (+2 only at listing high +1%, judged at the scan-moment price) is the likelier cause, unproven because the old rejection log stored no components.
+2. **Replay vs live mismatch found.** `preview_resting_entry` / `order_sheet.py` never list an IPO with fewer than 15 candles (PARASHLTH 10, SFCTECH 6, BRIGHTOUTD 3), and SONA's listing range is 4.8% (below the 5% cushion; whether the live immediate path enforces it was not verified). The live scanner enters after a crossing from age 5; the replay trades pre-placed stop-limit buys. Only about 14% of replay fills open at or above the trigger (32 of 230); the rest trigger intraday.
+3. **Key finding:** the 6:30 PM `stop_loss_update_scan` closes a position in `positions` at the DECISION-day close (`exit_price = current_price`), not at the next open. Ledger exits of any scanner row are therefore more optimistic than a real sale. Scanner rows are NOT re-priced (only autofill rows are).
+4. **Built and committed (4 commits, all pushed):**
+   * `c74decc` v3.8.1: `LISTING_LEADER_SCORE_CAUSAL_VOLUME` (default 0, workflow variable): volume term from the last completed session and breakout-strength term at the resting trigger once the day high reached it; rejections now log `vol_ratio` and `score`. Live behaviour unchanged while OFF.
+   * `c22d618` v3.8.2: `resting_order_alerts.py` evening job (workflow `resting-order-alerts.yml`, cron 13:50 UTC; dispatcher slot 13:45 UTC): builds tomorrow's orders, one Telegram message, `ORDER_GENERATED` ledger events (idempotent, retry-safe), heartbeat in `system_audits` (`resting_orders_<date>`); withholds orders when data is 2 or more sessions old.
+   * `b118695` v3.8.3 (research only): `core/realistic_friction.py` and `research_realistic_fills.py` re-price the 230 policy-P replay trades with a Learning-Lab spread and impact model: Rs 1 lakh realistic +4.47% vs replay +4.32% (PF closed / incl. open / ex-top-3 1.93 / 2.21 / 1.42 vs 1.87 / 2.14 / 1.37); Rs 50,000 with Rs 20 per order +3.80% (PF 1.68 / 1.93 / 1.23). The spread tiers are ASSUMED. The first run had a short-history bug, kept in `reports/2026-11-11/realistic_fills_run1_short_history_bug.txt`.
+   * `d697aa4` v3.8.4: the **automatic realistic forward test** (18.2).
+5. **Live API check (2026-11-11 14:06 IST):** Upstox full quotes return bid, ask, depth quantities and `upper_circuit_limit` / `lower_circuit_limit`; mid-session half spreads of 5 names were 1.6 to 14 bps, well below the assumed 25 to 90 bps tiers (5 names, one moment, NOT a calibration). 1-minute bars reproduced PARASHLTH's 2026-11-09 trigger at 14:40.
+
+### 18.2 The automatic forward test (how it works; files in CHANGELOG v3.8.4)
+* **Orders** live in the trade ledger (`ORDER_GENERATED`, source `resting_order_alerts.py`, `payload.order_date`). Outcome = a `positions` row with `signal_id RESTING_<SYMBOL>_<YYYYMMDD>` (FILLED) or a `NOTE` with `payload.kind RESTING_ORDER_EXPIRED`. No new collection.
+* **Morning (`resting_morning_exec.py`, dispatcher slot 03:45 UTC, backup cron 03:50 UTC; first quote after the open, not exactly 09:16):** gap-up (open at or above the trigger) fills at the real best ASK if within the limit (`quote_ask_open`); not filled when the open or ask is above the limit or at the upper circuit with no sellers; opens below the trigger are left for the evening. Exits whose stop fired on the previous close: SELL at the best BID (`quote_bid_open`); no bid or a lower circuit defers the sale. A quote after 09:45 IST is not the open book. Every quote is audited in `logs` (`scanner resting_exec`, `action QUOTE_AUDIT`, 30-day TTL).
+* **Evening (inside `resting_order_alerts.py`, runs BEFORE tomorrow's orders are built):** unfilled orders are priced from the day's 1-minute bars (`minute_bar_measured_spread` when the stock has audited quotes, else `minute_bar_tier_spread`; `daily_bar_replay_rule` when there are no bars); the fill day's close is checked against the initial stop (the 6:30 PM job skips 0-day positions); unsettled exits are priced from the next daily open less the modelled spread (`daily_open_tier_spread`; a lower-circuit lock defers).
+* **Records:** entries go through `db.upsert_position` (entry guard and `ENTRY_ACCEPTED`), tagged `entry_source=RESTING_AUTOFILL` (own cohort, AGENTS rule 39). Exits: the realised sale replaces the stop job's decision close, `exit_price_decision` keeps it, new ledger event `EXIT_SETTLED`; a row's `exit_price` is provisional until `exit_settled` is true (rule 40). Fail loud: a quote or database error exits non-zero and nothing is guessed. Idempotent: state is derived from the ledger and `positions`.
+* Nothing places a broker order. `trade_ledger.py fill` and `sell` are only for a REAL fill or sale that differs.
+
+### 18.3 Verified vs not verified
+* **Verified (2026-11-11):** the full pytest suite passes (49 new tests: `test_resting_exec.py` 30, `test_resting_jobs.py` 19; plus `test_resting_order_alerts.py`, `test_leader_causal_volume.py`, `test_realistic_friction.py`); `run_honest_backtest.py --verify-legacy` EXACT MATCH (209 trades); `master_audit.py --section 3` passes at 3.8.0; `trade_ledger.py verify` chain intact (14 events); GitHub dry runs of BOTH new workflows succeeded (secrets reach the runner, MongoDB connects, Upstox candles fetched, 9 orders for 2026-11-12 built); six real sessions (55 orders from the real order sheet, real minute bars) replayed end to end: 2 fills, the same two as the replay's daily rule (RENTOMOJO +0.09% over trigger vs the replay's +0.30%), 3 orders waited for a missing daily bar instead of being guessed.
+* **NOT verified:** a real (non-dry) evening run (Telegram send, `ORDER_GENERATED` writes, heartbeat); a real morning run with orders (quote path, `positions` write by the autofill, entry guard acceptance in production); the worker dispatching the 03:45 UTC morning job (the owner says it was redeployed after the last edit; not independently checked, the health endpoint reports 17 slots which does not distinguish); the leader-score flag live; any real broker fill.
+
+### 18.4 Next steps (ordered; resume here)
+1. **Tonight 2026-11-11 about 19:15 to 19:20 IST:** the "P RESTING ORDERS" Telegram message should arrive. Check MongoDB: `system_audits` with `audit_id resting_orders_2026-11-12` showing `sent true`, `ledger_ok true`, `exec_ok true`; `trade_ledger` `ORDER_GENERATED` events (`source resting_order_alerts.py`, `payload.order_date 2026-11-12`; 9 orders at the last dry run). Nothing can fill yet (no orders existed for 11-11). If the run failed, read the Actions log of `resting-order-alerts.yml`; the job exits non-zero on a settlement failure.
+2. **2026-11-12 about 09:18 to 09:25 IST:** first morning run. A Telegram message appears only when something fills, expires, is sold or is deferred (a quiet morning sends nothing). Check `system_audits` `resting_morning_2026-11-12` (`quotes`, `run_time_ist`, counts), `logs` QUOTE_AUDIT rows, any `positions` row with `entry_source RESTING_AUTOFILL`, the ledger notes. Expect few fills: most listed orders sit far below their triggers.
+3. **2026-11-12 evening:** the alert settles the remaining orders from the minute bars and lists 13 Nov's orders. A "WAITING FOR DATA" line means the daily bar was not in the candle cache yet; it retries on the next run and does not guess.
+4. Set the repo variable `RESTING_ORDER_CAPITAL` to the real account value (default 100000 sizes on Rs 1 lakh).
+5. After about 5 trading days of QUOTE_AUDIT rows: compare the measured half spreads with the tier model (`core/realistic_friction.SPREAD_TIERS_BPS`) and decide whether to replace the tiers. Do not recalibrate on a handful of quotes.
+6. Judge the cohort only with closed-only, incl.-open and ex-top-3 profit factors and intervals after 30 or more closed trades and 5 or more closed outliers (AGENTS rules 11, 15 and 20); until then it validates plumbing and fill quality, not edge.
+
+### 18.5 Known gaps and open decisions
+* **Edge is unproven.** Replay since 2026-07-05: N=37 closed -1.0%, PF 0.73 (a weak patch, small N); 20-year replay N=419 +4.73% (CI +2.3..+7.6), PF 2.05 / 2.17 / 1.69. The v3.8.0 live cohort has 0 trades. Status: plausible, not proven.
+* **Young IPOs (fewer than 15 candles)** are outside the validated order path; the live scanner can still trade them (separate cohort). Widening the order path needs a new replay and a version bump.
+* **Scanner vs autofill collision:** the autofill refuses a symbol that already has an ACTIVE or PAPER_ONLY position; the live scanner is not guarded against opening a symbol that has an autofill position (AGENTS rule 41).
+* **Leader-score flag:** deployed OFF. Turning it ON changes scanner entry selection: date it and report the later trades as their own cohort. Wait for the new rejection logging to show which score term cost the points before deciding.
+* **Scanner rows still close at the decision-day close**; only autofill rows are re-priced to the realised sale.
+* **Fill quality caveat:** the morning quote is the first the runner can take after the open (GitHub start and install take minutes); entries triggered during the session (about 86% in the replay) use real 1-minute prices but a measured-per-stock or tier spread, not a live book. Do not call the cohort "real fills" (rule 40).
+* **Costs:** Rs 50,000 positions pay fixed charges (Rs 20 per order plus a depository charge) that cost about 0.5pp per trade in the overlay; a zero-brokerage broker recovers it.
+* **Not covered by any job:** placing the real broker orders (owner), and recording a real fill that differs (`trade_ledger.py fill`).
+
+### 18.6 Pitfalls from this session (tooling)
+* A `"\n"` written inside an f-string through a shell heredoc becomes a real newline: three syntax errors. Use the Edit tool for such lines. Heredocs containing apostrophes break the Bash tool (write a file instead).
+* Pandas column names that collide with methods (`fee`, `xs`) are shadowed (`df.fee` is a method); use `df["col"]`.
+* Pickle-based research (`data_20261107.pkl`) runs with `.venv/Scripts/python.exe`; pytest runs with the system `python`. The Windows console needs `sys.stdout.reconfigure(encoding="utf-8")` for the emoji in messages.
+* `gh` is not authenticated on this machine: GitHub Actions status cannot be read from here; read MongoDB (`logs`, `system_audits`, `trade_ledger`) or ask the owner. The owner commits and pushes themselves; never commit or push without explicit permission.
+* The Cloudflare worker has one cron (`*/15 3-13 * * 1-6`); a new dispatch slot is a key in `SCHEDULE` and needs no new trigger, but ANY `index.js` edit needs `npx wrangler deploy` in `cloudflare-dispatcher/`.
+
+### 18.7 Where things are
+`core/resting_exec.py` (pure decisions, `RESTING_VERSION`), `core/resting_jobs.py` (flow, injected `Deps`), `core/resting_runtime.py` (live DB and Upstox wiring, Telegram text), `core/upstox_quotes.py`, `resting_morning_exec.py`, `resting_order_alerts.py`, `core/realistic_friction.py`, `research_realistic_fills.py`, `reports/2026-11-11/realistic_fills*.txt`, workflows `resting-morning-exec.yml` and `resting-order-alerts.yml`, dispatcher slots 03:45 and 13:45 UTC in `cloudflare-dispatcher/src/index.js`. Learning-Lab reference for the execution model: `D:\Personal Projects\Learning-Lab\src\nse_quant_lab\cost_model.py`, `upstox_feed.py`, `paper\manager.py`, `scripts\execute_paper_orders.py`.
+
+---
+
+## 19. STATE AS OF 2026-11-11 (late): evening data fix, stability changes (CHANGELOG v3.8.5-patch, UNCOMMITTED) and the TWO-MONTH REVIEW PLAN
+
+Resume prompt: **"Read SESSION_HANDOFF.md section 19, then CHANGELOG.md v3.8.5, then run the daily check (19.3) and continue the two-month review (19.4)."**
+
+### 19.1 What happened
+1. The owner doubted the day's Telegram alerts. Audit: rules, triggers, limits, stops and sizes recomputed exactly; the DATA was the defect. Both evening jobs ran one session behind (P: "45 fetched, 0 updated"; S3: STALE, orders not stored).
+2. Root cause: Upstox HISTORICAL endpoints (daily, 30-minute, 1-minute) have no bars for the current session; the INTRADAY endpoints return the full session. The refresh only asked the historical one. Second bug: the P refresh did not receive the exchange-holiday predicate. Fixed in `core/s3_refresh.py`, `core/upstox_quotes.py`, `order_sheet.py`. Measured on live data: P refresh 45 of 45 updated, S3 194 of 217, both messages "Fresh". The P list changed (3 names added, 3 dropped), so a stale list was a wrong list.
+3. Stability changes, plumbing only (no entry, exit or sizing rule changed): P slots count ACTIVE policy-P rows only (a paper shelf row no longer takes a slot); names left on an older bar are reported (`still_old`); the P job retries the refresh up to 2 times before sending or recording; S3 withholds its order list when stale. Alert layout: one block per order, distance to trigger, honest fill-frequency note. Shelf alerts and the EOD report label the paper-only shelf setup.
+4. Owner decisions recorded: the cooldown does NOT consult the archive collections (the 2026-11-09 reset was deliberate); the shelf breakout still skips the leader-score gate (unchanged, open).
+
+### 19.2 Verified vs not verified
+* **Verified:** full pytest suite exit code 0 (`test_evening_freshness.py` 28 tests, including the exact 11-09 to 11-11 holiday case); live dry runs of `resting_order_alerts.py` and `s3_paper_alerts.py` (`--dry-run --today 2026-11-11`) both Fresh; the intraday endpoint matched the live quote's OHLC for ARCIL.
+* **NOT verified:** a real scheduled run of the fixed code (nothing is committed or pushed; the owner pushes); the morning fill path (`resting_morning_exec.py`: quotes, `positions` write, entry guard) has never run with a real order; the S3 job was only dry-run; GitHub Actions status cannot be read from this machine (`gh` is not authenticated).
+
+### 19.3 Daily check (2 minutes, every trading day)
+1. Evening P message: "Data" equals the day just closed and says Fresh; the refresh line shows updated names and 0 failed. A "still on an older bar" count is fine unless a name you hold is in it.
+2. MongoDB `system_audits`: `resting_orders_<next day>` has `sent true`, `withheld false`, `lag 0`, `ledger_ok true`, `exec_ok true`; after a morning with orders also `resting_morning_<date>`.
+3. `logs`: QUOTE_AUDIT rows after a morning run (bid, ask, half spread).
+4. S3 message: Fresh, or "ORDERS WITHHELD" (then it retries next run; no order is stored on a stale run).
+5. Any non-zero exit or a Telegram "FAILED" line is a defect to fix, not noise.
+
+### 19.4 Two-month review (about 2026-11-12 to 2027-01-12): goal is to know how the system really behaves
+**Rules of the window.** Keep entry, exit and sizing rules FIXED (AGENTS rules 20, 38, 41). Any change to a decision rule is a new cohort with a version note; plumbing fixes are fine and are recorded in CHANGELOG. Do not recalibrate on a handful of observations.
+
+**What two months can and cannot say.** The replay averages about 50 entries a year, so expect roughly 8 to 10 entries and perhaps 5 to 6 closed trades by the end (an estimate, not a measurement). That is enough to judge plumbing, fill quality and operations. It is NOT enough to judge edge: the repo bar is 30 or more closed trades and 5 or more closed outliers (AGENTS rules 11, 15, 20), which will take longer. Evidence tier is PAPER forward (AGENTS rule 40); never call it LIVE, never pool the RESTING_AUTOFILL cohort with scanner rows or with the v3.5.0 to v3.7.0 cohort.
+
+**Checkpoints.**
+* 2026-11-12 morning and evening: first real morning run (about 09:18 IST) and first real evening settlement; confirm `system_audits` `resting_morning_2026-11-12`, ledger events, and that nothing is "WAITING FOR DATA".
+* End of week 1 (about 2026-11-18): compare measured half spreads (QUOTE_AUDIT) with `core/realistic_friction.SPREAD_TIERS_BPS`; decide whether to replace the tiers (do not calibrate on fewer than about 5 trading days of quotes).
+* About 2026-12-12 (one month): plumbing review: count fills, expiries, deferred sales, failed or late runs; run `python reconcile_trades.py` and `python trade_ledger.py verify`; fill quality against the pass mark (fills within +0.5% of the trigger, measured separately for open-time quote fills and minute-bar fills).
+* About 2027-01-12 (two months): full review. Report for the autofill cohort: N entries, N closed, fill extension versus trigger, realised PF three ways (closed only, including open at mark to market, excluding the top 3) with intervals, the S3 scorecard (`python s3_scorecard.py`, no verdict below 40 closed paper trades) and the X1 shadow (`python px1_shadow.py`, no verdict below 40 pairs). State plainly that the edge is plausible, not proven, unless the repo thresholds are met.
+
+**Open owner decisions for the review.** (1) Shelf breakout and the leader-score gate (paper only, negative in the replay). (2) The leader-score flag `LISTING_LEADER_SCORE_CAUSAL_VOLUME` (deployed OFF; turning it ON starts a new cohort). (3) Whether the live scanner should be guarded against a symbol that already has an autofill position (AGENTS rule 41). (4) `RESTING_ORDER_CAPITAL` repo variable set to the real account value.
+
+### 19.5 Pitfalls from this session
+* A `Write` path with `../` segments created a stray `D:\Users\DEEPJA~1\...` tree (one scratch script); delete `D:\Users` by hand. Use absolute scratchpad paths.
+* A helper named `run` on a `unittest.TestCase` shadows `TestCase.run`; name test helpers differently.
+* `pytest.ini` has `addopts = -ra -q`, so a green run prints no summary line; check the exit code.
+* `s3_paper_alerts.py` prints emoji and crashes a Windows console with cp1252: run it with `PYTHONIOENCODING=utf-8` (the P job already reconfigures stdout).
+* Upstox historical endpoints serve a session only the next day; for the current session use the intraday endpoints (`/v3/historical-candle/intraday/{key}/minutes/{1|30}`).
