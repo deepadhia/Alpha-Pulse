@@ -31,7 +31,7 @@ from core.execution_model import is_locked_down, is_locked_up
 from core.realistic_friction import LOCK_BAND_PCT, tick_down, tick_up
 
 IST = timezone(timedelta(hours=5, minutes=30))
-RESTING_VERSION = "1.0.0"
+RESTING_VERSION = "1.1.0"
 ENTRY_SOURCE = "RESTING_AUTOFILL"
 ORDER_SOURCE = "resting_order_alerts.py"
 OPEN_WINDOW_END = dtime(9, 45)          # a quote taken after this is no longer the open-time book: defer to the evening models
@@ -230,10 +230,25 @@ def order_state(ledger_col, positions_col, order: dict) -> str:
     sid = signal_id(order["symbol"], order["order_date"])
     if positions_col.find_one({"signal_id": sid}) is not None:
         return "FILLED"
+    # The symbol-keyed position can be replaced on re-entry. Its original fill is permanent in the ledger.
+    if ledger_col.find_one({"event_type": "ENTRY_ACCEPTED", "symbol": order["symbol"], "payload.signal_id": sid}) is not None:
+        return "FILLED"
     if ledger_col.find_one({"event_type": "NOTE", "symbol": order["symbol"], "payload.kind": "RESTING_ORDER_EXPIRED",
                             "payload.order_date": str(order["order_date"])}) is not None:
         return "EXPIRED"
     return "PLACED"
+
+
+def unsettled_orders_through(ledger_col, positions_col, day) -> List[dict]:
+    """Unresolved orders, deduplicated by session and symbol, oldest session first."""
+    end = str(pd.Timestamp(day).date())
+    days = set()
+    for event in ledger_col.find({"event_type": "ORDER_GENERATED"}):
+        order_day = (event.get("payload") or {}).get("order_date")
+        if order_day and str(order_day) <= end:
+            days.add(str(order_day))
+    return [o for d in sorted(days) for o in orders_for_day(ledger_col, d)
+            if order_state(ledger_col, positions_col, o) == "PLACED"]
 
 
 def record_expiry(ledger_append: Callable, order: dict, reason: str, extra: Optional[dict] = None) -> None:

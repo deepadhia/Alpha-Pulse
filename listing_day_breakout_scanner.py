@@ -2285,7 +2285,8 @@ def _commit_trade_to_db_unlocked(breakout_data, force_paper=False):
             return False, False, 0, 'UNKNOWN', 0.4
         
         # 1. Fetch current active count
-        active_count = db.positions.count_documents({"status": "ACTIVE"})
+        from core.portfolio_caps import capital_positions_query
+        active_count = db.positions.count_documents(capital_positions_query())
         
         # 2. Get market regime and size weight
         mr = breakout_data.get('market_regime', 'UNKNOWN')

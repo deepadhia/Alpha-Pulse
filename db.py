@@ -408,11 +408,12 @@ def has_signal_today(symbol: str, date_str: str = None) -> bool:
         return False
 
 def has_active_position(symbol: str) -> bool:
-    """Return True if the symbol already has an ACTIVE position."""
+    """Return True for capital allocated or a close decision whose sale is pending."""
     if positions_col is None or not symbol:
         return False
     try:
-        return positions_col.count_documents({"symbol": symbol, "status": "ACTIVE"}, limit=1) > 0
+        from core.portfolio_caps import capital_positions_query
+        return positions_col.count_documents({"symbol": symbol, **capital_positions_query()}, limit=1) > 0
     except Exception as e:
         logger.error(f"Failed has_active_position lookup for {symbol}: {e}")
         return False

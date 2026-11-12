@@ -21,6 +21,7 @@ from datetime import time as dtime
 from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 import pandas as pd
+from core.session_dates import daily_frame, session_date, ist_naive
 
 MARKET_CLOSE_IST = dtime(15, 45)     # same cutoff as streamlined_ipo_scanner.fetch_data: after it today's bar is final
 NEAR_PIVOT_FRAC = 0.75               # refresh names whose last close >= 0.75 x pivot: a 20% circuit day can lift 0.75 to 0.90 (the S3 proximity gate)
@@ -31,10 +32,10 @@ UPSTOX_URL = "https://api.upstox.com/v2/historical-candle/{key}/day/{to}/{frm}"
 
 def last_complete_date(now_ist, run_day=None) -> pd.Timestamp:
     """Date of the newest session whose daily bar is final: today after 15:45 IST, else yesterday; never later than `run_day` when given."""
-    now = pd.Timestamp(now_ist)
+    now = ist_naive(now_ist)
     d = now.normalize() if now.time() >= MARKET_CLOSE_IST else now.normalize() - pd.Timedelta(days=1)
     if run_day is not None:
-        d = min(d, pd.Timestamp(run_day).normalize())
+        d = min(d, session_date(run_day))
     return d
 
 
@@ -65,6 +66,8 @@ def merge_fresh(df: pd.DataFrame, fresh: pd.DataFrame, max_date) -> Tuple[pd.Dat
     """
     if fresh is None or fresh.empty:
         return df, "empty"
+    df, fresh = daily_frame(df), daily_frame(fresh)
+    max_date = session_date(max_date)
     last = pd.Timestamp(df["DATE"].iloc[-1]).normalize()
     overlap = fresh[fresh["DATE"] == last]
     if not overlap.empty:
@@ -225,13 +228,14 @@ def refresh_candles(candles: Dict[str, pd.DataFrame], listing_syms: Iterable[str
     Merge missing completed sessions (<= max_date) into the frames of the selected symbols.  Returns (new candle dict, report) with
     report = dict(selected=set, fetched=int, updated=int, failed={symbol: reason}, note=str|None).  The input dict is not mutated.
     """
+    candles = {s: daily_frame(df) for s, df in candles.items()}
     out = dict(candles)
     selected = select_symbols(candles, listing_syms, held)
     rep = dict(selected=selected, fetched=0, updated=0, failed={}, note=None, from_30m=[], still_old=[])
     if not token:
         rep["note"] = "UPSTOX_ACCESS_TOKEN missing: candles NOT refreshed"
         return out, rep
-    max_date = pd.Timestamp(max_date).normalize()
+    max_date = session_date(max_date)
     t0 = clock()
     for s in sorted(selected, key=lambda x: (x not in set(held), x)):      # held positions first: their stop alerts depend on the data
         df = candles[s]

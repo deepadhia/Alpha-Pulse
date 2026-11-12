@@ -14,6 +14,7 @@ import pandas as pd
 
 from core import resting_exec as X
 from core.resting_jobs import Deps
+from core.session_dates import daily_frame
 
 QUOTE_SCANNER = "resting_exec"
 QUOTE_ACTION = "QUOTE_AUDIT"
@@ -42,7 +43,7 @@ def daily_from_cache(symbol: str) -> Optional[pd.DataFrame]:
     if not doc or not doc.get("candles"):
         return None
     df = pd.DataFrame(doc["candles"])
-    df["DATE"] = pd.to_datetime(df["DATE"])
+    df = daily_frame(df)
     for c in ("OPEN", "HIGH", "LOW", "CLOSE", "VOLUME"):
         df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
     return df.sort_values("DATE").reset_index(drop=True)
@@ -78,7 +79,9 @@ def build_deps(source: str, token: Optional[str], capital: float, dry_run: bool 
     from core import upstox_quotes as UQ
     from core.ledger import append as ledger_append, ensure_indexes as ledger_indexes
     from core.trade_guard import default_is_trading_day
-    from db import SCANNER_VERSION, get_instrument_key_mapping, positions_col, trade_ledger_col, upsert_position
+    from db import SCANNER_VERSION, get_instrument_key_mapping, positions_col, trade_ledger_col, upsert_position, db
+    from core.locks import portfolio_commit_lock
+    from core.portfolio_caps import DEFAULT_HARD_ACTIVE_POSITIONS
     if positions_col is None or trade_ledger_col is None:
         raise SystemExit("MongoDB is not connected")
     mapping = get_instrument_key_mapping()
@@ -105,15 +108,21 @@ def build_deps(source: str, token: Optional[str], capital: float, dry_run: bool 
     def upsert(doc):
         return True if dry_run else upsert_position(doc)
 
+    def exit_params():
+        from streamlined_ipo_scanner import EXIT_PARAMS
+        return EXIT_PARAMS
+
     return Deps(ledger_col=trade_ledger_col, positions_col=ReadOnlyCol(positions_col) if dry_run else positions_col, ledger_append=append, upsert_position=upsert,
                 quotes=quotes, minute_bars=minute_bars, daily=daily,
                 audit_quote=(lambda s, q, d: None) if dry_run else (lambda s, q, d: audit_quote(s, q, d, now_ist)),
-                measured_hs=measured_half_spread, is_trading_day=default_is_trading_day, version=SCANNER_VERSION, capital=capital)
+                measured_hs=measured_half_spread, is_trading_day=default_is_trading_day, version=SCANNER_VERSION, capital=capital,
+                commit_lock=lambda: portfolio_commit_lock(db),
+                hard_cap=int(os.getenv("HARD_ACTIVE_POSITIONS", str(DEFAULT_HARD_ACTIVE_POSITIONS))), exit_params=exit_params)
 
 
 def symbols_needed(deps: Deps, run_day) -> List[str]:
     """Symbols whose daily candles the evening settlement needs: today's open orders, autofill positions, unsettled exits."""
-    syms = {o["symbol"] for o in X.orders_for_day(deps.ledger_col, run_day)}
+    syms = {o["symbol"] for o in X.unsettled_orders_through(deps.ledger_col, deps.positions_col, run_day)}
     syms |= {p["symbol"] for p in deps.positions_col.find({"entry_source": X.ENTRY_SOURCE})
              if p.get("status") == "ACTIVE" or not p.get("exit_settled")}
     return sorted(syms)

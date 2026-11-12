@@ -262,7 +262,8 @@ def policy_p_slots_used(position_docs) -> int:
     trades and take no P slot: on 2026-11-11 the paper shelf entry PARASHLTH cut the P order list from 10 to 9 (it was counted as 'held').  The symbol
     of a PAPER_ONLY row is still excluded from new orders (load_watchlist: 'already held'), because `positions` holds one row per symbol.
     """
-    return len({d.get("symbol") for d in position_docs if d.get("symbol") and d.get("status") == "ACTIVE"})
+    from core.portfolio_caps import occupies_capital_slot
+    return len({d.get("symbol") for d in position_docs if d.get("symbol") and occupies_capital_slot(d)})
 
 
 def build_resting_entries(candidates: List[dict], slots_used: int, cfg: SheetConfig = SheetConfig(),

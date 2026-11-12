@@ -4,7 +4,9 @@ Give this file to a new session and say: **"Read SESSION_HANDOFF.md, then LEARNI
 It is self-contained: goals, what exists, what was proven, what was rejected, what changed in the repo, how to reproduce everything,
 and what is still open.  Nothing here depends on the chat that produced it.
 
-> **Updated 2026-11-09: read section 17 (end of file) first** (operational DB wipe and archival, clean cohort reset, milestone v3.8.0 release dropping live partial-day gates per AGENTS Rule 21), then section 16, 15, and LEARNINGS.md sections 22-22.9.
+> **Updated 2026-11-12: read section 20 (end of file) first** (operational audit fixes v3.8.6: timezone normalization, completion record & deduplication, withholding orders on settlement error, shared portfolio cap enforcement, catch-up recovery of unsettled orders, forward cohort isolation), then section 19 and CHANGELOG.md v3.8.6.
+>
+> **Earlier update 2026-11-09: read section 17 first** (operational DB wipe and archival, clean cohort reset, milestone v3.8.0 release dropping live partial-day gates per AGENTS Rule 21), then section 16, 15, and LEARNINGS.md sections 22-22.9.
 >
 > **Earlier update 2026-10-22: read section 14 first** (S3 paper book, the proof tests, what is stored in MongoDB), then section 13, sections 11-12 and LEARNINGS.md sections 17-20.5.
 >
@@ -554,13 +556,13 @@ Resume prompt: **"Read SESSION_HANDOFF.md section 18, then CHANGELOG.md v3.8.4 a
 
 ---
 
-## 19. STATE AS OF 2026-11-11 (late): evening data fix, stability changes (CHANGELOG v3.8.5-patch, UNCOMMITTED) and the TWO-MONTH REVIEW PLAN
+## 19. STATE AS OF 2026-11-11 (late): evening data fix, stability changes (CHANGELOG v3.8.5-patch, COMMITTED as 9c601f1 and PUSHED, main in sync with origin/main when checked on 2026-11-11 late; the owner commits and pushes) and the TWO-MONTH REVIEW PLAN
 
 Resume prompt: **"Read SESSION_HANDOFF.md section 19, then CHANGELOG.md v3.8.5, then run the daily check (19.3) and continue the two-month review (19.4)."**
 
 ### 19.1 What happened
 1. The owner doubted the day's Telegram alerts. Audit: rules, triggers, limits, stops and sizes recomputed exactly; the DATA was the defect. Both evening jobs ran one session behind (P: "45 fetched, 0 updated"; S3: STALE, orders not stored).
-2. Root cause: Upstox HISTORICAL endpoints (daily, 30-minute, 1-minute) have no bars for the current session; the INTRADAY endpoints return the full session. The refresh only asked the historical one. Second bug: the P refresh did not receive the exchange-holiday predicate. Fixed in `core/s3_refresh.py`, `core/upstox_quotes.py`, `order_sheet.py`. Measured on live data: P refresh 45 of 45 updated, S3 194 of 217, both messages "Fresh". The P list changed (3 names added, 3 dropped), so a stale list was a wrong list.
+2. Root cause: Upstox HISTORICAL endpoints (daily, 30-minute, 1-minute) have no bars for the current session; the INTRADAY endpoints return the full session. The refresh only asked the historical one. Second bug: the P refresh did not receive the exchange-holiday predicate. Fixed in `core/s3_refresh.py`, `core/upstox_quotes.py`, `order_sheet.py`. Measured on live data: P refresh 45 of 45 updated, S3 194 of 217, both messages "Fresh". The P list changed: against the 9 orders sent that evening, the fresh data (with the slot fix of item 3) gives 10 orders, 3 added (FUSIONCX, HDFIRE, ARMEE; FUSIONCX had 14 candles on the stale data, one short of the 15 the order path needs) and 2 dropped for lack of a free slot (ADROITIND, GSPLTRANS, the farthest from their triggers). A stale list was a wrong list.
 3. Stability changes, plumbing only (no entry, exit or sizing rule changed): P slots count ACTIVE policy-P rows only (a paper shelf row no longer takes a slot); names left on an older bar are reported (`still_old`); the P job retries the refresh up to 2 times before sending or recording; S3 withholds its order list when stale. Alert layout: one block per order, distance to trigger, honest fill-frequency note. Shelf alerts and the EOD report label the paper-only shelf setup.
 4. Owner decisions recorded: the cooldown does NOT consult the archive collections (the 2026-11-09 reset was deliberate); the shelf breakout still skips the leader-score gate (unchanged, open).
 
@@ -588,9 +590,40 @@ Resume prompt: **"Read SESSION_HANDOFF.md section 19, then CHANGELOG.md v3.8.5, 
 
 **Open owner decisions for the review.** (1) Shelf breakout and the leader-score gate (paper only, negative in the replay). (2) The leader-score flag `LISTING_LEADER_SCORE_CAUSAL_VOLUME` (deployed OFF; turning it ON starts a new cohort). (3) Whether the live scanner should be guarded against a symbol that already has an autofill position (AGENTS rule 41). (4) `RESTING_ORDER_CAPITAL` repo variable set to the real account value.
 
-### 19.5 Pitfalls from this session
+### 19.5 Next steps (ordered; resume here)
+1. **Done by the owner:** commit 9c601f1 (v3.8.5-patch) is pushed. Check that the Cloudflare dispatcher and the GitHub workflows pick it up (no `index.js` change was made, so no `wrangler deploy` is needed). The first evening run after the push is the first run of the fixed code.
+2. **Evening of the first push day:** run the daily check (19.3). Expect the P message "Fresh", refresh "updated" close to "fetched", and S3 "Fresh". If the P message is still "1 session behind" after the retries, read the refresh line before anything else.
+3. **First morning with orders (about 09:18 IST):** the autofill path has never run for real: check `system_audits` `resting_morning_<date>`, `logs` QUOTE_AUDIT, any `positions` row with `entry_source RESTING_AUTOFILL`, ledger notes. Most orders sit 9 to 50 percent below their triggers, so a quiet morning is normal (a Telegram message appears only when something fills, expires, is sold or deferred).
+4. Set the repo variable `RESTING_ORDER_CAPITAL` to the real account value (default 100000).
+5. Owner decisions listed in 19.4 (shelf leader-score gate, leader-score flag, scanner-vs-autofill guard). Do not change decision rules during the window without a cohort note.
+6. Delete the stray `D:\Users` folder by hand (see 19.6).
+
+### 19.6 Pitfalls from this session
 * A `Write` path with `../` segments created a stray `D:\Users\DEEPJA~1\...` tree (one scratch script); delete `D:\Users` by hand. Use absolute scratchpad paths.
 * A helper named `run` on a `unittest.TestCase` shadows `TestCase.run`; name test helpers differently.
 * `pytest.ini` has `addopts = -ra -q`, so a green run prints no summary line; check the exit code.
 * `s3_paper_alerts.py` prints emoji and crashes a Windows console with cp1252: run it with `PYTHONIOENCODING=utf-8` (the P job already reconfigures stdout).
 * Upstox historical endpoints serve a session only the next day; for the current session use the intraday endpoints (`/v3/historical-candle/intraday/{key}/minutes/{1|30}`).
+
+---
+
+## 20. STATE AS OF 2026-11-12: Operational Audit Fixes (CHANGELOG v3.8.6-patch)
+
+Resume prompt: **"Read SESSION_HANDOFF.md section 20, then CHANGELOG.md v3.8.6, and continue from 20.3."**
+
+### 20.1 What was audited and fixed
+An external operational audit (`alpha-pulse-audit.md`, 12 Nov 2026) confirmed six distinct bugs affecting execution integrity and alerting:
+1. **Timezone mismatch:** Aware cache timestamps (`Asia/Kolkata`) compared to naive target dates caused `TypeError` or silently omitted existing bars. Fixed with `core/session_dates.py` (`ist_naive`, `session_date`, `daily_dates`, `daily_frame`), standardizing exchange session dates across all jobs.
+2. **Undefined variable on completion:** `resting_order_alerts.py:296` called `record_run(..., n_held=len(held))` where `held` was undefined, raising `NameError` after sending alerts. Fixed with `n_held=slots_used`. `already_sent()` now requires `exec_ok=True` and `ledger_ok=True` to suppress duplicates on workflow retries.
+3. **Orders published after settlement failure:** In `resting_order_alerts.py`, an error in `evening_execution()` previously fell through to publish orders. It now halts immediately, sends a `🚫 ORDERS WITHHELD` alert, and suppresses ledger `ORDER_GENERATED` appends.
+4. **Portfolio cap bypassed by autofill:** `_open_position()` previously allowed opening an 11th position by not verifying account-wide slot limits. Added `portfolio_commit_lock` acquisition and `occupies_capital_slot` checks across `core/resting_jobs.py` and `core/portfolio_caps.py`. Unsettled pending sales continue to consume slot capacity until sold at the open.
+5. **Older unsettled orders ignored:** `run_evening()` only fetched `orders_for_day(run_day)`. Added `unsettled_orders_through()` to catch up all past `PLACED` orders across sessions, price them against their original session data, and catch up missed closes via `_recover_position()`.
+6. **Paper-forward fills labelled LIVE:** `format_alphapulse_portfolio_report()` and `paper_scorecard.py` now cleanly isolate `entry_source == 'RESTING_AUTOFILL'` into `📋 P RESTING PAPER FORWARD`, keeping `LIVE BOOK` strictly for manual broker-executed trades.
+
+### 20.2 Verified vs Not Verified
+* **Verified:** 9 of 9 synthetic reproduction checks pass (`alpha-pulse-audit-repro.py`); 18 of 18 operational audit tests pass (`test_operational_audit.py`); 371 of 371 pytest tests pass across all 18 test modules in 80s; `python run_honest_backtest.py --verify-legacy` returned `PARITY: EXACT MATCH` (211/211 trades); `python master_audit.py --section 3` passed with 0 errors and 0 warnings.
+* **NOT verified:** Live market execution of the recovery catch-up loop during an active trading session (requires a live market run).
+
+### 20.3 Next Steps
+1. The working tree changes are fully tested and verified. Ready to stage and commit locally when requested by the owner.
+2. Ensure GitHub Actions environment variables and repository secrets remain in sync.

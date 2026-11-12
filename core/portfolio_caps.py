@@ -28,3 +28,16 @@ DEFAULT_HARD_ACTIVE_POSITIONS = 10   # hard cap (equal to the soft cap: no admis
 def equal_weight(hard_cap: int = DEFAULT_HARD_ACTIVE_POSITIONS) -> float:
     """Fraction of capital per position when every slot is filled."""
     return 1.0 / max(1, int(hard_cap))
+
+
+def capital_positions_query() -> dict:
+    """A close decision does not free capital until the modelled sale settles."""
+    return {"$or": [{"status": "ACTIVE"}, {"entry_source": "RESTING_AUTOFILL",
+            "status": {"$in": ["CLOSED", "PAPER_CLOSED"]}, "exit_settled": {"$ne": True}}]}
+
+
+def occupies_capital_slot(position: dict) -> bool:
+    return position.get("status") == "ACTIVE" or (
+        position.get("entry_source") == "RESTING_AUTOFILL"
+        and position.get("status") in ("CLOSED", "PAPER_CLOSED")
+        and position.get("exit_settled") is not True)

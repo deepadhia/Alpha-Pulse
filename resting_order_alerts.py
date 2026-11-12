@@ -29,6 +29,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
+from core.session_dates import session_date
 
 PREFIX = "P RESTING ORDERS"
 AUDIT_TYPE = "RESTING_ORDERS_ALERT"
@@ -61,7 +62,7 @@ def session_lag(data_asof, expected, is_trading_day) -> int:
     """Completed sessions between the median candle date (data_asof) and the last completed session (expected); 99 when unknown."""
     if data_asof is None:
         return 99
-    return max(0, sum(1 for d in pd.date_range(pd.Timestamp(data_asof) + pd.Timedelta(days=1), pd.Timestamp(expected))
+    return max(0, sum(1 for d in pd.date_range(session_date(data_asof) + pd.Timedelta(days=1), session_date(expected))
                       if is_trading_day(d.date())))
 
 
@@ -154,7 +155,8 @@ def already_sent(audits_col, order_day: pd.Timestamp) -> bool:
         doc = audits_col.find_one({"audit_id": f"resting_orders_{order_day.date()}"})
     except Exception:
         return False
-    return bool(doc and doc.get("sent") and not doc.get("withheld"))
+    return bool(doc and doc.get("sent") and not doc.get("withheld")
+                and doc.get("exec_ok", True) and doc.get("ledger_ok", True))
 
 
 def ledger_has_order(ledger_col, symbol: str, order_day: pd.Timestamp) -> bool:
@@ -221,7 +223,7 @@ def main(argv=None):
         raise SystemExit("MongoDB is not connected")
     if not enable_exchange_holidays():
         print("WARNING: NSE holiday list unavailable, only weekends are skipped when picking the order day")
-    run_day = pd.Timestamp(a.today) if a.today else pd.Timestamp(datetime.now().date())
+    run_day = pd.Timestamp(a.today) if a.today else session_date(datetime.now(timezone.utc))
     if _closed(run_day) and not a.force:
         print(f"{run_day.date()} is a weekend or an exchange holiday: no session to report (use --force to run anyway)")
         return
@@ -236,12 +238,24 @@ def main(argv=None):
     try:
         exec_rep = evening_execution(run_day, a.capital, a.dry_run)
         exec_lines = rt.format_exec_lines(exec_rep, "after the close")
+        if exec_rep.get("waiting") or exec_rep.get("exit_waiting"):
+            raise RuntimeError("settlement has unresolved data or recovery gaps")
     except Exception as e:
         exec_exc = e
-        exec_lines = ["", "⚠️ <b>Forward-test settlement FAILED</b>: " + html.escape(f"{type(e).__name__}: {e}") + " (orders below are still listed; the run will fail)"]
+        exec_lines += ["", "⚠️ <b>Forward-test settlement FAILED</b>: " + html.escape(f"{type(e).__name__}: {e}")]
+    if exec_exc is not None:
+        text = "\n".join([f"⚠️ <b>{PREFIX}</b> • {order_day.date()}"] + exec_lines + [
+            "", "🚫 <b>ORDERS WITHHELD</b>: settle and reconcile the position book before generating new orders."])
+        print(text)
+        if not a.dry_run:
+            sent = send_telegram_msg(text, disable_notification=False)
+            record_run(system_audits_col, order_day, sent=bool(sent), withheld=True, n_orders=0,
+                       capital=a.capital, exec_ok=False, exec_error=f"{type(exec_exc).__name__}: {exec_exc}", ledger_ok=True)
+        raise exec_exc
     cfg = SheetConfig(capital=a.capital)
     from core.order_sheet import policy_p_slots_used
-    held_docs = list(positions_col.find({"status": {"$in": ["ACTIVE", "PAPER_ONLY"]}}, {"_id": 0, "symbol": 1, "status": 1}))
+    held_docs = list(positions_col.find({"status": {"$in": ["ACTIVE", "PAPER_ONLY", "CLOSED", "PAPER_CLOSED"]}},
+                                     {"_id": 0, "symbol": 1, "status": 1, "entry_source": 1, "exit_settled": 1}))
     slots_used = policy_p_slots_used(held_docs)                    # policy P slots only: a PAPER_ONLY row (shelf, overflow) is not a P trade
     n_paper = len({d["symbol"] for d in held_docs if d.get("status") == "PAPER_ONLY"})
     expected = pd.Timestamp(previous_trading_day(order_day.date()))
@@ -293,12 +307,14 @@ def main(argv=None):
             msg["text"] += "\n⚠️ <b>Ledger not fully written</b> (" + html.escape(ledger_error) + "); a fill cannot be reconciled until this is fixed."
 
     sent = send_telegram_msg(msg["text"], disable_notification=not msg["actionable"])
-    record_run(system_audits_col, order_day, sent=bool(sent), withheld=msg["withheld"], n_orders=msg["n_orders"], n_held=len(held),
+    record_run(system_audits_col, order_day, sent=bool(sent), withheld=msg["withheld"], n_orders=msg["n_orders"], n_held=slots_used,
                capital=a.capital, data_asof=(pd.Timestamp(data_asof).to_pydatetime() if data_asof is not None else None), lag=lag,
                ledger_ok=ledger_error is None, ledger_error=ledger_error,
                exec_ok=exec_exc is None, exec_error=(f"{type(exec_exc).__name__}: {exec_exc}" if exec_exc is not None else None))
     if exec_exc is not None:
         raise exec_exc                          # fail the workflow run so the failure is visible; the alert above was still sent
+    if not sent or ledger_error is not None:
+        raise RuntimeError(ledger_error or "Telegram send failed; order alert will retry")
 
 
 if __name__ == "__main__":

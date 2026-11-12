@@ -3613,7 +3613,8 @@ def detect_scan(symbols, listing_map):
                 # --- Capital Allocation Gate: Max Active Positions Limit (Soft Cap 5 / Hard Cap 7) ---
                 try:
                     from db import positions_col
-                    active_count = positions_col.count_documents({"status": "ACTIVE"})
+                    from core.portfolio_caps import capital_positions_query
+                    active_count = positions_col.count_documents(capital_positions_query())
                     if active_count < MAX_ACTIVE_POSITIONS:
                         portfolio_full = False
                     elif active_count >= HARD_ACTIVE_POSITIONS:
@@ -4010,8 +4011,9 @@ def format_alphapulse_portfolio_report():
         return r
 
     now_ist = _now_ist()   # was datetime.now(): the job runs on a UTC runner, so the 'IST' label showed UTC (13:06 instead of 18:36)
-    active_live = [p for p in positions if p.get('status') == 'ACTIVE']
-    active_paper = [p for p in positions if p.get('status') == 'PAPER_ONLY']
+    active_forward = [p for p in positions if p.get('status') in ('ACTIVE', 'PAPER_ONLY') and p.get('entry_source') == 'RESTING_AUTOFILL']
+    active_live = [p for p in positions if p.get('status') == 'ACTIVE' and p.get('entry_source') != 'RESTING_AUTOFILL']
+    active_paper = [p for p in positions if p.get('status') == 'PAPER_ONLY' and p.get('entry_source') != 'RESTING_AUTOFILL']
 
     from utils import escape_html_text
 
@@ -4129,6 +4131,17 @@ def format_alphapulse_portfolio_report():
         report += '\n'.join(paper_lines) + "\n\n"
     else:
         report += "📋 <b>PAPER BOOK (0 Active)</b>\n• <i>No active paper positions.</i>\n\n"
+
+    if active_forward:
+        report += f"📋 <b>P RESTING PAPER FORWARD ({len(active_forward)} Active)</b>\n"
+        report += "<i>Automatic modelled execution; broker fills unverified. Separate from scanner and shelf records.</i>\n"
+        for p in active_forward:
+            entry = float(p.get('entry_price') or 0)
+            curr = float(p.get('current_price') or entry)
+            sl = float(p.get('trailing_stop') or p.get('stop_loss') or 0)
+            pnl = (curr / entry - 1) * 100 if entry else 0
+            report += f"• <b>{escape_html_text(p.get('symbol'))}</b>: CMP ₹{curr:,.2f} ({pnl:+.1f}%) • stop alert ₹{sl:,.2f}\n"
+        report += "\n"
 
     if exit_lines:
         report += f"🚪 <b>RECENT EXITS</b>\n" + '\n'.join(exit_lines) + "\n\n"

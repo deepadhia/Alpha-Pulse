@@ -13,6 +13,9 @@ import argparse
 from datetime import datetime
 
 from core.scorecard import GateConfig, format_pf_report, format_scorecard, pf_report, scorecard
+from core.forward_cohorts import split_cohorts
+from core.trade_guard import to_date
+from core.versioning import NATIVE_FORWARD_CUTOFF, NATIVE_FORWARD_VERSIONS
 
 
 def main(argv=None):
@@ -26,28 +29,21 @@ def main(argv=None):
     if positions_col is None:
         raise SystemExit("MongoDB is not connected")
 
-    cohorts = {"LIVE (CLOSED)": ["CLOSED"], "PAPER (PAPER_CLOSED)": ["PAPER_CLOSED"],
-               "ALL NATIVE (live + paper)": ["CLOSED", "PAPER_CLOSED"]}
+    if to_date(args.since) is None:
+        ap.error("--since must be YYYY-MM-DD")
+    groups, excluded = split_cohorts(positions_col.find(
+        {"_backfilled": {"$ne": True}, "version": {"$in": list(NATIVE_FORWARD_VERSIONS)}}, {"_id": 0}), args.since)
     cfg = GateConfig(friction_pct=args.friction)
-    for title, statuses in cohorts.items():
-        since_dt = datetime.strptime(args.since, "%Y-%m-%d")
-        docs = list(positions_col.find({
-            "status": {"$in": statuses},
-            "_backfilled": {"$ne": True},
-            # entry_date is stored as a datetime by the listing scanner and as a string elsewhere;
-            # BSON only compares like types, so match either form
-            "$or": [{"entry_date": {"$gte": since_dt}}, {"entry_date": {"$gte": args.since}}],
-        }, {"_id": 0, "pnl_pct": 1, "symbol": 1}))
-        pnls = [d.get("pnl_pct") for d in docs if d.get("pnl_pct") is not None]
+    print("Separate cohorts; no pooled LIVE headline. Pending sales/recoveries are excluded from performance.")
+    for title, group in sorted(groups.items()):
+        pnls = [d["pnl_pct"] for d in group["closed"] if d.get("pnl_pct") is not None]
         print(format_scorecard(scorecard(pnls, cfg), title))
-        open_docs = list(positions_col.find({
-            "status": {"$in": ["ACTIVE"] if statuses == ["CLOSED"] else (["PAPER_ONLY"] if statuses == ["PAPER_CLOSED"] else ["ACTIVE", "PAPER_ONLY"])},
-            "_backfilled": {"$ne": True},
-            "$or": [{"entry_date": {"$gte": since_dt}}, {"entry_date": {"$gte": args.since}}],
-        }, {"_id": 0, "pnl_pct": 1, "symbol": 1}))
-        open_pnls = [d.get("pnl_pct") for d in open_docs if d.get("pnl_pct") is not None]
+        open_pnls = [d["pnl_pct"] for d in group["open"] if d.get("pnl_pct") is not None]
         print(format_pf_report(pf_report(pnls, open_pnls, cfg, target=args.pf_target), "PROFIT FACTOR MONITOR"))
-        print()
+        print(f"Unsettled sales/recoveries excluded: {len(group['pending'])}\n")
+    if not groups:
+        print("No eligible native forward records.")
+    print(f"Other ineligible records excluded: {excluded}")
 
 
 if __name__ == "__main__":

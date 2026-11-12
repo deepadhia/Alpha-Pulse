@@ -657,7 +657,8 @@ def save_breakout_signal(breakout_data):
         try:
             from db import positions_col
             if positions_col is not None:
-                active_count = positions_col.count_documents({"status": "ACTIVE"})
+                from core.portfolio_caps import capital_positions_query
+                active_count = positions_col.count_documents(capital_positions_query())
             if active_count >= soft_cap:
                 portfolio_full = True
                 logger.info(

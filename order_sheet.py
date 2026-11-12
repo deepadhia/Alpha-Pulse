@@ -34,6 +34,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
+from core.session_dates import daily_frame
 
 from core.honest_backtest import Params, preview_resting_entry
 from core.order_sheet import (SheetConfig, build_resting_entries, build_sheet, format_resting_entries,
@@ -87,7 +88,7 @@ def load_watchlist(today: pd.Timestamp, p: Params):
             if not d.get("candles"):
                 continue
             df = pd.DataFrame(d["candles"])
-            df["DATE"] = pd.to_datetime(df["DATE"])
+            df = daily_frame(df)
             for col in ("OPEN", "HIGH", "LOW", "CLOSE", "VOLUME"):
                 df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
             df = df[df["DATE"] < today].sort_values("DATE").reset_index(drop=True)
