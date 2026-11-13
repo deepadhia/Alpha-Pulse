@@ -75,6 +75,17 @@ class TestMessage(unittest.TestCase):
         self.assertIn("ENGINE SAYS EXITED", m["text"])
         self.assertTrue(m["actionable"])
 
+    def test_cache_telemetry_warnings_suppressed_from_message(self):
+        warnings = [
+            "last session built from 30-minute candles for 191 name(s)",
+            "38 name(s) still on an older bar (no complete session available): XYZ",
+            "General market note"
+        ]
+        m = self.build(entries=[entry()], warnings=warnings)
+        self.assertNotIn("30-minute candles", m["text"])
+        self.assertNotIn("older bar", m["text"])
+        self.assertIn("General market note", m["text"])
+
 
 def closed(pnl, sym="S"):
     return dict(symbol=sym, status="CLOSED", pnl_pct=pnl)

@@ -165,7 +165,12 @@ def build_message(rows: list, entries: list, order_day: pd.Timestamp, data_asof,
         lines += ["", "💤 <i>No S3 orders for the next session.</i>"]
 
     for w in (warnings or []):
-        lines.append(f"  ! {e(w)}")
+        w_str = str(w or "")
+        # Filter low-level candle cache pipeline notes from the public Telegram alert
+        # (they remain logged to console/DB, but should not clutter user-facing order cards)
+        if any(token in w_str for token in ("30-minute", "older bar", "candle refresh failed")):
+            continue
+        lines.append(f"  ! {e(w_str)}")
 
     lines += ["", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
 

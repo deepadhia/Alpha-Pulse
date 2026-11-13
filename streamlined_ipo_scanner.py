@@ -4041,13 +4041,15 @@ def format_alphapulse_portfolio_report():
             
         pnl_c = '🟢' if pnl >= 0 else '🔴'
         pnl_s = '+' if pnl >= 0 else ''
-        sl_dist = ((sl - curr) / curr * 100) if curr > 0 else 0.0
+        sl_risk_from_entry = ((sl - entry) / entry * 100) if entry > 0 else 0.0
+        cushion = ((curr - sl) / curr * 100) if curr > 0 else 0.0
+        cushion_str = f"cushion {cushion:.1f}%" if curr >= sl else "stop breached"
 
         if p.get('_backfilled'):
             w_badge += " 📦"
         live_lines.append(
             f"• <b>{sym}</b> ({grd} · {days}d){w_badge}\n"
-            f"  CMP: ₹{curr:,.2f} ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>)  •  SL: ₹{sl:,.2f} ({sl_dist:.1f}%)"
+            f"  CMP: ₹{curr:,.2f} ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>)  •  SL: ₹{sl:,.2f} ({sl_risk_from_entry:+.1f}% from entry · {cushion_str})"
         )
 
     avg_live_pnl = (total_live_pnl / len(active_live)) if active_live else 0.0
@@ -4077,13 +4079,15 @@ def format_alphapulse_portfolio_report():
             
         pnl_c = '🟢' if pnl >= 0 else '🔴'
         pnl_s = '+' if pnl >= 0 else ''
-        sl_dist = ((sl - curr) / curr * 100) if curr > 0 else 0.0
+        sl_risk_from_entry = ((sl - entry) / entry * 100) if entry > 0 else 0.0
+        cushion = ((curr - sl) / curr * 100) if curr > 0 else 0.0
+        cushion_str = f"cushion {cushion:.1f}%" if curr >= sl else "stop breached"
 
         if p.get('_backfilled'):
             w_badge += " 📦"
         paper_lines.append(
             f"• <b>{sym}</b> ({grd} · {days}d){w_badge}\n"
-            f"  CMP: ₹{curr:,.2f} ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>)  •  SL: ₹{sl:,.2f} ({sl_dist:.1f}%)"
+            f"  CMP: ₹{curr:,.2f} ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>)  •  SL: ₹{sl:,.2f} ({sl_risk_from_entry:+.1f}% from entry · {cushion_str})"
         )
 
     avg_paper_pnl = (total_paper_pnl / len(active_paper)) if active_paper else 0.0

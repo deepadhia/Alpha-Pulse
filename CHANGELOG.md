@@ -4,6 +4,16 @@ All notable changes, quantitative safeguards, and alerting architecture updates 
 
 ---
 
+## [v3.8.7-patch] - 2026-11-13 (patch, no milestone bump): suppress cache telemetry in S3 Telegram alerts; clarify EOD report stop cushion
+
+* **Why.** 1. Informational cache warnings (`! last session built from 30-minute candles...`, `! 38 name(s) still on an older bar...`) were cluttering user-facing S3 Telegram order messages.
+  2. The EOD portfolio report calculated stop distance relative to current price (`(SL - CMP) / CMP`), displaying confusing negative percentages like `EDELALTS SL: ₹1,630.55 (-17.4%)` that gave the false impression that a -17.4% risk was being taken.
+* **1. S3 Telegram alert filtering (`s3_paper_alerts.py`).** Suppressed cache pipeline notes (30-minute fallback, older bar notes, refresh failures) from public Telegram messages while keeping them logged in console and database telemetry.
+* **2. EOD portfolio report stop-loss display (`streamlined_ipo_scanner.py`).** Updated `format_alphapulse_portfolio_report()` to display structural risk from entry alongside the current profit cushion: `SL: ₹{sl} ({sl_risk:+.1f}% from entry · cushion {cushion:.1f}%)`.
+* **Tests.** Added test in `test_s3_alerts_scorecard.py` and `test_operational_audit.py` (both pass cleanly). Full regression suite passes.
+
+---
+
 ## [v3.8.6-patch] - 2026-11-12 (patch, no milestone bump): operational audit fixes (timezone, completion records, withheld orders, portfolio lock, catch-up recovery, forward cohort isolation)
 
 * **Why.** Comprehensive operational audit (`alpha-pulse-audit.md`, 12 Nov 2026) confirmed six distinct issues affecting settlement reliability, retries, and portfolio enforcement.

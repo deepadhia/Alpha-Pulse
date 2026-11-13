@@ -238,5 +238,29 @@ class TestForwardCohorts(unittest.TestCase):
         self.assertEqual((len(groups), excluded), (1, 0))
 
 
+class TestPortfolioReportFormatting(unittest.TestCase):
+    def test_stop_loss_risk_and_cushion_display(self):
+        import db as db_module
+        from streamlined_ipo_scanner import format_alphapulse_portfolio_report
+
+        mock_positions = [
+            {
+                "symbol": "EDELALTS",
+                "status": "PAPER_ONLY",
+                "entry_price": 1852.90,
+                "current_price": 1974.20,
+                "stop_loss": 1630.55,
+                "trailing_stop": 1630.55,
+                "pnl_pct": 6.5,
+                "days_held": 0,
+                "signal_id": "SHELF_EDELALTS_20261113",
+                "version": "3.8.0",
+            }
+        ]
+        with patch.object(db_module.db.positions, "find", return_value=mock_positions):
+            rep = format_alphapulse_portfolio_report()
+            self.assertIn("SL: ₹1,630.55 (-12.0% from entry · cushion 17.4%)", rep)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
