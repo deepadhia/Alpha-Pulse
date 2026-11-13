@@ -106,27 +106,33 @@ def build_message(rows: list, entries: list, order_day: pd.Timestamp, data_asof,
     if settled.get("filled"):
         lines += ["", "🟢 <b>PAPER FILLS RECORDED</b> (auto: the resting order would have filled):"]
         for x in settled["filled"]:
-            lines.append(f"  • {e(x)}")
+            lines += ["", f"• {e(x)}"]
 
     if settled.get("expired"):
         lines += ["", "⏳ <b>ORDERS THAT DID NOT FILL</b> (expired at market close):"]
         for x in settled["expired"]:
-            lines.append(f"  • {e(x)}")
+            lines += ["", f"• {e(x)}"]
 
     if alerts:
         lines += ["", "🛑 <b>STOP ALERT: mark the exit at the next open</b>"]
         for r in alerts:
             pnl_str = f"{r['pnl_pct']:+.1f}%"
-            lines.append(
-                f"  • <b>{e(r['symbol'])}</b>: Close ₹{r['last_close']:.2f} at/below alert ₹{r['trailing']:.2f} ({pnl_str})\n"
-                f"    Action: Sell at tomorrow's open -> <code>python s3_paper.py exit {e(r['symbol'])} PRICE</code>"
-            )
+            lines += [
+                "",
+                f"• <b>{e(r['symbol'])}</b>",
+                f"      Close: ₹{r['last_close']:.2f} at/below alert ₹{r['trailing']:.2f} ({pnl_str})",
+                f"      Action: Sell at tomorrow's open -> <code>python s3_paper.py exit {e(r['symbol'])} PRICE</code>",
+            ]
 
     if exited:
         lines += ["", "🚪 <b>ENGINE SAYS EXITED (record it):</b>"]
         for r in exited:
             pnl_str = f"{r['pnl_pct']:+.1f}%"
-            lines.append(f"  • <b>{e(r['symbol'])}</b>: {str(r['exit_date'])[:10]} @ ₹{r['exit_price']:.2f} ({e(r['exit_reason'])}) {pnl_str}")
+            lines += [
+                "",
+                f"• <b>{e(r['symbol'])}</b>",
+                f"      Exit: {str(r['exit_date'])[:10]} @ ₹{r['exit_price']:.2f} ({e(r['exit_reason'])}) {pnl_str}",
+            ]
 
     if open_rows:
         lines += ["", "📈 <b>OPEN POSITIONS (alert level = trailing stop)</b>"]
@@ -134,9 +140,14 @@ def build_message(rows: list, entries: list, order_day: pd.Timestamp, data_asof,
             pnl_color = "🟢" if r.get('pnl_pct', 0) >= 0 else "🔴"
             pnl_str = f"{r.get('pnl_pct', 0):+.1f}%"
             peak_str = f"{r.get('max_runup', 0):+.1f}%"
-            lines.append(
-                f"  • <b>{e(r['symbol'])}</b>: Close ₹{r['last_close']:.2f} · {pnl_color} <b>{pnl_str}</b> (Peak: {peak_str}) · Trailing Stop: ₹{r['trailing']:.2f}"
-            )
+            days = r.get('days_held')
+            days_str = f"  ·  {days}d held" if days is not None else ""
+            lines += [
+                "",
+                f"• <b>{e(r['symbol'])}</b>{days_str}",
+                f"      Close: ₹{r['last_close']:.2f}   ({pnl_color} <b>{pnl_str}</b> · Peak: {peak_str})",
+                f"      Trailing Stop: ₹{r['trailing']:.2f}",
+            ]
 
     if pending:
         lines += ["", "⏳ <b>FILLED TODAY, WAITING FOR THE CANDLE CACHE:</b> " + ", ".join(e(r["symbol"]) for r in pending)]

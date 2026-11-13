@@ -4,12 +4,14 @@ All notable changes, quantitative safeguards, and alerting architecture updates 
 
 ---
 
-## [v3.8.7-patch] - 2026-11-13 (patch, no milestone bump): suppress cache telemetry in S3 Telegram alerts; clarify EOD report stop cushion
+## [v3.8.7-patch] - 2026-11-13 (patch, no milestone bump): vertical formatting with clean card spacing; suppress cache telemetry in S3 Telegram alerts; clarify stop cushion
 
-* **Why.** 1. Informational cache warnings (`! last session built from 30-minute candles...`, `! 38 name(s) still on an older bar...`) were cluttering user-facing S3 Telegram order messages.
-  2. The EOD portfolio report calculated stop distance relative to current price (`(SL - CMP) / CMP`), displaying confusing negative percentages like `EDELALTS SL: ₹1,630.55 (-17.4%)` that gave the false impression that a -17.4% risk was being taken.
-* **1. S3 Telegram alert filtering (`s3_paper_alerts.py`).** Suppressed cache pipeline notes (30-minute fallback, older bar notes, refresh failures) from public Telegram messages while keeping them logged in console and database telemetry.
-* **2. EOD portfolio report stop-loss display (`streamlined_ipo_scanner.py`).** Updated `format_alphapulse_portfolio_report()` to display structural risk from entry alongside the current profit cushion: `SL: ₹{sl} ({sl_risk:+.1f}% from entry · cushion {cushion:.1f}%)`.
+* **Why.** 1. Position and stop-loss metrics in the Daily Portfolio Report and S3 alerts were squashed horizontally into single lines (`CMP: ... • SL: ...`), making them hard to read on mobile Telegram screens.
+  2. Informational cache pipeline warnings (`! last session built from 30-minute candles...`, `! 38 name(s) still on an older bar...`) were cluttering user-facing S3 Telegram order cards.
+  3. The EOD portfolio report calculated stop distance relative to current price (`(SL - CMP) / CMP`), displaying misleading negative percentages like `EDELALTS SL: ₹1,630.55 (-17.4%)` that gave the false impression that a -17.4% risk was being taken.
+* **1. Vertical layout & spacing (`streamlined_ipo_scanner.py`, `s3_paper_alerts.py`).** Formatted positions, stop loss adjustments, and S3 open positions vertically with indented lines (CMP, Stop Loss, Trailing Stop) and empty-line separation between cards, matching the high-readability layout of Policy P resting orders.
+* **2. S3 Telegram alert filtering (`s3_paper_alerts.py`).** Suppressed cache pipeline notes (30-minute fallback, older bar notes, refresh failures) from public Telegram messages while keeping them logged in console and database telemetry.
+* **3. EOD portfolio report stop-loss display (`streamlined_ipo_scanner.py`).** Updated `format_alphapulse_portfolio_report()` to display structural risk from entry alongside the current profit cushion: `Stop Loss: ₹{sl} ({sl_risk:+.1f}% from entry · cushion {cushion:.1f}%)`.
 * **Tests.** Added test in `test_s3_alerts_scorecard.py` and `test_operational_audit.py` (both pass cleanly). Full regression suite passes.
 
 ---

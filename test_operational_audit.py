@@ -259,7 +259,8 @@ class TestPortfolioReportFormatting(unittest.TestCase):
         ]
         with patch.object(db_module.db.positions, "find", return_value=mock_positions):
             rep = format_alphapulse_portfolio_report()
-            self.assertIn("SL: ₹1,630.55 (-12.0% from entry · cushion 17.4%)", rep)
+            self.assertIn("Stop Loss: ₹1,630.55   (-12.0% from entry · cushion 17.4%)", rep)
+            self.assertIn("CMP: ₹1,974.20   (🟢 <b>+6.5%</b>)", rep)
 
 
 if __name__ == "__main__":
