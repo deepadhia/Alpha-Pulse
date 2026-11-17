@@ -4048,9 +4048,15 @@ def format_alphapulse_portfolio_report():
         if p.get('_backfilled'):
             w_badge += " 📦"
         live_lines.append(
-            f"• <b>{sym}</b>  ·  {grd}  ·  {days}d held{w_badge}\n"
-            f"      CMP: ₹{curr:,.2f}   ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>)\n"
-            f"      Stop Loss: ₹{sl:,.2f}   ({sl_risk_from_entry:+.1f}% from entry · {cushion_str})"
+            f"<b>{sym}</b>\n"
+            f"Setup: {grd}\n"
+            f"Held: {days} day{'s' if days != 1 else ''}\n"
+            f"Winner score: {escape_html_text(w_badge.replace(' | ', '').strip()) if w_badge else 'not available'}\n"
+            f"CMP: ₹{curr:,.2f}\n"
+            f"P&L: {pnl_s}{pnl:.1f}%\n"
+            f"Stop Loss: ₹{sl:,.2f}\n"
+            f"Stop from entry: {sl_risk_from_entry:+.1f}%\n"
+            f"Stop cushion: {cushion:.1f}%"
         )
 
     avg_live_pnl = (total_live_pnl / len(active_live)) if active_live else 0.0
@@ -4087,9 +4093,15 @@ def format_alphapulse_portfolio_report():
         if p.get('_backfilled'):
             w_badge += " 📦"
         paper_lines.append(
-            f"• <b>{sym}</b>  ·  {grd}  ·  {days}d held{w_badge}\n"
-            f"      CMP: ₹{curr:,.2f}   ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>)\n"
-            f"      Stop Loss: ₹{sl:,.2f}   ({sl_risk_from_entry:+.1f}% from entry · {cushion_str})"
+            f"<b>{sym}</b>\n"
+            f"Setup: {grd}\n"
+            f"Held: {days} day{'s' if days != 1 else ''}\n"
+            f"Winner score: {escape_html_text(w_badge.replace(' | ', '').strip()) if w_badge else 'not available'}\n"
+            f"CMP: ₹{curr:,.2f}\n"
+            f"P&L: {pnl_s}{pnl:.1f}%\n"
+            f"Stop Loss: ₹{sl:,.2f}\n"
+            f"Stop from entry: {sl_risk_from_entry:+.1f}%\n"
+            f"Stop cushion: {cushion:.1f}%"
         )
 
     avg_paper_pnl = (total_paper_pnl / len(active_paper)) if active_paper else 0.0
@@ -4118,31 +4130,34 @@ def format_alphapulse_portfolio_report():
         pnl_s = '+' if pnl >= 0 else ''
         days = int(float(p.get('days_held') or 0))
         exit_lines.append(
-            f"• <b>{sym}</b>  ·  Held {days}d\n"
-            f"      Outcome: {pnl_c} <b>{pnl_s}{pnl:.1f}%</b>   <i>({reason})</i>"
+            f"<b>{sym}</b>\n"
+            f"Held: {days} day{'s' if days != 1 else ''}\n"
+            f"Outcome: {pnl_s}{pnl:.1f}%\n"
+            f"Reason: {reason}"
         )
 
-    report = f"""📊 <b>AlphaPulse | DAILY PORTFOLIO &amp; RISK REPORT</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    report = f"""<b>DAILY PORTFOLIO &amp; RISK REPORT</b>
 
-📅 <b>{now_ist.strftime('%d %b %Y')}</b>  •  ⏱️ <b>{now_ist.strftime('%H:%M IST')}</b>  •  🛡️ Clean Cohort Active
+Date: {now_ist.strftime('%d %b %Y')}
+Time: {now_ist.strftime('%H:%M IST')}
+Cohort: clean forward records
 
 """
 
     if active_live:
-        report += f"🟢 <b>LIVE BOOK ({len(active_live)} Active)</b>  •  Avg: {avg_live_color} <b>{avg_live_pnl:+.1f}%</b>\n\n"
+        report += f"<b>LIVE BOOK ({len(active_live)} Active)</b>\nAverage P&L: {avg_live_pnl:+.1f}%\n\n"
         report += '\n\n'.join(live_lines) + "\n\n"
     else:
-        report += "🟢 <b>LIVE BOOK (0 Active)</b>\n• <i>No active live positions.</i>\n\n"
+        report += "<b>LIVE BOOK (0 Active)</b>\nNo active live positions.\n\n"
 
     if active_paper:
-        report += f"📋 <b>PAPER BOOK ({len(active_paper)} Active)</b>  •  Avg: {avg_paper_color} <b>{avg_paper_pnl:+.1f}%</b>\n\n"
+        report += f"<b>PAPER BOOK ({len(active_paper)} Active)</b>\nAverage P&L: {avg_paper_pnl:+.1f}%\n\n"
         report += '\n\n'.join(paper_lines) + "\n\n"
     else:
-        report += "📋 <b>PAPER BOOK (0 Active)</b>\n• <i>No active paper positions.</i>\n\n"
+        report += "<b>PAPER BOOK (0 Active)</b>\nNo active paper positions.\n\n"
 
     if active_forward:
-        report += f"📋 <b>P RESTING PAPER FORWARD ({len(active_forward)} Active)</b>\n"
+        report += f"<b>P RESTING PAPER FORWARD ({len(active_forward)} Active)</b>\n"
         report += "<i>Automatic modelled execution; broker fills unverified. Separate from scanner and shelf records.</i>\n\n"
         fwd_lines = []
         for p in active_forward:
@@ -4158,9 +4173,14 @@ def format_alphapulse_portfolio_report():
             cushion = ((curr - sl) / curr * 100) if curr > 0 else 0.0
             cushion_str = f"cushion {cushion:.1f}%" if curr >= sl else "stop breached"
             fwd_lines.append(
-                f"• <b>{sym}</b>  ·  Resting Forward  ·  {days}d held\n"
-                f"      CMP: ₹{curr:,.2f}   ({pnl_c} <b>{pnl_s}{pnl:.1f}%</b>)\n"
-                f"      Stop Alert: ₹{sl:,.2f}   ({sl_risk:+.1f}% from entry · {cushion_str})"
+                f"<b>{sym}</b>\n"
+                f"Setup: Resting Forward\n"
+                f"Held: {days} day{'s' if days != 1 else ''}\n"
+                f"CMP: ₹{curr:,.2f}\n"
+                f"P&L: {pnl_s}{pnl:.1f}%\n"
+                f"Stop Alert: ₹{sl:,.2f}\n"
+                f"Stop from entry: {sl_risk:+.1f}%\n"
+                f"Stop cushion: {cushion:.1f}%"
             )
         report += '\n\n'.join(fwd_lines) + "\n\n"
 
@@ -4170,8 +4190,7 @@ def format_alphapulse_portfolio_report():
     if any(p.get('_backfilled') for p in active_live + active_paper):
         report += "📦 <i>= backfilled legacy row (not live evidence; excluded from the clean cohort)</i>\n\n"
 
-    report += """━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse EOD Snapshot</i>"""
+    report += "<i>AlphaPulse EOD Snapshot</i>"
     return report
 
 def format_consolidated_sl_updates(sl_updates, logic_version=None):
@@ -4183,10 +4202,10 @@ def format_consolidated_sl_updates(sl_updates, logic_version=None):
     now_str = _now_ist().strftime('%Y-%m-%d')
     time_str = _now_ist().strftime('%H:%M IST')
     lines = [
-        f"🛑 <b>AlphaPulse | STOP LOSS ADJUSTMENTS</b>",
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"<b>STOP LOSS ADJUSTMENTS</b>",
         f"",
-        f"📅 <b>{now_str}</b>  •  <b>{len(sl_updates)}</b> update(s)",
+        f"Date: {now_str}",
+        f"Updated positions: {len(sl_updates)}",
         f"",
     ]
     for item in sl_updates:
@@ -4196,10 +4215,11 @@ def format_consolidated_sl_updates(sl_updates, logic_version=None):
         curr = float(item.get('current_price') or 0.0)
         pnl = float(item.get('pnl') or 0.0)
         grade = escape_html_text(str(item.get('grade', 'A')))
+        book = "PAPER FORWARD" if item.get('entry_source') == 'RESTING_AUTOFILL' else ("PAPER" if item.get('status') == 'PAPER_ONLY' else "SCANNER")
         entry = float(item.get('entry_price') or 0.0)
         days = int(float(item.get('days_held') or 0))
         
-        sl_type = "ATR Trail"
+        sl_type = "Trailing stop"
         if entry > 0 and new_sl >= round(entry * 1.005, 2) and old_sl < round(entry * 1.005, 2):
             sl_type = "Breakeven"
         elif entry > 0 and curr >= entry * 1.75:
@@ -4210,13 +4230,20 @@ def format_consolidated_sl_updates(sl_updates, logic_version=None):
         sl_change = ((new_sl - old_sl) / old_sl * 100) if old_sl > 0 else 0
         sl_change_sign = '+' if sl_change >= 0 else ''
         lines.append(
-            f"• <b>{sym}</b>  ·  Grade {grade}  ·  {days}d held\n"
-            f"      CMP: ₹{curr:,.2f}   ({pnl_c} <b>{pnl_sign}{pnl:.1f}%</b>)\n"
-            f"      Stop Loss: ₹{old_sl:,.2f} → <b>₹{new_sl:,.2f}</b>   ({sl_change_sign}{sl_change:.1f}% · {sl_type})"
+            f"<b>{sym}</b>\n"
+            f"Book: {book}\n"
+            f"Grade: {grade}\n"
+            f"Held: {days} day{'s' if days != 1 else ''}\n"
+            f"CMP: ₹{curr:,.2f}\n"
+            f"P&L: {pnl_sign}{pnl:.1f}%\n"
+            f"Previous stop: ₹{old_sl:,.2f}\n"
+            f"New stop: ₹{new_sl:,.2f}\n"
+            f"Stop change: {sl_change_sign}{sl_change:.1f}%\n"
+            f"Update type: {sl_type}"
         )
         lines.append("")
-    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    lines.append(f"⚡ <i>AlphaPulse {version_label} • {time_str}</i>")
+    lines.append(f"Time: {time_str}")
+    lines.append(f"Version: {version_label}")
     return '\n'.join(lines)
 
 def format_position_update_alert(symbol, current_price, entry_price, old_trailing, new_trailing, pnl_pct, days_held, grade):
@@ -4790,7 +4817,9 @@ def stop_loss_update_scan():
                             'entry_price': entry_price,
                             'pnl': pnl,
                             'days_held': days_held,
-                            'grade': grade
+                            'grade': pos.get("grade", "N/A"),
+                            'status': pos.get("status"),
+                            'entry_source': pos.get("entry_source")
                         })
 
                     # Persist to DB (Critical Fix: was missing)

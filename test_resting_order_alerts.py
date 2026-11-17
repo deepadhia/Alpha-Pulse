@@ -52,7 +52,7 @@ class TestMessage(unittest.TestCase):
         self.assertTrue(m["actionable"])
         self.assertFalse(m["withheld"])
         self.assertIn("ABC", m["text"])
-        self.assertIn("BUY 20 qty", m["text"])
+        self.assertIn("Action: BUY\nQuantity: 20", m["text"])
         self.assertIn("101.50", m["text"])
 
     def test_no_orders_is_silent(self):
@@ -67,7 +67,7 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m["n_orders"], 0)
         self.assertTrue(m["actionable"])
         self.assertIn("WITHHELD", m["text"])
-        self.assertNotIn("BUY 20 qty", m["text"])
+        self.assertNotIn("Quantity: 20", m["text"])
 
     def test_one_session_lag_is_a_note_not_a_block(self):
         m = R.build_message([entry()], [], self.day, pd.Timestamp("2026-11-10"), self.exp, 1, [], 0, 100000)
@@ -146,6 +146,41 @@ class TestLedgerIdempotency(unittest.TestCase):
                 raise RuntimeError("db down")
         with self.assertRaises(RuntimeError):
             R.ledger_has_order(Boom(), "ABC", self.day)
+
+
+class TestSettlementFailureCard(unittest.TestCase):
+    def test_pause_card_leads_with_impact_and_keeps_errors_in_logs(self):
+        report = dict(waiting=[f"{s}: no daily bar for 2026-11-17 yet" for s in
+                              ("ADROITIND", "ELEVATE", "FUSIONCX", "GERMAN", "GSPLTRANS", "HDFIRE", "NITYAS", "ORIENTCABL")])
+        text = R.settlement_failure_message(pd.Timestamp("2026-11-18"), pd.Timestamp("2026-11-17"), report)
+        self.assertIn("P ORDERS PAUSED", text)
+        self.assertIn("18 Nov 2026", text)
+        self.assertIn("17 Nov 2026", text)
+        self.assertIn("Affected names (8)", text)
+        self.assertIn("ORDERS WITHHELD", text)
+        self.assertNotIn("RuntimeError", text)
+        self.assertNotIn("PLACE BEFORE THE OPEN", text)
+        for symbol in ("ADROITIND", "ELEVATE", "FUSIONCX", "GERMAN", "GSPLTRANS", "HDFIRE", "NITYAS", "ORIENTCABL"):
+            self.assertIn(symbol, text)
+
+    def test_generic_failure_card_does_not_invent_a_data_outage(self):
+        text = R.settlement_failure_message(pd.Timestamp("2026-11-18"), pd.Timestamp("2026-11-17"), {})
+        self.assertIn("execution log", text)
+        self.assertNotIn("Affected names", text)
+
+    def test_dynamic_symbols_are_escaped_and_deduplicated(self):
+        report = dict(waiting=["A<B: missing"], exit_waiting=["A<B: recovery incomplete"])
+        text = R.settlement_failure_message(pd.Timestamp("2026-11-18"), pd.Timestamp("2026-11-17"), report)
+        self.assertIn("Affected names (1)", text)
+        self.assertIn("A&lt;B", text)
+        self.assertNotIn("A<B", text)
+
+    def test_partial_settlement_activity_is_not_hidden_by_the_pause(self):
+        report = dict(filled=["SYNTHETIC fill"], sold=["SYNTHETIC sale"], waiting=["ABC: missing bar"])
+        text = R.settlement_failure_message(pd.Timestamp("2026-11-18"), pd.Timestamp("2026-11-17"), report)
+        self.assertIn("Already recorded before the pause", text)
+        self.assertIn("Paper-forward fills: 1", text)
+        self.assertIn("Sales: 1", text)
 
 
 if __name__ == "__main__":

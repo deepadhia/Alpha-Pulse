@@ -60,6 +60,14 @@ class TestMessage(unittest.TestCase):
         self.assertFalse(m["actionable"])
         self.assertIn("No S3 orders for the next session", m["text"])
 
+    def test_each_position_and_order_is_a_vertical_card_without_borders(self):
+        text = self.build(rows=[pos_row("HELD_A"), pos_row("HELD_B")], entries=[entry("ORDER_A"), entry("ORDER_B")])["text"]
+        self.assertNotIn("━", text)
+        for symbol in ("HELD_A", "HELD_B", "ORDER_A", "ORDER_B"):
+            self.assertIn(f"\n\n<b>{symbol}</b>\n", text)
+        self.assertIn("<b>HELD_A</b>\nHeld: 9 days\nClose: ₹100.00\nP&L: -1.5%\nPeak: +3.0%\nTrailing Stop: ₹98.00", text)
+        self.assertIn("<b>ORDER_A</b>\nAction: BUY\nQuantity: 50\nTrigger: ₹111.65\nLimit: ₹112.75\nInitial stop: ₹98.50\nCapital at risk: 0.67%", text)
+
     def test_stale_data_is_flagged_and_actionable(self):
         m = self.build(asof="2026-10-20", entries=[entry()])
         self.assertTrue(m["stale"])

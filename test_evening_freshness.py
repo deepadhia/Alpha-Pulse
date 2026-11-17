@@ -200,14 +200,14 @@ class TestOrderMessageDistance(unittest.TestCase):
 
     def test_each_order_is_its_own_spaced_block_with_one_fact_per_line(self):
         lines = self.build(last_closes={"NEAR": 100.0, "FAR": 100.0})["text"].split("\n")
-        i = next(k for k, l in enumerate(lines) if "1. NEAR" in l)
-        j = next(k for k, l in enumerate(lines) if "2. FAR" in l)
+        i = lines.index("<b>NEAR</b>")
+        j = lines.index("<b>FAR</b>")
         block = lines[i:j]
         self.assertEqual(lines[i - 1], "")                           # blank line before each order
         self.assertEqual(lines[j - 1], "")
-        self.assertEqual(len([l for l in block if l.strip()]), 5)    # header, trigger, limit, stop alert, age/R:R
-        for needle in ("Trigger", "Limit", "Stop alert", "Age"):
-            self.assertEqual(sum(needle in l for l in block), 1, needle)
+        for label in ("Action:", "Quantity:", "Trigger:", "Limit:", "Stop alert:", "Capital at risk:", "IPO age:", "R:R:", "Trigger distance:"):
+            self.assertEqual(sum(l.startswith(label) for l in block), 1, label)
+        self.assertFalse(any("━" in line or " · " in line for line in lines))
         self.assertEqual(sum("Trigger" in l and "Limit" in l for l in block), 0)    # never trigger and limit on one line
 
     def test_distance_helper(self):
@@ -255,8 +255,8 @@ class TestPolicyPSlots(unittest.TestCase):
         import resting_order_alerts as A
         m = A.build_message([], [], pd.Timestamp("2026-11-12"), pd.Timestamp("2026-11-11"), pd.Timestamp("2026-11-11"), 0, n_held=0,
                             capital=100000.0, n_paper=1)
-        self.assertIn(f"Slots used 0 of {A._slot_cap()}", m["text"])
-        self.assertIn("+1 paper-only, no slot", m["text"])
+        self.assertIn(f"Slots used: 0 of {A._slot_cap()}", m["text"])
+        self.assertIn("Paper-only positions: 1 (no P slot)", m["text"])
 
 
 class TestStillOldIsReported(unittest.TestCase):
@@ -338,8 +338,72 @@ class TestS3StaleWithholdsOrders(unittest.TestCase):
         m = self.build(pd.Timestamp("2026-11-11"))
         self.assertFalse(m["stale"])
         self.assertEqual(m["n_orders"], 1)
-        self.assertIn("1. KNACK", m["text"])
+        self.assertIn("<b>KNACK</b>\nAction: BUY\nQuantity:", m["text"])
         self.assertNotIn("ORDERS WITHHELD", m["text"])
+
+
+class TestMultiSessionEveningRefresh(unittest.TestCase):
+    """SYNTHETIC_TEST: historical catch-up followed by the current session."""
+
+    def cache(self, end="2026-11-13"):
+        return {"X": pd.DataFrame(dict(DATE=pd.bdate_range(end=end, periods=20), OPEN=100.0,
+                                      HIGH=102.0, LOW=99.0, CLOSE=101.0, VOLUME=5000.0))}
+
+    def test_daily_catchup_does_not_block_current_session_intraday_fallback(self):
+        calls = []
+        def http(url, headers=None, timeout=None):
+            calls.append(url)
+            if "/intraday/" in url:
+                return Resp(200, half_hours("2026-11-17"))
+            return Resp(200, daily_rows(["2026-11-13", "2026-11-16"]))
+        with patch("core.s3_refresh.ist_today", return_value=pd.Timestamp("2026-11-17")):
+            out, rep = rf.refresh_candles(self.cache(), set(), ["X"], "2026-11-17", "SYNTHETIC_TEST",
+                                          {"X": "NSE_EQ|X"}, http_get=http, sleep=lambda _: None)
+        self.assertEqual(out["X"]["DATE"].iloc[-1], pd.Timestamp("2026-11-17"))
+        self.assertTrue(any("/intraday/" in call for call in calls))
+        self.assertEqual(rep["still_old"], [])
+
+    def test_real_historical_hole_still_blocks_splicing_in_today(self):
+        calls = []
+        def http(url, headers=None, timeout=None):
+            calls.append(url)
+            return Resp(200, daily_rows(["2026-11-13"]))
+        with patch("core.s3_refresh.ist_today", return_value=pd.Timestamp("2026-11-17")):
+            out, rep = rf.refresh_candles(self.cache(), set(), ["X"], "2026-11-17", "SYNTHETIC_TEST",
+                                          {"X": "NSE_EQ|X"}, http_get=http, sleep=lambda _: None)
+        self.assertEqual(out["X"]["DATE"].iloc[-1], pd.Timestamp("2026-11-13"))
+        self.assertFalse(any("/intraday/" in call for call in calls))
+        self.assertEqual(rep["still_old"], ["X"])
+
+    def test_long_cache_lag_is_allowed_only_when_all_intervening_sessions_arrive(self):
+        dates = [str(d.date()) for d in pd.bdate_range("2026-11-06", "2026-11-16")]
+        def http(url, headers=None, timeout=None):
+            return Resp(200, half_hours("2026-11-17")) if "/intraday/" in url else Resp(200, daily_rows(dates))
+        with patch("core.s3_refresh.ist_today", return_value=pd.Timestamp("2026-11-17")):
+            out, _ = rf.refresh_candles(self.cache("2026-11-06"), set(), ["X"], "2026-11-17", "SYNTHETIC_TEST",
+                                       {"X": "NSE_EQ|X"}, http_get=http, sleep=lambda _: None)
+        self.assertEqual(out["X"]["DATE"].iloc[-1], pd.Timestamp("2026-11-17"))
+
+    def test_partial_current_session_does_not_become_a_daily_bar(self):
+        def http(url, headers=None, timeout=None):
+            return Resp(200, half_hours("2026-11-17", n=5)) if "/intraday/" in url else Resp(200, daily_rows(["2026-11-13", "2026-11-16"]))
+        with patch("core.s3_refresh.ist_today", return_value=pd.Timestamp("2026-11-17")):
+            out, rep = rf.refresh_candles(self.cache(), set(), ["X"], "2026-11-17", "SYNTHETIC_TEST",
+                                          {"X": "NSE_EQ|X"}, http_get=http, sleep=lambda _: None)
+        self.assertEqual(out["X"]["DATE"].iloc[-1], pd.Timestamp("2026-11-16"))
+        self.assertEqual(rep["still_old"], ["X"])
+
+    def test_old_interior_hole_is_not_hidden_by_a_recent_daily_bar(self):
+        dates = [str(d.date()) for d in pd.bdate_range("2026-11-06", "2026-11-16") if str(d.date()) != "2026-11-12"]
+        calls = []
+        def http(url, headers=None, timeout=None):
+            calls.append(url)
+            return Resp(200, daily_rows(dates))
+        with patch("core.s3_refresh.ist_today", return_value=pd.Timestamp("2026-11-17")):
+            out, _ = rf.refresh_candles(self.cache("2026-11-06"), set(), ["X"], "2026-11-17", "SYNTHETIC_TEST",
+                                       {"X": "NSE_EQ|X"}, http_get=http, sleep=lambda _: None)
+        self.assertFalse(any("/intraday/" in call for call in calls))
+        self.assertEqual(out["X"]["DATE"].iloc[-1], pd.Timestamp("2026-11-16"))
 
 
 if __name__ == "__main__":

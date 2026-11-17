@@ -103,16 +103,20 @@ def select_symbols(candles: Dict[str, pd.DataFrame], listing_syms: Iterable[str]
     return sel
 
 
-def _skipped_session_gap(last: pd.Timestamp, max_date: pd.Timestamp, is_holiday: Optional[Callable] = None) -> bool:
+def _skipped_session_gap(last: pd.Timestamp, max_date: pd.Timestamp, is_holiday: Optional[Callable] = None,
+                         available_dates: Iterable = ()) -> bool:
     """
-    True when more than one trading day lies between the cached last bar and max_date: a single 30-minute day cannot close that gap.
-    `is_holiday` (optional predicate on a Timestamp) removes exchange holidays from the count; without it only weekends are skipped, so the first
-    session after a holiday would wrongly look like a two-day gap and never use the 30-minute fallback.
+    True when a session before max_date remains missing after historical catch-up.
+    The final 30-minute session cannot repair an earlier hole. Exchange holidays
+    are excluded; available_dates names the sessions the daily response supplied.
     """
-    gap = pd.bdate_range(pd.Timestamp(last) + pd.Timedelta(days=1), pd.Timestamp(max_date))
+    # The historical response may already contain the intervening sessions. Only
+    # genuine remaining holes prohibit splicing in the final intraday session.
+    covered = {session_date(d) for d in available_dates}
+    gap = pd.bdate_range(session_date(last) + pd.Timedelta(days=1), session_date(max_date) - pd.Timedelta(days=1))
     if is_holiday is not None:
         gap = [d for d in gap if not _safe_holiday(is_holiday, d)]
-    return len(gap) > 1
+    return any(d not in covered for d in gap)
 
 
 def _safe_holiday(is_holiday: Callable, d) -> bool:
@@ -259,7 +263,12 @@ def refresh_candles(candles: Dict[str, pd.DataFrame], listing_syms: Iterable[str
             fresh2 = parse_upstox_candles(raw2) if not err2 else None
             if fresh2 is not None and (_newest(fresh) is None or (_newest(fresh2) is not None and _newest(fresh2) > _newest(fresh))):
                 fresh = fresh2
-        if in_budget and (fresh is None or _newest(fresh) is None or _newest(fresh) < max_date) and (max_date - last).days <= 4 and not _skipped_session_gap(last, max_date, is_holiday):
+        latest_fetched = _newest(fresh)
+        remaining_from = max(last, latest_fetched) if latest_fetched is not None else last
+        available = fresh["DATE"] if fresh is not None and not fresh.empty else ()
+        if (in_budget and (latest_fetched is None or latest_fetched < max_date)
+                and (max_date - remaining_from).days <= 4
+                and not _skipped_session_gap(last, max_date, is_holiday, available)):
             bar, err3 = fetch_upstox_day_from_30m(s, key, token, max_date, http_get, sleep)
             if bar is not None:
                 fresh = bar if fresh is None or fresh.empty else pd.concat([fresh, bar], ignore_index=True).drop_duplicates("DATE", keep="last").sort_values("DATE")

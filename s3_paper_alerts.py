@@ -94,12 +94,12 @@ def build_message(rows: list, entries: list, order_day: pd.Timestamp, data_asof,
     stale = data_asof is None or pd.Timestamp(data_asof) < expected
 
     lines = [
-        f"📋 <b>{PREFIX}</b>  (paper only, not P)",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        f"📅 <b>Target Session:</b> {order_day.date()}  •  <b>Data:</b> {pd.Timestamp(data_asof).date() if data_asof is not None else 'n/a'}"
-        + ("  ⚠️ <b>STALE: expected " + str(expected.date()) + "; do not trust today's orders</b>" if stale else "  (✅ Fresh)"),
-        "ℹ️ <i>Automated Stage-2 (61–400d) paper test. No real capital allocated.</i>",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"<b>{PREFIX}</b>", "",
+        "Book: paper only, not P",
+        f"Orders for: {order_day.strftime('%d %b %Y')}",
+        f"Data: {pd.Timestamp(data_asof).date() if data_asof is not None else 'n/a'}",
+        f"Data status: {'STALE' if stale else 'Fresh'}",
+        "Real capital allocated: none",
     ]
 
     settled = settled or {}
@@ -119,9 +119,12 @@ def build_message(rows: list, entries: list, order_day: pd.Timestamp, data_asof,
             pnl_str = f"{r['pnl_pct']:+.1f}%"
             lines += [
                 "",
-                f"• <b>{e(r['symbol'])}</b>",
-                f"      Close: ₹{r['last_close']:.2f} at/below alert ₹{r['trailing']:.2f} ({pnl_str})",
-                f"      Action: Sell at tomorrow's open -> <code>python s3_paper.py exit {e(r['symbol'])} PRICE</code>",
+                f"<b>{e(r['symbol'])}</b>",
+                f"Close: ₹{r['last_close']:,.2f}",
+                f"Stop alert: ₹{r['trailing']:,.2f}",
+                f"P&L: {pnl_str}",
+                "Paper action: exit at the next open",
+                f"Record: <code>python s3_paper.py exit {e(r['symbol'])} PRICE</code>",
             ]
 
     if exited:
@@ -130,8 +133,11 @@ def build_message(rows: list, entries: list, order_day: pd.Timestamp, data_asof,
             pnl_str = f"{r['pnl_pct']:+.1f}%"
             lines += [
                 "",
-                f"• <b>{e(r['symbol'])}</b>",
-                f"      Exit: {str(r['exit_date'])[:10]} @ ₹{r['exit_price']:.2f} ({e(r['exit_reason'])}) {pnl_str}",
+                f"<b>{e(r['symbol'])}</b>",
+                f"Exit date: {str(r['exit_date'])[:10]}",
+                f"Exit price: ₹{r['exit_price']:,.2f}",
+                f"Reason: {e(r['exit_reason'])}",
+                f"P&L: {pnl_str}",
             ]
 
     if open_rows:
@@ -141,12 +147,14 @@ def build_message(rows: list, entries: list, order_day: pd.Timestamp, data_asof,
             pnl_str = f"{r.get('pnl_pct', 0):+.1f}%"
             peak_str = f"{r.get('max_runup', 0):+.1f}%"
             days = r.get('days_held')
-            days_str = f"  ·  {days}d held" if days is not None else ""
             lines += [
                 "",
-                f"• <b>{e(r['symbol'])}</b>{days_str}",
-                f"      Close: ₹{r['last_close']:.2f}   ({pnl_color} <b>{pnl_str}</b> · Peak: {peak_str})",
-                f"      Trailing Stop: ₹{r['trailing']:.2f}",
+                f"<b>{e(r['symbol'])}</b>",
+                f"Held: {days} day{'s' if days != 1 else ''}" if days is not None else "Held: not available",
+                f"Close: ₹{r['last_close']:,.2f}",
+                f"P&L: {pnl_str}",
+                f"Peak: {peak_str}",
+                f"Trailing Stop: ₹{r['trailing']:,.2f}",
             ]
 
     if pending:
@@ -164,13 +172,16 @@ def build_message(rows: list, entries: list, order_day: pd.Timestamp, data_asof,
         lines += ["", "🚫 <b>ORDERS WITHHELD</b>: the candle data is behind the last completed session. Nothing was stored; the next run retries."]
     elif entries:
         lines += ["", "🎯 <b>RESTING BUY ORDERS</b> (stop-limit, DAY)"]
-        for i, x in enumerate(entries, 1):
+        for x in entries:
             lines += [
                 "",
-                f"<b>{i}. {e(x.symbol)}</b>  ·  BUY {x.quantity} qty",
-                f"      Trigger  ₹{x.trigger:.2f}",
-                f"      Limit      ₹{x.limit:.2f}",
-                f"      Initial stop  ₹{x.stop_alert:.2f}   (risk {x.risk_pct_of_capital:.2f}% of capital)",
+                f"<b>{e(x.symbol)}</b>",
+                "Action: BUY",
+                f"Quantity: {x.quantity}",
+                f"Trigger: ₹{x.trigger:,.2f}",
+                f"Limit: ₹{x.limit:,.2f}",
+                f"Initial stop: ₹{x.stop_alert:,.2f}",
+                f"Capital at risk: {x.risk_pct_of_capital:.2f}%",
             ]
     else:
         lines += ["", "💤 <i>No S3 orders for the next session.</i>"]
@@ -183,7 +194,6 @@ def build_message(rows: list, entries: list, order_day: pd.Timestamp, data_asof,
             continue
         lines.append(f"  ! {e(w_str)}")
 
-    lines += ["", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
 
     actionable = bool(alerts or exited or entries or errors or stale or settled.get("filled"))
     return dict(text="\n".join(lines), n_alerts=len(alerts), n_orders=len(entries), n_open=len(open_rows), stale=stale, actionable=actionable)

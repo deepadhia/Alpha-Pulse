@@ -4,7 +4,9 @@ Give this file to a new session and say: **"Read SESSION_HANDOFF.md, then LEARNI
 It is self-contained: goals, what exists, what was proven, what was rejected, what changed in the repo, how to reproduce everything,
 and what is still open.  Nothing here depends on the chat that produced it.
 
-> **Updated 2026-11-12: read section 20 (end of file) first** (operational audit fixes v3.8.6: timezone normalization, completion record & deduplication, withholding orders on settlement error, shared portfolio cap enforcement, catch-up recovery of unsettled orders, forward cohort isolation), then section 19 and CHANGELOG.md v3.8.6.
+> **Updated 2026-11-17: read section 21 first** (multi-session refresh repair and paused-order/stop-update message fixes; local, uncommitted), then section 20.
+>
+> **Earlier update 2026-11-12: read section 20 first** (operational audit fixes v3.8.6), then section 19 and CHANGELOG.md v3.8.6.
 >
 > **Earlier update 2026-11-09: read section 17 first** (operational DB wipe and archival, clean cohort reset, milestone v3.8.0 release dropping live partial-day gates per AGENTS Rule 21), then section 16, 15, and LEARNINGS.md sections 22-22.9.
 >
@@ -627,3 +629,15 @@ An external operational audit (`alpha-pulse-audit.md`, 12 Nov 2026) confirmed si
 ### 20.3 Next Steps
 1. The working tree changes are fully tested and verified. Ready to stage and commit locally when requested by the owner.
 2. Ensure GitHub Actions environment variables and repository secrets remain in sync.
+
+---
+
+## 21. STATE AS OF 2026-11-17: refreshed session gap and Telegram clarity (local, uncommitted)
+
+The owner pasted a P pause alert for 18 Nov: eight names lacked the 17 Nov bar; S3 separately reported Fresh. The P withholding guard is working. A deterministic synthetic regression reproduced a refresh bug: a cache ending Fri 13 Nov receives Mon 16 Nov from the daily endpoint, but the gap check still uses the original Friday date and blocks Tuesday's intraday fallback. The refresh now counts the newly fetched historical sessions and only requests the final completed session when earlier sessions are covered. Genuine missing history and partial sessions remain blocked. This source-level reproduction matches the symptom; production provider responses for the eight names were not inspected.
+
+P failures now use a concise `P ORDERS PAUSED` card with dates, affected symbols and the order-withholding outcome. The detailed exception, waiting reasons and refresh report remain in execution logs/audit records. SKYWAYS's stop-update grade was taken from a stale outer-loop variable; the message payload now reads the position's grade. `ATR Trail` becomes `Trailing stop` because this path does not calculate ATR. Stop calculations and all strategy rules are unchanged.
+
+The owner explicitly selected clean vertical cards: stock name first, one field per line, blank space between stocks, no decorative borders. Applied consistently across P orders, paused-order alerts, stop updates, portfolio cards and S3. The real message builders were rendered with synthetic fixture values into a preview under this chat's outputs folder; nothing was sent.
+
+Verified: 374 selected tests passed with isolated/mock services; cached legacy parity EXACT MATCH (203 trades on each side, zero missing/extra/price mismatches). Regression checks reproduce and fix both the refresh and grade-label defects and check the new layout. The standard master-audit CLI requires MongoDB and was not run against production. No `.env`, production database, broker execution or Telegram send was used. These changes are not committed or pushed; the owner controls publication.

@@ -4,6 +4,17 @@ All notable changes, quantitative safeguards, and alerting architecture updates 
 
 ---
 
+## [v3.8.8-patch] - 2026-11-17 (local, uncommitted): historical catch-up before intraday refresh; clearer paused-order card; correct stop-update grade
+
+* **Refresh defect reproduced.** With a Friday 11-13 cache, the historical response supplies Monday 11-16, but the old gap check still uses Friday and refuses the Tuesday 11-17 intraday fallback. The refresh now accounts for sessions supplied by the daily response. It permits the final completed session only when no earlier trading session remains missing, including when the original cache lag exceeds four calendar days but historical catch-up closes it. Incomplete sessions, genuine historical holes, overlap mismatches and invalid candles remain guarded.
+* **P failure alert.** Lead with `P ORDERS PAUSED`, dates, affected symbols and `ORDERS WITHHELD`. Raw exceptions and per-symbol data diagnostics stay in console logs and the audit heartbeat (`exec_error`, `exec_waiting`, `exec_refresh`). Refresh diagnostics are no longer discarded by the evening settlement wrapper. New orders remain blocked until settlement succeeds.
+* **SKYWAYS grade label.** The stop-update payload used a stale `grade` from another loop. It now reads the current position's grade. The shared exit calculation already read the current position and is unchanged. Replace the unsupported `ATR Trail` label with `Trailing stop`; this path does not calculate ATR.
+* **Owner-selected layout.** Clean vertical cards across P orders, paused P orders, stop updates, portfolio positions and S3: bold stock name on its own line, one field per line, blank space between symbols, no decorative borders. Quantity, price, P&L, stop levels, stop distance, capital risk, grade and holding period are no longer combined on single lines. Stop updates identify paper/scanner/forward records. The ten-order P example is 2,456 HTML characters, within the existing 4,000-character chunk threshold.
+* **Rules unchanged.** No entry threshold, stop formula, sizing, paper rule, execution-price convention or milestone version changed. These are data and presentation fixes.
+* **Tests.** Reproduced the stale-refresh and grade-label defects before fixing them. Added multi-session catch-up/hole/incomplete-session checks, paused-card checks and vertical layout assertions. Broader selected suite: 374 passed; cached legacy parity EXACT MATCH (203 trades on each side, no mismatches). Real provider responses, production database state and deployment were not accessed in this session.
+
+---
+
 ## [v3.8.7-patch] - 2026-11-13 (patch, no milestone bump): vertical formatting with clean card spacing; suppress cache telemetry in S3 Telegram alerts; clarify stop cushion
 
 * **Why.** 1. Position and stop-loss metrics in the Daily Portfolio Report and S3 alerts were squashed horizontally into single lines (`CMP: ... • SL: ...`), making them hard to read on mobile Telegram screens.

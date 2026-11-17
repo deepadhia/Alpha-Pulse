@@ -97,12 +97,13 @@ def build_message(entries: list, skipped: list, order_day: pd.Timestamp, data_as
     withheld = lag >= 2
     asof_s = str(pd.Timestamp(data_asof).date()) if data_asof is not None else "n/a"
     lines = [
-        f"🎯 <b>{PREFIX}</b>  (policy P, validated entry path)",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        f"📅 <b>Order session:</b> {order_day.date()}  •  <b>Data:</b> {asof_s}"
-        + (f"  ⚠️ <b>STALE: expected {expected.date()}</b>" if withheld else ("  (1 session behind, see note)" if lag == 1 else "  (✅ Fresh)")),
-        f"💼 Capital Rs {capital:,.0f}  •  Slots used {n_held} of {_slot_cap()}" + (f"  (+{n_paper} paper-only, no slot)" if n_paper else ""),
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"<b>{PREFIX}</b>", "",
+        f"Orders for: {order_day.strftime('%d %b %Y')}",
+        f"Data: {asof_s}",
+        f"Data status: {'STALE' if withheld else ('1 session behind' if lag == 1 else 'Fresh')}",
+        f"Capital: ₹{capital:,.0f}",
+        f"Slots used: {n_held} of {_slot_cap()}",
+        f"Paper-only positions: {n_paper} (no P slot)",
     ]
     lines += list(extra_lines or [])           # today's automatic forward-test fills / exits / expiries (core.resting_runtime.format_exec_lines)
     if withheld:
@@ -114,25 +115,30 @@ def build_message(entries: list, skipped: list, order_day: pd.Timestamp, data_as
         if known:
             near = sum(1 for d in known if d <= NEAR_TRIGGER_PCT)
             nearest = min(dists, key=lambda s: dists[s] if dists[s] is not None else 1e9)
-            lines += ["", f"📏 <b>{near} of {len(entries)}</b> trigger within {NEAR_TRIGGER_PCT:.0f}% of the last close · nearest: "
-                          f"<b>{e(nearest)}</b> ({dists[nearest]:+.1f}%). A far order needs a rally of that size to trigger; the list is "
-                          f"sorted nearest first."]
+            lines += ["", f"Orders within {NEAR_TRIGGER_PCT:.0f}% of trigger: {near} of {len(entries)}",
+                      f"Nearest: {e(nearest)} ({dists[nearest]:+.1f}%)"]
         lines += ["", "🛒 <b>PLACE BEFORE THE OPEN</b> (stop-limit BUY, validity DAY, re-place each session):"]
-        for i, x in enumerate(entries, 1):
+        for x in entries:
             d = dists.get(x.symbol)
-            far = f"   ({d:+.1f}% from last close)" if d is not None else ""
             # one short line per fact and a blank line between orders: a Telegram phone screen reads this as separate cards, not one block
             lines += [
                 "",
-                f"<b>{i}. {e(x.symbol)}</b>  ·  BUY {x.quantity} qty{far}",
-                f"      Trigger  ₹{x.trigger:.2f}",
-                f"      Limit      ₹{x.limit:.2f}",
-                f"      Stop alert  ₹{x.stop_alert:.2f}   (risk {x.risk_pct_of_capital:.2f}% of capital)",
-                f"      Age {x.age}d  ·  R:R {x.rr:.2f}",
+                f"<b>{e(x.symbol)}</b>",
+                "Action: BUY",
+                f"Quantity: {x.quantity}",
+                f"Trigger: ₹{x.trigger:,.2f}",
+                f"Limit: ₹{x.limit:,.2f}",
+                f"Stop alert: ₹{x.stop_alert:,.2f}",
+                f"Capital at risk: {x.risk_pct_of_capital:.2f}%",
+                f"IPO age: {x.age} days",
+                f"R:R: {x.rr:.2f}",
             ]
-        lines += ["", "ℹ️ <i>Expect few fills: the replay averaged about one new entry a week across the whole list (about 50 a year), so most of these "
-                      "will not trigger tomorrow. Fills and exits are recorded automatically from the real book (open-time bid/ask quotes, 1-minute bars). "
-                      "Use trade_ledger.py fill / sell only to record a REAL broker fill or sale that differs. Pass mark: fills within +0.5% of the trigger.</i>"]
+            if d is not None:
+                lines.append(f"Trigger distance: {d:+.1f}% from last close")
+        lines += ["", "Expected activity: replay averaged about one new entry a week; this is not a forecast.",
+                  "Execution tracking: paper forward using quotes, minute bars and measured or modelled spreads.",
+                  "Broker corrections: use trade_ledger.py fill / sell only for a real fill or sale that differs.",
+                  "Fill check: within +0.5% of the trigger."]
     else:
         lines += ["", "💤 <i>No eligible resting orders for the next session.</i>"]
     if skipped and not withheld:
@@ -144,7 +150,6 @@ def build_message(entries: list, skipped: list, order_day: pd.Timestamp, data_as
         lines.append(f"ℹ️ <i>{e(refresh_note)}</i>")
     for w in (warnings or []):
         lines.append(f"  ! {e(str(w))}")
-    lines += ["", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
     return dict(text="\n".join(lines), n_orders=0 if withheld else len(entries), withheld=withheld,
                 actionable=bool(withheld or entries))
 
@@ -176,6 +181,30 @@ def record_run(audits_col, order_day: pd.Timestamp, **fields) -> None:
     audits_col.update_one({"audit_id": f"resting_orders_{order_day.date()}"}, {"$set": doc}, upsert=True)
 
 
+def settlement_failure_message(order_day, run_day, report: dict) -> str:
+    """A short action card; the traceback and refresh diagnostics stay in the job logs."""
+    e = html.escape
+    missing = report.get("waiting", []) + report.get("exit_waiting", [])
+    symbols = sorted({str(line).split(":", 1)[0] for line in missing})
+    lines = ["<b>P ORDERS PAUSED</b>", "",
+             f"<b>Orders for:</b> {pd.Timestamp(order_day).strftime('%d %b %Y')}",
+             f"<b>Session being checked:</b> {pd.Timestamp(run_day).strftime('%d %b %Y')}", ""]
+    if missing:
+        lines += ["<b>Reason:</b> complete price data or recovery checks are pending.", "",
+                  f"<b>Affected names ({len(symbols)})</b>"]
+        lines += [e(symbol) for symbol in symbols]
+    else:
+        lines += ["<b>Reason:</b> the settlement job encountered an error. Review its execution log."]
+    if report.get("filled") or report.get("sold") or report.get("day0_stops"):
+        lines += ["", "<b>Already recorded before the pause</b>",
+                  f"Paper-forward fills: {len(report.get('filled', []))}",
+                  f"Sales: {len(report.get('sold', []))}",
+                  f"Stop decisions: {len(report.get('day0_stops', []))}"]
+    lines += ["", "🚫 <b>ORDERS WITHHELD</b>", "No new P buy orders were generated by this run.",
+              "Orders resume only after settlement succeeds."]
+    return "\n".join(lines)
+
+
 def evening_execution(run_day: pd.Timestamp, capital: float, dry_run: bool) -> dict:
     """
     The automatic forward test, evening half (core/resting_jobs.run_evening): price the orders that did not fill at the open from the day's 1-minute
@@ -191,11 +220,18 @@ def evening_execution(run_day: pd.Timestamp, capital: float, dry_run: bool) -> d
     deps0 = rt.build_deps(SOURCE, token, capital, dry_run=dry_run, now_ist=now_ist)
     needed = rt.symbols_needed(deps0, run_day.date())
     candles = {s: df for s in needed for df in [rt.daily_from_cache(s)] if df is not None}
+    _frep = None
     if candles:
         candles, _frep = s3_refresh.refresh_candles(candles, set(), needed, s3_refresh.last_complete_date(now_ist, run_day), token,
                                                      get_instrument_key_mapping(), is_holiday=S3A._is_holiday)
     deps = rt.build_deps(SOURCE, token, capital, dry_run=dry_run, now_ist=now_ist, candles=candles)
-    return run_evening(deps, run_day.date())
+    report = run_evening(deps, run_day.date())
+    if _frep is not None:
+        diagnostics = s3_refresh.describe(_frep)
+        for line in diagnostics:
+            print(f"[settlement refresh] {line}")
+        report["refresh"] = _frep
+    return report
 
 
 def main(argv=None):
@@ -234,7 +270,7 @@ def main(argv=None):
 
     # automatic forward test first: fills and exits settled today change which names are held, so they must precede tomorrow's order list
     from core import resting_runtime as rt
-    exec_exc, exec_lines = None, []
+    exec_exc, exec_lines, exec_rep = None, [], {}
     try:
         exec_rep = evening_execution(run_day, a.capital, a.dry_run)
         exec_lines = rt.format_exec_lines(exec_rep, "after the close")
@@ -244,13 +280,17 @@ def main(argv=None):
         exec_exc = e
         exec_lines += ["", "⚠️ <b>Forward-test settlement FAILED</b>: " + html.escape(f"{type(e).__name__}: {e}")]
     if exec_exc is not None:
-        text = "\n".join([f"⚠️ <b>{PREFIX}</b> • {order_day.date()}"] + exec_lines + [
-            "", "🚫 <b>ORDERS WITHHELD</b>: settle and reconcile the position book before generating new orders."])
+        print(f"[settlement failed] {type(exec_exc).__name__}: {exec_exc}")
+        for line in exec_rep.get("waiting", []) + exec_rep.get("exit_waiting", []):
+            print(f"[settlement waiting] {line}")
+        text = settlement_failure_message(order_day, run_day, exec_rep)
         print(text)
         if not a.dry_run:
             sent = send_telegram_msg(text, disable_notification=False)
             record_run(system_audits_col, order_day, sent=bool(sent), withheld=True, n_orders=0,
-                       capital=a.capital, exec_ok=False, exec_error=f"{type(exec_exc).__name__}: {exec_exc}", ledger_ok=True)
+                       capital=a.capital, exec_ok=False, exec_error=f"{type(exec_exc).__name__}: {exec_exc}", ledger_ok=True,
+                       exec_waiting=exec_rep.get("waiting", []) + exec_rep.get("exit_waiting", []),
+                       exec_refresh={k: v for k, v in (exec_rep.get("refresh") or {}).items() if k != "selected"})
         raise exec_exc
     cfg = SheetConfig(capital=a.capital)
     from core.order_sheet import policy_p_slots_used
