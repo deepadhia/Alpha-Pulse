@@ -47,6 +47,7 @@ def fake_main(settlement_error=None, with_candidate=False):
     rep = dict(filled=[], expired=[], waiting=[], sold=[], deferred=[], day0_stops=[], exit_waiting=[], notes=[])
     with patch.dict(sys.modules, {"db": db, "utils": utils, "order_sheet": osh, "s3_paper_alerts": s3}), \
          patch.object(R, "evening_execution", side_effect=settlement_error, return_value=rep), \
+         patch("time.sleep"), \
          patch.object(trade_guard, "default_is_trading_day", lambda day: day.weekday() < 5), \
          patch.object(trade_guard, "previous_trading_day", lambda day: day - timedelta(days=1)), \
          patch.object(ledger, "ensure_indexes"), patch.object(ledger, "append", return_value={"seq": 1}) as append, \
@@ -101,6 +102,28 @@ class AuditRegressions(unittest.TestCase):
                 pass
             self.assertFalse(append.called, "new ORDER_GENERATED written after settlement failure")
             self.assertNotIn("PLACE BEFORE THE OPEN", send.call_args.args[0])
+
+    def test_settlement_retry_keeps_completed_fills_and_clears_resolved_waits(self):
+        first = dict(filled=["ABC: BUY 20 @ 102.10"], waiting=["XYZ: no daily bar yet"], exit_waiting=[])
+        second = dict(filled=[], expired=["XYZ: trigger not reached"], waiting=[], exit_waiting=[])
+        with fake_main() as (db, send, append), \
+             patch.object(R, "evening_execution", side_effect=[first, second]), patch("time.sleep"):
+            R.main(["--today", "2026-11-12"])
+            self.assertIn("ABC: BUY 20 @ 102.10", send.call_args.args[0])
+            self.assertIn("XYZ: trigger not reached", send.call_args.args[0])
+            self.assertNotIn("WAITING FOR DATA", send.call_args.args[0])
+            send.assert_called_once()
+
+    def test_failed_retry_still_reports_earlier_completed_fills(self):
+        first = dict(filled=["ABC: BUY 20 @ 102.10"], waiting=["XYZ: no daily bar yet"], exit_waiting=[])
+        with fake_main() as (db, send, append), \
+             patch.object(R, "evening_execution", side_effect=[first, RuntimeError("provider unavailable")]), \
+             patch.object(R, "REFRESH_RETRIES", 1), patch("time.sleep"):
+            with self.assertRaises(RuntimeError):
+                R.main(["--today", "2026-11-12"])
+            self.assertIn("Paper-forward fills: 1", send.call_args.args[0])
+            self.assertIn("ORDERS WITHHELD", send.call_args.args[0])
+            self.assertFalse(append.called)
 
     def test_fill_respects_portfolio_cap_after_other_scanner_fills(self):
         held = [dict(symbol=f"HELD{i}", status="ACTIVE", entry_price=100.0) for i in range(10)]

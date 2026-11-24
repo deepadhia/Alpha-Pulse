@@ -6,7 +6,7 @@ Kept apart from the decision logic so that logic stays import-light and unit-tes
 
 import html
 import os
-from datetime import datetime, timezone
+from datetime import datetime, time as dtime, timezone
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -64,12 +64,27 @@ def measured_half_spread(symbol: str, day) -> Optional[float]:
     from db import logs_col
     if logs_col is None:
         return None
-    rows = logs_col.find({"scanner": QUOTE_SCANNER, "action": QUOTE_ACTION, "symbol": symbol}).sort("timestamp", -1).limit(MEASURED_SAMPLES)
+    rows = logs_col.find({"scanner": QUOTE_SCANNER, "action": QUOTE_ACTION, "symbol": symbol,
+                          "details.day": {"$lte": str(day)}}).sort("timestamp", -1)
     vals = []
     for r in rows:
         d = r.get("details") or {}
-        if d.get("half_spread_bps") is not None and str(d.get("day", "")) <= str(day):
-            vals.append(float(d["half_spread_bps"]))
+        # Older cron backups audited late quotes before checking the open window.
+        # Filter those persisted samples BEFORE taking the last N valid samples.
+        try:
+            ts = pd.Timestamp(r.get("candle_timestamp") or r.get("timestamp"))
+            ts = ts.tz_localize("UTC") if ts.tzinfo is None else ts
+            ts = ts.tz_convert(X.IST)
+            hs = float(d["half_spread_bps"])
+            if (str(ts.date()) != d.get("day") or str(ts.date()) > str(day)
+                    or not (dtime(9, 15) <= ts.time() <= X.OPEN_WINDOW_END)
+                    or not np.isfinite(hs) or hs < 0):
+                continue
+        except (TypeError, ValueError, KeyError):
+            continue
+        vals.append(hs)
+        if len(vals) == MEASURED_SAMPLES:
+            break
     return float(np.median(vals)) if vals else None
 
 
@@ -150,7 +165,9 @@ def format_exec_lines(rep: dict, when: str) -> List[str]:
 
 
 def format_morning_message(rep: dict, now_ist: datetime) -> str:
-    head = [f"🔔 <b>RESTING FORWARD TEST: open-time execution</b>", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            f"📅 {rep['day']} • quotes {rep.get('quotes', 0)} • {now_ist.strftime('%H:%M IST')}"]
+    head = ["🔔 <b>P RESTING PAPER FORWARD</b>", "", f"Session: {rep['day']}",
+            f"Run time: {now_ist.strftime('%H:%M IST')}", f"Opening quotes: {rep.get('quotes', 0)}"]
+    if rep.get("skipped"):
+        return "\n".join(head + ["", "Status: SKIPPED", html.escape(rep["skipped"])])
     body = format_exec_lines(rep, "best ask after the open")
-    return "\n".join(head + (body or ["", "💤 <i>Nothing to execute at the open.</i>"]) + ["", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"])
+    return "\n".join(head + (body or ["", "💤 <i>Nothing to execute at the open.</i>"]))

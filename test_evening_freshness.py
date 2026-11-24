@@ -68,6 +68,16 @@ class TestCurrentSessionFrom30m(unittest.TestCase):
         self.assertIsNone(frame)
         self.assertFalse(any("/intraday/" in u for u in calls))
 
+    def test_utc_rows_and_aware_target_are_compared_in_exchange_time(self):
+        raw = half_hours("2026-11-11")
+        for row in raw:
+            row[0] = pd.Timestamp(row[0]).tz_convert("UTC").isoformat()
+        frame, err = rf.fetch_upstox_day_from_30m(
+            "X", "k", "t", pd.Timestamp("2026-11-11", tz="Asia/Kolkata"),
+            lambda *a, **k: Resp(200, raw), today=pd.Timestamp("2026-11-11", tz="Asia/Kolkata"))
+        self.assertIsNone(err)
+        self.assertEqual(frame.iloc[0]["CLOSE"], 113)
+
     def test_a_session_still_forming_is_refused(self):
         def get(url, headers=None, timeout=None):
             return Resp(200, half_hours("2026-11-11", n=8)) if "/intraday/" in url else Resp(200, [])

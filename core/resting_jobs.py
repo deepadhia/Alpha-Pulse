@@ -137,10 +137,14 @@ def _open_position(deps: Deps, order: dict, decision: dict, fill_dt: datetime, d
 
 # ------------------------------------------------------------------------------------------------ morning
 def run_morning(deps: Deps, now_ist: datetime) -> dict:
+    now_ist = now_ist.astimezone(X.IST)
     day = now_ist.date()
     rep = dict(day=str(day), skipped=None, filled=[], expired=[], pending=[], waiting=[], sold=[], deferred=[], exit_waiting=[], quotes=0)
     if not deps.is_trading_day(day):
         rep["skipped"] = "not an NSE trading day"
+        return rep
+    if not X._in_open_window(now_ist):
+        rep["skipped"] = "after the 09:45 IST open window; evening settlement will use session data"
         return rep
     placed = [o for o in X.orders_for_day(deps.ledger_col, day) if X.order_state(deps.ledger_col, deps.positions_col, o) == "PLACED"]
     exits = [p for p in pending_exits(deps) if p["_target"] == day]
@@ -149,6 +153,19 @@ def run_morning(deps: Deps, now_ist: datetime) -> dict:
     rep["quotes"] = len(quotes)
     for s, qt in quotes.items():
         deps.audit_quote(s, qt, day)
+    # A completed sale releases capacity for this open's buys. A missing bid or
+    # circuit deferral keeps the slot occupied and the normal cap check applies.
+    for p in exits:
+        sym = p["symbol"]
+        d = X.decide_exit_at_open(quotes.get(sym), now_ist)
+        if d["action"] == "SELL":
+            out = X.settle_exit(deps.positions_col, deps.ledger_append, p, d, day)
+            rep["sold"].append(f"{sym}: SELL @ {d['price']:.2f} (best bid; decision close {out['exit_price_decision']:.2f}; P&L {out['pnl_pct']:+.1f}%)")
+        elif d["action"] == "DEFER":
+            _defer_exit(deps, p, d["reason"])
+            rep["deferred"].append(f"{sym}: {d['reason']}")
+        else:
+            rep["exit_waiting"].append(f"{sym}: {d['reason']}")
     for o in placed:
         sym = o["symbol"]
         d = X.decide_entry_at_open(o, quotes.get(sym), now_ist)
@@ -167,17 +184,6 @@ def run_morning(deps: Deps, now_ist: datetime) -> dict:
             rep["pending"].append(f"{sym}: {d['reason']}")
         else:
             rep["waiting"].append(f"{sym}: {d['reason']}")
-    for p in exits:
-        sym = p["symbol"]
-        d = X.decide_exit_at_open(quotes.get(sym), now_ist)
-        if d["action"] == "SELL":
-            out = X.settle_exit(deps.positions_col, deps.ledger_append, p, d, day)
-            rep["sold"].append(f"{sym}: SELL @ {d['price']:.2f} (best bid; decision close {out['exit_price_decision']:.2f}; P&L {out['pnl_pct']:+.1f}%)")
-        elif d["action"] == "DEFER":
-            _defer_exit(deps, p, d["reason"])
-            rep["deferred"].append(f"{sym}: {d['reason']}")
-        else:
-            rep["exit_waiting"].append(f"{sym}: {d['reason']}")
     return rep
 
 

@@ -219,11 +219,22 @@ def evening_execution(run_day: pd.Timestamp, capital: float, dry_run: bool) -> d
     now_ist = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=5, minutes=30)))
     deps0 = rt.build_deps(SOURCE, token, capital, dry_run=dry_run, now_ist=now_ist)
     needed = rt.symbols_needed(deps0, run_day.date())
-    candles = {s: df for s in needed for df in [rt.daily_from_cache(s)] if df is not None}
+    mapping = get_instrument_key_mapping()
+    candles = {}
+    for s in needed:
+        df = rt.daily_from_cache(s)
+        if (df is None or df.empty) and token:
+            key = mapping.get(s)
+            if key:
+                raw, _ = s3_refresh.fetch_upstox_daily(s, key, token, run_day - pd.Timedelta(days=120), run_day)
+                if raw:
+                    df = s3_refresh.parse_upstox_candles(raw)
+        if df is not None and not df.empty:
+            candles[s] = df
     _frep = None
     if candles:
         candles, _frep = s3_refresh.refresh_candles(candles, set(), needed, s3_refresh.last_complete_date(now_ist, run_day), token,
-                                                     get_instrument_key_mapping(), is_holiday=S3A._is_holiday)
+                                                     mapping, is_holiday=S3A._is_holiday)
     deps = rt.build_deps(SOURCE, token, capital, dry_run=dry_run, now_ist=now_ist, candles=candles)
     report = run_evening(deps, run_day.date())
     if _frep is not None:
@@ -269,16 +280,31 @@ def main(argv=None):
         return
 
     # automatic forward test first: fills and exits settled today change which names are held, so they must precede tomorrow's order list
+    import time
     from core import resting_runtime as rt
-    exec_exc, exec_lines, exec_rep = None, [], {}
-    try:
-        exec_rep = evening_execution(run_day, a.capital, a.dry_run)
-        exec_lines = rt.format_exec_lines(exec_rep, "after the close")
-        if exec_rep.get("waiting") or exec_rep.get("exit_waiting"):
-            raise RuntimeError("settlement has unresolved data or recovery gaps")
-    except Exception as e:
-        exec_exc = e
-        exec_lines += ["", "⚠️ <b>Forward-test settlement FAILED</b>: " + html.escape(f"{type(e).__name__}: {e}")]
+    exec_exc, exec_rep = None, {}
+    completed = {k: [] for k in ("filled", "expired", "sold", "deferred", "day0_stops", "pending", "notes")}
+    retries = 0 if a.dry_run else REFRESH_RETRIES
+    for attempt in range(1 + retries):
+        exec_exc = None
+        try:
+            latest = evening_execution(run_day, a.capital, a.dry_run)
+            # Writes from an earlier partial attempt are idempotent, so a retry's
+            # report omits them. Preserve completed work while replacing waits.
+            for key, items in completed.items():
+                for item in latest.get(key, []):
+                    if item not in items:
+                        items.append(item)
+            exec_rep = dict(latest, **completed)
+            if exec_rep.get("waiting") or exec_rep.get("exit_waiting"):
+                raise RuntimeError("settlement has unresolved data or recovery gaps")
+            break
+        except Exception as e:
+            exec_exc = e
+            if attempt < retries:
+                print(f"[settlement retry {attempt + 1} of {retries} in {REFRESH_RETRY_WAIT_S}s: {e}]")
+                time.sleep(REFRESH_RETRY_WAIT_S)
+    exec_lines = rt.format_exec_lines(exec_rep, "after the close")
     if exec_exc is not None:
         print(f"[settlement failed] {type(exec_exc).__name__}: {exec_exc}")
         for line in exec_rep.get("waiting", []) + exec_rep.get("exit_waiting", []):

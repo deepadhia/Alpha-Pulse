@@ -137,6 +137,33 @@ class TestMorningEntries(unittest.TestCase):
         w = World(orders=[order()], trading=lambda d: False)
         self.assertEqual(run_morning(w.deps, NOW)["skipped"], "not an NSE trading day")
 
+    def test_delayed_backup_does_not_audit_an_evening_quote_as_open_time(self):
+        w = World(orders=[order()], quotes={"ABC": quote(102.0, 101.9, 102.1)})
+        rep = run_morning(w.deps, NOW.replace(hour=19, minute=11))
+        self.assertEqual(w.audits, [], "late quote would contaminate the measured opening spread")
+        self.assertEqual(rep["quotes"], 0)
+        self.assertIn("open window", rep["skipped"])
+        self.assertEqual((w.positions.rows, w.events), ([], []))
+
+    def test_delayed_backup_does_not_call_the_quote_provider(self):
+        w = World(orders=[order()], quotes=RuntimeError("late backup must not fetch quotes"))
+        rep = run_morning(w.deps, NOW.replace(hour=10))
+        self.assertIsNotNone(rep["skipped"])
+
+    def test_open_sale_frees_its_slot_before_an_open_buy_is_checked(self):
+        w = World(orders=[order()], positions=[closed_pos("OLD")], daily={"ABC": history()},
+                  quotes={"ABC": quote(102.0, 101.9, 102.1), "OLD": quote(95.0, 94.9, 95.1)})
+        w.deps.hard_cap = 1
+        rep = run_morning(w.deps, NOW)
+        self.assertEqual((len(rep["sold"]), len(rep["filled"]), rep["expired"]), (1, 1, []))
+
+    def test_deferred_sale_keeps_its_slot_and_prevents_an_open_buy(self):
+        w = World(orders=[order()], positions=[closed_pos("OLD")], daily={"ABC": history()},
+                  quotes={"ABC": quote(102.0, 101.9, 102.1), "OLD": quote(80.0, 0, 0, lc=80.0)})
+        w.deps.hard_cap = 1
+        rep = run_morning(w.deps, NOW)
+        self.assertEqual((len(rep["deferred"]), rep["filled"], len(rep["expired"])), (1, [], 1))
+
 
 def closed_pos(sym="ABC", decision="2026-11-11", entry=100.0, decision_px=96.0, deferred=0):
     return dict(symbol=sym, signal_id=f"RESTING_{sym}_20261110", entry_source="RESTING_AUTOFILL", status="CLOSED", entry_price=entry, exit_price=decision_px,

@@ -632,7 +632,7 @@ An external operational audit (`alpha-pulse-audit.md`, 12 Nov 2026) confirmed si
 
 ---
 
-## 21. STATE AS OF 2026-11-17: refreshed session gap and Telegram clarity (local, uncommitted)
+## 21. STATE AS OF 2026-11-17: refreshed session gap and Telegram clarity (published in a4d07d6)
 
 The owner pasted a P pause alert for 18 Nov: eight names lacked the 17 Nov bar; S3 separately reported Fresh. The P withholding guard is working. A deterministic synthetic regression reproduced a refresh bug: a cache ending Fri 13 Nov receives Mon 16 Nov from the daily endpoint, but the gap check still uses the original Friday date and blocks Tuesday's intraday fallback. The refresh now counts the newly fetched historical sessions and only requests the final completed session when earlier sessions are covered. Genuine missing history and partial sessions remain blocked. This source-level reproduction matches the symptom; production provider responses for the eight names were not inspected.
 
@@ -640,4 +640,16 @@ P failures now use a concise `P ORDERS PAUSED` card with dates, affected symbols
 
 The owner explicitly selected clean vertical cards: stock name first, one field per line, blank space between stocks, no decorative borders. Applied consistently across P orders, paused-order alerts, stop updates, portfolio cards and S3. The real message builders were rendered with synthetic fixture values into a preview under this chat's outputs folder; nothing was sent.
 
-Verified: 374 selected tests passed with isolated/mock services; cached legacy parity EXACT MATCH (203 trades on each side, zero missing/extra/price mismatches). Regression checks reproduce and fix both the refresh and grade-label defects and check the new layout. The standard master-audit CLI requires MongoDB and was not run against production. No `.env`, production database, broker execution or Telegram send was used. These changes are not committed or pushed; the owner controls publication.
+Verified: 374 selected tests passed with isolated/mock services; cached legacy parity EXACT MATCH (203 trades on each side, zero missing/extra/price mismatches). Regression checks reproduce and fix both the refresh and grade-label defects and check the new layout. The standard master-audit CLI requires MongoDB and was not run against production. No `.env`, production database, broker execution or Telegram send was used for this validation. Publication subsequently verified on origin/main at a4d07d6.
+
+## 22. STATE AS OF 2026-11-24: forward execution follow-up
+
+The owner asked to check recent executions, then explicitly asked to address anything needing attention. Earlier authorization to stage and push from the owner's account persists. Git author/committer are Deep Adhia <adhia750@gmail.com>; SSH authenticates as deepadhia.
+
+Read-only GitHub UI checks of the latest trading day, 23 Nov, found the 09:15 morning dispatcher run successful (seven quotes, all seven below trigger), the evening P run successful (the same seven orders expired; seven new orders recorded for 25 Nov), and S3 successful (one paper fill, three expiries, zero waiting). The 24 Nov P run explicitly skipped the exchange holiday. Green status alone must not be called evidence of active execution. Morning cron backups started hours late; the dispatcher runs were timely. No production MongoDB reconciliation or broker-fill validation was performed.
+
+Reproduced and fixed three operational problems: late backups audited evening quotes as opening-spread samples; settlement retries dropped earlier completed fills from the final message; buys were checked against capacity before same-open sales released slots. The morning job now skips after its existing 09:45 cutoff before quote fetch/audit, and spread measurement filters old invalid/late/future samples before taking five valid samples. Successful sales precede buys; deferred sales retain capacity. Partial retry completions are accumulated and resolved waits disappear. The skip is explicit in the console without overwriting the good morning heartbeat or sending duplicate Telegram messages.
+
+Reviewed all three pre-existing unpublished edits. Retained cache bootstrap (including empty caches), bounded settlement retries and IST candle matching. Reverted the unsupported extra-day daily request (official Upstox docs say inclusive dates), redundant cross-endpoint fallbacks and the production TESTING timing switch. Existing past/current endpoint separation and freshness guards remain covered by regression tests. `test_s3_refresh.py` returns to its committed inclusive-date assertion and has no remaining diff.
+
+Validation: 385 selected tests passed with mocked services, including the required core suite. Cached legacy parity returned EXACT MATCH: 203 trades on each side, zero missing/extra/P&L mismatches (858 symbols, 871 listing records). No `.env`, production database, broker action or Telegram send was used for validation. The next scheduled market run remains unverified. Milestone, resting execution and S3 rule versions are unchanged; formulas and thresholds are unchanged. Operational corrections can affect future fill selection and spread inputs, so do not retrospectively alter earlier forward records. GitHub cron scheduling latency remains external; Cloudflare dispatch stays primary.

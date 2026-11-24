@@ -130,6 +130,7 @@ def fetch_upstox_daily(symbol: str, key: str, token: str, start, end, http_get: 
     """(raw candles list, None) or (None, reason).  One retry after a 429."""
     import requests
     http_get = http_get or requests.get
+    # Upstox documents both date boundaries as inclusive.
     url = UPSTOX_URL.format(key=key, to=pd.Timestamp(end).strftime("%Y-%m-%d"), frm=pd.Timestamp(start).strftime("%Y-%m-%d"))
     headers = {"Accept": "application/json", "Api-Version": "2.0", "Authorization": f"Bearer {token}"}
     try:
@@ -175,11 +176,11 @@ def _get_candles(url: str, token: str, http_get: Callable, sleep: Callable):
 def _session_from_30m_rows(raw, day: pd.Timestamp):
     """(daily frame, None) or (None, reason) from raw 30-minute rows of `day`; refuses an incomplete session (never a guessed bar)."""
     rows = []
+    day = session_date(day)
     for c in raw or []:
         try:
-            ts = pd.Timestamp(c[0])
-            ts = ts.tz_localize(None) if ts.tzinfo else ts
-            if ts.normalize() == day:
+            ts = ist_naive(c[0])
+            if session_date(ts) == day:
                 rows.append((ts, float(c[1]), float(c[2]), float(c[3]), float(c[4]), float(c[5])))
         except (TypeError, ValueError, IndexError):
             continue
@@ -201,10 +202,10 @@ def fetch_upstox_day_from_30m(symbol: str, key: str, token: str, day, http_get: 
     """
     import requests
     http_get = http_get or requests.get
-    day = pd.Timestamp(day).normalize()
-    today = pd.Timestamp(today).normalize() if today is not None else ist_today()
+    day = session_date(day)
+    today = session_date(today) if today is not None else session_date(ist_today())
     if day == today:
-        urls = [INTRADAY_TODAY_URL.format(key=key)]          # the historical URL is known to be empty for the current session: do not spend a call on it
+        urls = [INTRADAY_TODAY_URL.format(key=key)]
     else:
         urls = [INTRADAY_URL.format(key=key, day=day.strftime("%Y-%m-%d"))]
     reason = "30m no data"
