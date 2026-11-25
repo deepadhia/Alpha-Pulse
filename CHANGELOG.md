@@ -4,6 +4,14 @@ All notable changes, quantitative safeguards, and alerting architecture updates 
 
 ---
 
+## [v3.8.10-patch] - 2026-11-25: exit cards identify book and settlement status
+
+* Exit-decision alerts and recent exits share `core/exit_alerts.py`: stock name first, one field per line, no decorative borders. Escape dynamic reason/outcome text.
+* Automatic P forward exits identify their separate paper book. Unsettled records show provisional P&L and awaiting-next-open status; settled paper exits distinguish opening-quote pricing from modelled pricing and remain explicitly broker-unverified. Scanner and shelf records do not claim a verified broker sale. The stop-job alert is explicitly an exit decision, not a completed sale.
+* No stored record, trading threshold, exit calculation, sizing rule or rule version changed. Validation: 149 selected tests passed, then all seven exit-card tests passed after adding an integration check of the actual scanner alert and portfolio functions (150 distinct tests total). No production database access, `.env` access or Telegram sends were used for validation. Today's GitHub logs remain unverified because browser control stopped on URL identification.
+
+---
+
 ## [v3.8.9-patch] - 2026-11-24: guard delayed morning backups; preserve partial settlement reports; release sold slots before buys
 
 * **Delayed morning backups.** Recent GitHub cron backups started after market close while the dispatcher-triggered runs started near 09:15 IST. `run_morning` now checks the existing 09:45 cutoff before fetching or auditing quotes. A late invocation prints `Status: SKIPPED` and leaves session-data settlement to the evening job. It does not overwrite the successful morning heartbeat or send a redundant Telegram alert. The spread reader also excludes previously stored late, future, invalid or wrong-session samples before selecting its five valid opening samples. No historical audit rows or fills are rewritten.

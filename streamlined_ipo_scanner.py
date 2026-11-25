@@ -1059,7 +1059,7 @@ def format_signal_alert(symbol, grade, entry_price, stop_loss, target_price, sco
 ⚡ <i>AlphaPulse v{SCANNER_VERSION} • {date_str}</i>"""
     return msg
 
-def format_exit_alert(symbol, exit_reason, exit_price, pnl_pct, days_held, entry_price, outcome_type=None, peak_runup=None, is_paper=False):
+def format_exit_alert(symbol, exit_reason, exit_price, pnl_pct, days_held, entry_price, outcome_type=None, peak_runup=None, is_paper=False, position=None):
     """Format clean, institutional exit alert with broker-grade P&L colors and integrated outcome telemetry"""
     from utils import escape_html_text
     
@@ -1089,36 +1089,16 @@ def format_exit_alert(symbol, exit_reason, exit_price, pnl_pct, days_held, entry
         clean_reason = r.split("(")[0].strip() if "(" in r else r
         emoji = "📊"
 
-    clean_sym = escape_html_text(symbol)
-    pnl_abs = exit_price - entry_price
-    if pnl_pct > 0:
-        pnl_badge = f"🟢 <b>+{pnl_pct:.2f}%</b> (▲ +₹{pnl_abs:,.2f}/sh)"
-    elif pnl_pct < 0:
-        pnl_badge = f"🔴 <b>{pnl_pct:.2f}%</b> (▼ ₹{pnl_abs:,.2f}/sh)"
-    else:
-        pnl_badge = f"⚪ <b>0.00%</b> (₹0.00/sh)"
-    
-    paper_prefix = "⚠️ <b>[PAPER ONLY EXIT]</b>\n" if is_paper else ""
-    header_title = f"{emoji} <b>AlphaPulse | POSITION CLOSED</b>"
-    
-    outcome_line = ""
-    if outcome_type:
-        outcome_disp = outcome_type.replace("_", " ").title()
-        peak_str = f" (Peak: +{peak_runup:.1f}%)" if peak_runup is not None else ""
-        outcome_line = f"\n🎯 <b>Outcome:</b> {outcome_disp}{peak_str}"
+    from core.exit_alerts import format_exit_card
+    record = dict(position or {})
+    record.update(symbol=symbol, exit_reason=clean_reason, exit_price=exit_price,
+                  pnl_pct=pnl_pct, days_held=days_held, entry_price=entry_price,
+                  outcome_type=outcome_type, max_runup_pct=peak_runup)
+    if is_paper:
+        record["status"] = "PAPER_CLOSED"
+    return ("<b>AlphaPulse | EXIT DECISION</b>\n\n" + format_exit_card(record, clean_reason)
+            + f"\n\nAlphaPulse v{SCANNER_VERSION}\n{_now_ist().strftime('%d %b %Y, %H:%M IST')}")
 
-    days_held_int = int(float(days_held))
-    days_str = f"{days_held_int} day{'s' if days_held_int != 1 else ''}"
-
-    msg = f"""{paper_prefix}{header_title}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 <b>{clean_sym}</b> ({days_str} held)
-{pnl_badge} │ ₹{entry_price:,.2f} → <b>₹{exit_price:,.2f}</b>
-
-📋 <b>Exit:</b> {clean_reason}{outcome_line}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ <i>AlphaPulse v{SCANNER_VERSION} • {_now_ist().strftime('%d %b %Y, %H:%M IST')}</i>"""
-    return msg
 
 
 def close_active_signal(symbol, exit_price, pnl_pct, days_held, exit_reason):
@@ -4121,20 +4101,8 @@ def format_alphapulse_portfolio_report():
     closed_positions.sort(key=get_exit_sort_key, reverse=True)
     recent_exits = closed_positions[:4]
 
-    exit_lines = []
-    for p in recent_exits:
-        sym = escape_html_text(p.get('symbol'))
-        pnl = float(p.get('pnl_pct') or 0.0)
-        reason = escape_html_text(clean_exit_reason(p.get('exit_reason')))
-        pnl_c = '🟢' if pnl >= 0 else '🔴'
-        pnl_s = '+' if pnl >= 0 else ''
-        days = int(float(p.get('days_held') or 0))
-        exit_lines.append(
-            f"<b>{sym}</b>\n"
-            f"Held: {days} day{'s' if days != 1 else ''}\n"
-            f"Outcome: {pnl_s}{pnl:.1f}%\n"
-            f"Reason: {reason}"
-        )
+    from core.exit_alerts import format_exit_card
+    exit_lines = [format_exit_card(p, clean_exit_reason(p.get('exit_reason'))) for p in recent_exits]
 
     report = f"""<b>DAILY PORTFOLIO &amp; RISK REPORT</b>
 
@@ -4738,7 +4706,8 @@ def stop_loss_update_scan():
                     is_paper_trade = (pos["status"] == "PAPER_ONLY")
                     exit_msg = format_exit_alert(
                         sym, exit_reason, current_price, pnl, days_held, entry_price,
-                        outcome_type=outcome_type, peak_runup=new_max_runup, is_paper=is_paper_trade
+                        outcome_type=outcome_type, peak_runup=new_max_runup, is_paper=is_paper_trade,
+                        position=dict(pos, exit_settled=False)
                     )
                     send_telegram(exit_msg)
 
